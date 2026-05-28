@@ -1,4 +1,8 @@
 {
+   "ts-node": {
+        // Do not forget to `npm i -D tsconfig-paths`
+        "require": ["tsconfig-paths/register"]
+    },
   "compilerOptions": {
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
@@ -19,7 +23,7 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@*": ["./src/*"]
     }
   },
   "include": [
@@ -28,7 +32,9 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    "drizzle.config.ts",
+     "app/**/***/**.ts"
   ],
   "exclude": ["node_modules"]
 }
