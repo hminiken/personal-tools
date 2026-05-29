@@ -14,10 +14,24 @@ import {
   IconCategory
 } from '@tabler/icons-react';
 
+
 export default function NavigationShell({ children }: { children: React.ReactNode }) {
   // Start the sidebar closed by default
   const [opened, { toggle, close }] = useDisclosure(false);
   const pathname = usePathname();
+
+  const getPageTitle = () => {
+    // If the URL is exactly the root, or maybe a dashboard
+    if (pathname === '/') return 'Command Center';
+    
+    // We use .includes() so that both the gallery (/patterns) 
+    // AND the individual item (/patterns/1) show the correct category!
+    if (pathname.includes('/crafting/patterns')) return 'Pattern Library';
+    if (pathname.includes('/crafting/projects')) return 'Active Projects';
+    if (pathname.includes('/crafting/inventory')) return 'Yarn Stash'; // Just in case you add this later!
+    
+    return 'Command Center'; // A safe fallback
+  };
 
   return (
     <AppShell
@@ -28,15 +42,15 @@ export default function NavigationShell({ children }: { children: React.ReactNod
         // This forces the sidebar to hide on ALL screen sizes when closed
         collapsed: { desktop: !opened, mobile: !opened } 
       }}
-      padding="md"
+      padding={40}
     >
-      <AppShell.Header>
+      <AppShell.Header bg="olive.8" >
         <Group h="100%" px="md">
           {/* Show the burger menu only when the sidebar is hidden */}
           {!opened && (
             <Burger opened={opened} onClick={toggle} size="sm" />
           )}
-          <Title order={3}>Command Center</Title>
+          <Title order={3} c='olive.0'>{getPageTitle()}</Title>
         </Group>
       </AppShell.Header>
 
@@ -44,7 +58,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
         {/* TOP BAR OF THE SIDEBAR (Logo and Close Button) */}
         <AppShell.Section>
           <Group justify="space-between" p="md">
-            <IconCategory size={28} stroke={1.5} color="var(--mantine-color-blue-filled)" />
+            <IconCategory size={28} stroke={1.5} color="olive" />
             <ActionIcon onClick={close} variant="subtle" color="gray">
               <IconChevronLeft size={20} />
             </ActionIcon>

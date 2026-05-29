@@ -1,3 +1,10 @@
+'use server'
+import { db } from "@db";
+import { images, patterns } from "@db/schema";
+import { eq } from "drizzle-orm";
+import { writeFile } from "fs";
+import { revalidatePath } from "next/cache";
+import path from "path";
 
 export async function uploadProjectImage(formData: FormData) {
   const projectId = Number(formData.get('projectId'));

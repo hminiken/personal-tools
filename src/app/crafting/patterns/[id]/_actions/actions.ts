@@ -25,17 +25,25 @@ export async function getPatternById(id: number) {
 
 
 export async function spawnProject(formData: FormData) {
-  const patternId = Number(formData.get('patternId'));
+ const patternId = Number(formData.get('patternId'));
   const title = formData.get('title') as string;
   const yarnUsed = formData.get('yarnUsed') as string;
   const colors = formData.get('colors') as string;
+  const hookSizes = formData.get('hookSizes') as string;
+  const yarnWeights = formData.get('yarnWeights') as string;
 
-  // Insert the new project
+  // Grab the master pattern to copy its text
+  const masterPattern = await db.select().from(patterns).where(eq(patterns.id, patternId)).get();
+
+  // Insert the new project WITH the cloned text
   const newProject = await db.insert(projects).values({
     patternId,
     title,
     yarnUsed,
     colors,
+    hookSizes,
+    yarnWeights,
+    annotatedPattern: masterPattern?.patternText || '', // The magic clone!
   }).returning();
 
   const projectId = newProject[0].id;
@@ -58,33 +66,48 @@ export async function spawnProject(formData: FormData) {
   redirect(`/crafting/projects/${projectId}`);
 }
 
+// 1. The Text & Metadata Update Action
 export async function updatePattern(formData: FormData) {
   const patternId = Number(formData.get('patternId'));
   
-  // 1. Build a payload of ONLY the text fields that were actually submitted
-  // formData.has() checks if the field exists in the form at all
-  const textUpdates: any = {};
+  // Extract Metadata
+  const title = formData.get('title') as string;
+  const hookSizes = formData.get('hookSizes') as string;
+  const yarnWeights = formData.get('yarnWeights') as string;
+  const yarnYardage = formData.get('yarnYardage') ? Number(formData.get('yarnYardage')) : null;
+  const sourceUrl = formData.get('sourceUrl') as string;
+
+  // Extract Rich Text
+  const patternText = formData.get('patternText') as string;
+  const materials = formData.get('materials') as string;
+  const abbreviations = formData.get('abbreviations') as string;
+  const sizing = formData.get('sizing') as string;
+  const patternNotes = formData.get('patternNotes') as string;
+
+  // Save to Database
+  await db
+    .update(patterns)
+    .set({ 
+      title, hookSizes, yarnWeights, yarnYardage, sourceUrl, 
+      patternText, materials, abbreviations, sizing, patternNotes 
+    })
+    .where(eq(patterns.id, patternId));
+
+  revalidatePath(`/crafting/patterns/${patternId}`);
+  revalidatePath(`/crafting/patterns`); 
+}
+
+// 2. The Image Upload Action
+export async function uploadPatternImage(formData: FormData) {
+  const patternId = Number(formData.get('patternId'));
+  const imageFile = formData.get('image') as File | null;
   
-  if (formData.has('patternText')) textUpdates.patternText = formData.get('patternText');
-  if (formData.has('materials')) textUpdates.materials = formData.get('materials');
-  if (formData.has('abbreviations')) textUpdates.abbreviations = formData.get('abbreviations');
-  if (formData.has('sizing')) textUpdates.sizing = formData.get('sizing');
-  if (formData.has('patternNotes')) textUpdates.patternNotes = formData.get('patternNotes');
-
-  // 2. Only run the text update if we actually received text fields
-  if (Object.keys(textUpdates).length > 0) {
-    await db
-      .update(patterns)
-      .set(textUpdates)
-      .where(eq(patterns.id, patternId));
-  }
-
-  // 3. Handle the Image Upload (This stays exactly the same)
- const imageFile = formData.get('image') as File | null;
   if (imageFile && imageFile.size > 0) {
     const buffer = Buffer.from(await imageFile.arrayBuffer());
     const filename = `${Date.now()}-${imageFile.name.replaceAll(' ', '_')}`;
     const filepath = path.join(process.cwd(), 'public/uploads', filename);
+    
+    // Note: Make sure 'fs/promises' and 'path' are imported at the top of your file!
     await writeFile(filepath, buffer);
 
     const newImagePath = `/uploads/${filename}`;
@@ -94,16 +117,11 @@ export async function updatePattern(formData: FormData) {
       isInline: false,
     });
 
-    // Check if pattern already has a cover. If not, make this the cover!
+    // Auto-set as cover if none exists
     const currentPattern = await db.select().from(patterns).where(eq(patterns.id, patternId)).get();
     if (!currentPattern?.coverImagePath) {
       await db.update(patterns).set({ coverImagePath: newImagePath }).where(eq(patterns.id, patternId));
     }
   }
-
   revalidatePath(`/crafting/patterns/${patternId}`);
-  revalidatePath(`/crafting/patterns`);
 }
-
-
-

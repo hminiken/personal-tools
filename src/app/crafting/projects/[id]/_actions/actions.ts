@@ -46,13 +46,57 @@ export async function updateProject(formData: FormData) {
   const title = formData.get('title') as string;
   const yarnUsed = formData.get('yarnUsed') as string;
   const colors = formData.get('colors') as string;
+  const hookSizes = formData.get('hookSizes') as string;
+  const yarnWeights = formData.get('yarnWeights') as string;
   const projectNotes = formData.get('projectNotes') as string;
+  const annotatedPattern = formData.get('annotatedPattern') as string; // Catch the edits
 
   await db
     .update(projects)
-    .set({ title, yarnUsed, colors, projectNotes })
+    .set({ title, yarnUsed, colors, hookSizes, yarnWeights, projectNotes, annotatedPattern })
     .where(eq(projects.id, projectId));
 
-  // Refresh the specific project page
+  revalidatePath(`/crafting/projects/${projectId}`);
+}
+
+
+export async function setProjectCoverImage(projectId: number, imagePath: string) {
+  await db
+    .update(projects)
+    .set({ coverImagePath: imagePath })
+    .where(eq(projects.id, projectId));
+    
+  revalidatePath(`/crafting/projects/${projectId}`);
+  revalidatePath(`/crafting/projects`); // Optional: If you build a Projects Gallery later!
+}
+
+
+
+export async function addQuickNote(projectId: number, newNote: string) {
+  // 1. Get the current notes
+  const project = await db.select({ notes: projects.projectNotes })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .get();
+
+  // 2. Append the new note with a timestamp
+const timestamp = new Date().toLocaleDateString('en-US', {
+  year: '2-digit',
+  month: 'numeric',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true
+}).replace(',', '').toLowerCase();
+
+const formattedNote = `<p><strong>[${timestamp}]</strong> ${newNote}</p>`;
+const updatedNotes = (project?.notes || '') + formattedNote;
+
+
+  // 3. Save
+  await db.update(projects)
+    .set({ projectNotes: updatedNotes })
+    .where(eq(projects.id, projectId));
+
   revalidatePath(`/crafting/projects/${projectId}`);
 }
