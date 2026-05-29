@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  crafting-app:
+    build: .
+    container_name: crafting-nextjs
+    restart: unless-stopped
+    expose:
+      - "3000"
+    networks:
+      - proxy-network
+
+networks:
+  proxy-network:
+    external: true
