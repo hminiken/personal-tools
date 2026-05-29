@@ -44,6 +44,7 @@ export async function saveRulerPosition(projectId: number, yPosition: number) {
 export async function updateProject(formData: FormData) {
   const projectId = Number(formData.get('projectId'));
   const title = formData.get('title') as string;
+  const sourceUrl = formData.get('sourceUrl') as string;
   const yarnUsed = formData.get('yarnUsed') as string;
   const colors = formData.get('colors') as string;
   const hookSizes = formData.get('hookSizes') as string;
@@ -53,7 +54,7 @@ export async function updateProject(formData: FormData) {
 
   await db
     .update(projects)
-    .set({ title, yarnUsed, colors, hookSizes, yarnWeights, projectNotes, annotatedPattern })
+    .set({ title, yarnUsed, colors, hookSizes, yarnWeights, projectNotes, annotatedPattern, sourceUrl })
     .where(eq(projects.id, projectId));
 
   revalidatePath(`/crafting/projects/${projectId}`);

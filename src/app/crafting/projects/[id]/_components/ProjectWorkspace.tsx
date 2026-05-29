@@ -77,26 +77,26 @@ export default function ProjectWorkspace({ project, pattern, images }: { project
 
 
 
-const handleUpdateStatus = async (newStatus: string) => {
-    // 1. Store the previous status in case we need to roll back
-    const previousStatus = status ?? project.status ?? '';
+    const handleUpdateStatus = async (newStatus: string) => {
+        // 1. Store the previous status in case we need to roll back
+        const previousStatus = status ?? project.status ?? '';
 
-    // 2. Optimistic Update: Set the UI state immediately
-    setStatus(newStatus);
+        // 2. Optimistic Update: Set the UI state immediately
+        setStatus(newStatus);
 
-    // 3. Call the server
-    try {
-        const result = await updateProjectStatus(project.id, newStatus);
-        
-        if (!result.success) {
-            throw new Error('Database update failed');
+        // 3. Call the server
+        try {
+            const result = await updateProjectStatus(project.id, newStatus);
+
+            if (!result.success) {
+                throw new Error('Database update failed');
+            }
+        } catch {
+            // 4. Rollback on error
+            setStatus(previousStatus);
+            alert('Failed to save status. Reverting...');
         }
-    } catch  {
-        // 4. Rollback on error
-        setStatus(previousStatus);
-        alert('Failed to save status. Reverting...');
-    }
-};
+    };
 
     return (
         <Paper p={{ base: 'xs', sm: 'xl' }} radius="md">
@@ -134,6 +134,7 @@ const handleUpdateStatus = async (newStatus: string) => {
                         /* RESTORED: The form inputs for editing! */
                         <Stack style={{ flexGrow: 1 }}>
                             <TextInput name="title" label="Project Name" defaultValue={project.title} required />
+                            <TextInput name="sourceUrl" label="sourceUrl" defaultValue={project.sourceUrl ?? ''} required />
                             <Group grow>
                                 <TextInput name="yarnUsed" label="Yarn Brand/Line" defaultValue={project.yarnUsed || ''} />
                                 <TextInput name="colors" label="Colors" defaultValue={project.colors || ''} />
@@ -147,12 +148,12 @@ const handleUpdateStatus = async (newStatus: string) => {
                     ) : (
                         <Box>
                             <Group>
-                            <Title order={2}>{project.title}</Title>
-                             <Anchor fw={500} href={project.sourceUrl ?? ''} ml={4}  target="_blank" 
-                                                                rel="noopener noreferrer">
-                                                              <IconExternalLink />
-                                                            </Anchor>
-                                                        </Group>
+                                <Title order={2}>{project.title}</Title>
+                                <Anchor fw={500} href={project.sourceUrl ?? ''} ml={4} target="_blank"
+                                    rel="noopener noreferrer">
+                                    <IconExternalLink />
+                                </Anchor>
+                            </Group>
                             <Text c="dimmed" size="sm">Based on:
                                 <Anchor fw={500} href={`/crafting/patterns/${pattern.id}`} ml={4}>
                                     {pattern.title}
