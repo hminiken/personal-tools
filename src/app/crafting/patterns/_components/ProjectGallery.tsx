@@ -20,9 +20,10 @@ export default function ProjectGallery({ initialProjects }: { initialProjects: P
       // Inject the Project-specific badges
       renderBadges={(project) => (
         <Group gap="xs" mb="md">
-          {project.yarnUsed && <Badge color="violet" variant="light">{project.yarnUsed}</Badge>}
-          {project.hookSizes && <Badge color="blue" variant="outline">{project.hookSizes}</Badge>}
-          {project.yarnWeights && <Badge color="grape" variant="outline">{project.yarnWeights}</Badge>}
+          {project.status && <Badge color="mustard" variant="light">{project.status}</Badge>}
+          {project.yarnUsed && <Badge color="mustard" variant="outline">{project.yarnUsed}</Badge>}
+          {project.hookSizes && <Badge color="rust" variant="outline">{project.hookSizes}</Badge>}
+          {project.yarnWeights && <Badge color="olive" variant="outline">{project.yarnWeights}</Badge>}
         </Group>
       )}
       

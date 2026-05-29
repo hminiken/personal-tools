@@ -100,3 +100,18 @@ const updatedNotes = (project?.notes || '') + formattedNote;
 
   revalidatePath(`/crafting/projects/${projectId}`);
 }
+
+
+export async function updateProjectStatus(projectId: number, status: string ) {
+    try {
+    await db
+      .update(projects)
+      .set({ status: status })
+      .where(eq(projects.id, projectId));
+      
+    return { success: true };
+  } catch (error) {
+    console.error('Database update failed:', error);
+    return { success: false, error: 'Failed to update database' };
+  }
+}

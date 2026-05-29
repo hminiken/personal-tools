@@ -125,3 +125,19 @@ export async function uploadPatternImage(formData: FormData) {
   }
   revalidatePath(`/crafting/patterns/${patternId}`);
 }
+
+
+
+export async function updatePatternStatus(patternId: number, status: string ) {
+    try {
+    await db
+      .update(patterns)
+      .set({ status: status })
+      .where(eq(patterns.id, patternId));
+      
+    return { success: true };
+  } catch (error) {
+    console.error('Database update failed:', error);
+    return { success: false, error: 'Failed to update database' };
+  }
+}

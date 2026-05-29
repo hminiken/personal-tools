@@ -20,11 +20,10 @@ export default function PatternGallery({ initialPatterns }: { initialPatterns: P
       // 1. Inject the Pattern-specific badges
       renderBadges={(pattern) => (
         <Group gap="xs" mb="md">
-          {pattern.hookSize && <Badge color="blue" variant="light">{pattern.hookSize}</Badge>}
-          {pattern.yarnWeight && <Badge color="grape" variant="light">{pattern.yarnWeight}</Badge>}
-          {!pattern.hookSize && !pattern.yarnWeight && (
-            <Badge color="gray" variant="light">Draft</Badge>
-          )}
+          {pattern.hookSizes && <Badge color="mustard" variant="light">{pattern.hookSizes}</Badge>}
+          {pattern.yarnWeights && <Badge color="rust" variant="light">{pattern.yarnWeights}</Badge>}
+          {pattern.status && <Badge color="olive" variant="light">{pattern.status}</Badge>}
+        
         </Group>
       )}
 

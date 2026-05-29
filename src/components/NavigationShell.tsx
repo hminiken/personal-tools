@@ -1,7 +1,7 @@
 // src/components/NavigationShell.tsx
 'use client';
 
-import { AppShell, Burger, Group, NavLink, Title, ActionIcon, ScrollArea } from '@mantine/core';
+import { AppShell, Burger, Group, NavLink, Title, ActionIcon, ScrollArea, useComputedColorScheme, useMantineColorScheme, Tooltip } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -11,14 +11,21 @@ import {
   IconHome,
   IconCurrencyDollar,
   IconChevronLeft,
-  IconCategory
+  IconCategory,
+  IconMoon,
+  IconSun,
+  IconCoffee
 } from '@tabler/icons-react';
+import { useWakeLock } from '@hooks/useWakeLock';
 
 
 export default function NavigationShell({ children }: { children: React.ReactNode }) {
   // Start the sidebar closed by default
   const [opened, { toggle, close }] = useDisclosure(false);
   const pathname = usePathname();
+
+  const { setColorScheme } = useMantineColorScheme();
+  const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
 
   const getPageTitle = () => {
     // If the URL is exactly the root, or maybe a dashboard
@@ -33,6 +40,9 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     return 'Command Center'; // A safe fallback
   };
 
+
+  const { isAwake, setIsAwake, isSupported } = useWakeLock();
+
   return (
     <AppShell
       header={{ height: 60 }}
@@ -44,13 +54,41 @@ export default function NavigationShell({ children }: { children: React.ReactNod
       }}
       padding={40}
     >
-      <AppShell.Header bg="olive.8" >
-        <Group h="100%" px="md">
-          {/* Show the burger menu only when the sidebar is hidden */}
-          {!opened && (
-            <Burger opened={opened} onClick={toggle} size="sm" />
-          )}
-          <Title order={3} c='olive.0'>{getPageTitle()}</Title>
+     <AppShell.Header bg={"olive.8"}>
+        <Group h="100%" px="md" justify="space-between">
+          <Group>
+            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+            <Title c={"neutrals.1"} order={3}>{getPageTitle()}</Title>
+          </Group>
+          
+          <Group>
+            {/* 3. Add the Keep Awake Toggle (Only renders if the browser supports it) */}
+            {isSupported && (
+              <Tooltip label={isAwake ? "Allow screen to sleep" : "Keep screen awake"} withArrow>
+                <ActionIcon
+                  onClick={() => setIsAwake(!isAwake)}
+                  variant={isAwake ? "light" : "default"}
+                  color={isAwake ? "orange" : "gray"}
+                  size="lg"
+                  aria-label="Toggle screen wake lock"
+                >
+                  <IconCoffee stroke={1.5} />
+                </ActionIcon>
+              </Tooltip>
+            )}
+
+            {/* Your Dark Mode Toggle */}
+            <ActionIcon
+              onClick={() => setColorScheme(computedColorScheme === 'light' ? 'dark' : 'light')}
+              variant="default"
+              size="lg"
+              aria-label="Toggle color scheme"
+            >
+              <IconSun stroke={1.5} className="mantine-light-hidden" />
+              <IconMoon stroke={1.5} className="mantine-dark-hidden" />
+            </ActionIcon>
+          </Group>
+          
         </Group>
       </AppShell.Header>
 
@@ -121,7 +159,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
         </AppShell.Section>
       </AppShell.Navbar>
 
-      <AppShell.Main>
+      <AppShell.Main p={{ base: '0', sm: 'xl' }}>
         {children}
       </AppShell.Main>
     </AppShell>

@@ -21,3 +21,8 @@ export async function createNewPattern(formData: FormData) {
   // Redirect instantly to the new pattern's edit page
   redirect(`/crafting/patterns/${newPattern[0].id}`);
 }
+
+
+
+
+
