@@ -2,7 +2,7 @@
 import { db } from "@db";
 import { images, patterns } from "@db/schema";
 import { eq } from "drizzle-orm";
-import { writeFile } from "fs";
+import { writeFile } from 'fs/promises';
 import { revalidatePath } from "next/cache";
 import path from "path";
 

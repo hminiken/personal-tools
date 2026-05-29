@@ -38,6 +38,8 @@ export const images = sqliteTable('images', {
 
 export const projects = sqliteTable('projects', {
   id: integer('id').primaryKey({ autoIncrement: true }),
+  sourceUrl: text('source_url'), // <-- ADD THIS LINE
+
   patternId: integer('pattern_id').references(() => patterns.id).notNull(),
   title: text('title').notNull(),
   yarnUsed: text('yarn_used'),

@@ -13,7 +13,7 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { spawnProject, updatePattern, updatePatternStatus, uploadPatternImage } from '../_actions/actions';
 import Link from 'next/link';
-import { IconArrowLeft, IconNeedleThread, IconPlus } from '@tabler/icons-react';
+import { IconArrowLeft, IconExternalLink, IconLink, IconNeedleThread, IconPlus } from '@tabler/icons-react';
 // Tiptap Imports
 import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -102,10 +102,10 @@ const handleUpdateStatus = async (newStatus: string) => {
 
                 // Preserve the rich text so the server doesn't wipe it!
 
-                await updateProject(formData);
+                await updatePattern(formData);
                 setIsEditingDetails(false);
             }}>
-                <input type="hidden" name="projectId" value={pattern.id} />
+                <input type="hidden" name="patternId" value={pattern.id} />
 
                 {/* 1. Header Row */}
                 <Group justify="space-between" align="flex-start" mb="sm">
@@ -113,6 +113,7 @@ const handleUpdateStatus = async (newStatus: string) => {
                         /* RESTORED: The form inputs for editing! */
                         <Stack style={{ flexGrow: 1 }}>
                             <TextInput name="title" label="Project Name" defaultValue={pattern.title} required />
+                            <TextInput name="sourceUrl" label="SourceUrl" defaultValue={pattern.sourceUrl ?? ''}  />
                             <Group grow>
                                 {/* <TextInput name="yarnUsed" label="Yarn Brand/Line" defaultValue={pattern.yarnUsed || ''} /> */}
                                 {/* <TextInput name="colors" label="Colors" defaultValue={pattern.colors || ''} /> */}
@@ -125,8 +126,13 @@ const handleUpdateStatus = async (newStatus: string) => {
                         </Stack>
                     ) : (
                         <Box>
+                          <Group>
                             <Title order={2}>{pattern.title}</Title>
-                           
+                                <Anchor fw={500} href={pattern.sourceUrl ?? ''} ml={4}  target="_blank" 
+                                    rel="noopener noreferrer">
+                                  <IconExternalLink />
+                                </Anchor>
+                           </Group>
                         </Box>
                     )}
 
@@ -154,6 +160,7 @@ const handleUpdateStatus = async (newStatus: string) => {
                             <Button variant="outline" onClick={() => setIsEditingDetails(!isEditingDetails)}>
                                 {isEditingDetails ? 'Cancel' : 'Edit Details'}
                             </Button>
+                            <Button onClick={openProject}>Start New Project</Button>
                         </Group>
 
                         {isEditingDetails && (
@@ -187,6 +194,7 @@ const handleUpdateStatus = async (newStatus: string) => {
         formData.set('patternNotes', notesEditor?.getHTML() || '');
         // Preserve metadata
         formData.set('title', pattern.title);
+        formData.set('sourceUrl', pattern.sourceUrl ?? '');
         formData.set('hookSizes', hookTags.join(','));
         formData.set('yarnWeights', weightTags.join(','));
         await updatePattern(formData);

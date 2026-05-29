@@ -7,7 +7,7 @@ import {
     Anchor, TagsInput,
     Modal
 } from '@mantine/core';
-import { IconArrowLeft, IconNeedleThread, IconPlus } from '@tabler/icons-react';
+import { IconArrowLeft, IconExternalLink, IconNeedleThread, IconPlus } from '@tabler/icons-react';
 import { saveRulerPosition, setProjectCoverImage, updateProject, updateProjectStatus } from '../_actions/actions';
 import { useDisclosure } from '@mantine/hooks';
 import { addQuickNote } from '../_actions/actions';
@@ -146,7 +146,13 @@ const handleUpdateStatus = async (newStatus: string) => {
                         </Stack>
                     ) : (
                         <Box>
+                            <Group>
                             <Title order={2}>{project.title}</Title>
+                             <Anchor fw={500} href={project.sourceUrl ?? ''} ml={4}  target="_blank" 
+                                                                rel="noopener noreferrer">
+                                                              <IconExternalLink />
+                                                            </Anchor>
+                                                        </Group>
                             <Text c="dimmed" size="sm">Based on:
                                 <Anchor fw={500} href={`/crafting/patterns/${pattern.id}`} ml={4}>
                                     {pattern.title}

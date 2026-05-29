@@ -28,6 +28,7 @@ export async function spawnProject(formData: FormData) {
  const patternId = Number(formData.get('patternId'));
   const title = formData.get('title') as string;
   const yarnUsed = formData.get('yarnUsed') as string;
+  const sourceUrl = formData.get('sourceUrl') as string;
   const colors = formData.get('colors') as string;
   const hookSizes = formData.get('hookSizes') as string;
   const yarnWeights = formData.get('yarnWeights') as string;
@@ -43,6 +44,7 @@ export async function spawnProject(formData: FormData) {
     colors,
     hookSizes,
     yarnWeights,
+    sourceUrl ,
     annotatedPattern: masterPattern?.patternText || '', // The magic clone!
   }).returning();
 
