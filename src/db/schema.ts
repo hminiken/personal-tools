@@ -1,7 +1,6 @@
 // src/db/schema.ts
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import { relations } from 'drizzle-orm';
-import { boolean } from 'drizzle-orm/gel-core';
+// CORRECT: Everything comes from sqlite-core
+import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core';
 
 // 1. The Pattern (The Template)
 export const patterns = sqliteTable('patterns', {
@@ -33,7 +32,6 @@ export const images = sqliteTable('images', {
   patternId: integer('pattern_id').references(() => patterns.id), // Make sure this is NOT marked .notNull()
   projectId: integer('project_id').references(() => projects.id), // NEW: Link to projects
   imagePath: text('image_path').notNull(),
-  isInline: boolean('is_inline'),
 });
 
 export const projects = sqliteTable('projects', {

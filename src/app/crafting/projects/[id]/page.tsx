@@ -3,7 +3,7 @@ import { db } from '@/db';
 import { patterns, projects, images} from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
-import ProjectWorkspace from './_components/ProjectWorkspace';
+import ProjectWorkspace from  './_components/ProjectWorkspace'
 
 interface PageProps {
   params: Promise<{ id: string }>;

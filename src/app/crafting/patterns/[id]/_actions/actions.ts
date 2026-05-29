@@ -59,7 +59,6 @@ export async function spawnProject(formData: FormData) {
       projectId: projectId, // Link to the new project
       patternId: null,      // Explicitly detach from pattern so they are independent
       imagePath: img.imagePath, // Point to the exact same file on the hard drive
-      isInline: img.isInline
     }));
     
     await db.insert(images).values(projectImagesToInsert);
@@ -116,7 +115,6 @@ export async function uploadPatternImage(formData: FormData) {
     await db.insert(images).values({
       patternId,
       imagePath: newImagePath,
-      isInline: false,
     });
 
     // Auto-set as cover if none exists

@@ -34,7 +34,9 @@ function ReadOnlyHTML({ html, fallback }: { html: string | null, fallback: strin
     );
 }
 
-export default function ProjectWorkspace({ project, pattern, images }: { project: Project & { categories?: string }, pattern: Pattern, images: PatternImage[] }) {
+// export default function ProjectWorkspace({ project, pattern, images }: { project: Project & { categories?: string }, pattern: Pattern, images: PatternImage[] }) {
+export default function ProjectWorkspace({ project, pattern, images }:
+     { project: Project & { categories?: string | null }, pattern: Pattern, images: PatternImage[] }) {
     const [rulerEnabled, setRulerEnabled] = useState(true);
     const [rulerY, setRulerY] = useState(project.rulerPosition || 0);
 
@@ -254,7 +256,7 @@ export default function ProjectWorkspace({ project, pattern, images }: { project
 
                     <Tabs.Panel value="pattern" p={{ base: 'xs', sm: 'md' }}>
                         <Group justify="space-between" mb="sm">
-                            <Text size="sm" c="dimmed" fs="italic">This is your project's clone of the pattern. Mark it up!</Text>
+                            <Text size="sm" c="dimmed" fs="italic">This is your project&apos;s clone of the pattern. Mark it up!</Text>
                         </Group>
                         <Group>
                             <Switch

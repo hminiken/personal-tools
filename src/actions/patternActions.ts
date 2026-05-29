@@ -19,7 +19,6 @@ export async function uploadProjectImage(formData: FormData) {
     await db.insert(images).values({
       projectId,
       imagePath: `/uploads/${filename}`,
-      isInline: false,
     });
   }
   revalidatePath(`/crafting/projects/${projectId}`);
