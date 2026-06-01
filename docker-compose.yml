@@ -3,6 +3,7 @@ services:
     build: .
     container_name: crafting-nextjs
     restart: unless-stopped
+    user: "1000:1000" # Force the container to run as a standard user
     env_file: .env
     expose:
       - "3000"
