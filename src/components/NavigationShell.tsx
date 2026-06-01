@@ -57,7 +57,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
      <AppShell.Header bg={"olive.8"}>
         <Group h="100%" px="md" justify="space-between">
           <Group>
-            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+            <Burger opened={opened} onClick={toggle} size="sm" />
             <Title c={"neutrals.1"} order={3}>{getPageTitle()}</Title>
           </Group>
           
@@ -159,7 +159,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
         </AppShell.Section>
       </AppShell.Navbar>
 
-      <AppShell.Main p={{ base: '0', sm: 'xl' }}>
+      <AppShell.Main p={{ sm: 'xl' }}>
         {children}
       </AppShell.Main>
     </AppShell>
