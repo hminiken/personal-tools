@@ -52,7 +52,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
         // This forces the sidebar to hide on ALL screen sizes when closed
         collapsed: { desktop: !opened, mobile: !opened } 
       }}
-      padding={40}
+      padding={'xl'}
     >
      <AppShell.Header bg={"olive.8"}>
         <Group h="100%" px="md" justify="space-between">
@@ -159,7 +159,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
         </AppShell.Section>
       </AppShell.Navbar>
 
-      <AppShell.Main p={{ sm: 'xl' }}>
+      <AppShell.Main>
         {children}
       </AppShell.Main>
     </AppShell>
