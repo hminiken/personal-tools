@@ -72,7 +72,7 @@ export default function PatternViewer({ pattern, images }: { pattern: Pattern, i
   };
 
   return (
-    <Paper pl="xl" radius="md">
+    <Paper pl={{ base: '0', sm: 'xl' }} pr={{ base: 'xs', sm: 'xl' }} radius="md">
       <Button component={Link} href="/crafting/patterns" variant="subtle" color="gray" leftSection={<IconArrowLeft size={16} />} mb="md" pl={0}>
         Back to Patterns
       </Button>

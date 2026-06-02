@@ -137,7 +137,7 @@ export default function ProjectWorkspace({ project, pattern, images }: { project
   };
 
     return (
-        <Paper pl={{ base: 'xs', sm: 'xl' }} pr={{ base: 'xs', sm: 'xl' }} radius="md">
+        <Paper pl={{ base: '0', sm: 'xl' }} pr={{ base: 'xs', sm: 'xl' }} radius="md">
             <Button  component={Link} href="/crafting/projects" variant="subtle" color="gray" leftSection={<IconArrowLeft size={16} />} mb="md" pl={0}>
                 Back to Projects
             </Button>
