@@ -1,5 +1,5 @@
 FROM node:22-alpine AS base
-# 1. Install dependencies only when needed
+
 # 1. Install dependencies only when needed
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
@@ -17,12 +17,12 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN \
-  if [ -f yarn.lock ]; then yarn run build; \
-  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm run build; \
-  elif [ -f package-lock.json ]; then npm run build; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
+
+# Bypass corepack and install the same stable pnpm (v9)
+RUN npm install -g pnpm@9
+
+# Run the build command directly
+RUN pnpm run build
 
 # 3. Production image, copy all the files and run next
 FROM base AS runner
@@ -37,7 +37,6 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
 
 USER nextjs
 EXPOSE 3000
