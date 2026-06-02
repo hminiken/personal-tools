@@ -7,8 +7,8 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconTrash, IconPhotoStar, IconPlus } from '@tabler/icons-react';
-import { uploadPatternImage } from '@app/crafting/patterns/[id]/_actions/actions';
 import { UploadModal } from '@app/crafting/patterns/[id]/_components/UploadModal';
+import { uploadPatternImage } from '@app/crafting/patterns/_actions/actions';
 
 // Define the flexible props this component accepts
 interface ImageGalleryProps {
