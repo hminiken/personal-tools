@@ -7,6 +7,8 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconTrash, IconPhotoStar, IconPlus } from '@tabler/icons-react';
+import { uploadPatternImage } from '@app/crafting/patterns/[id]/_actions/actions';
+import { UploadModal } from '@app/crafting/patterns/[id]/_components/UploadModal';
 
 // Define the flexible props this component accepts
 interface ImageGalleryProps {
@@ -129,13 +131,11 @@ export default function ImageGallery({
                 </Accordion.Item>
             </Accordion>
 
-            {/* UPLOAD MODAL */}
-            <Modal opened={uploadModalOpened} onClose={closeUpload} title="Upload Photo" centered>
+            {/* <Modal opened={uploadModalOpened} onClose={closeUpload} title="Upload Photo" centered>
                 <form action={async (formData) => {
                     await uploadAction(formData);
                     closeUpload();
                 }}>
-                    {/* Dynamically uses "patternId" or "projectId" depending on where it is rendered */}
                     <input type="hidden" name={idFieldName} value={targetId} />
                     <Stack>
                         <FileInput
@@ -148,7 +148,14 @@ export default function ImageGallery({
                         </Group>
                     </Stack>
                 </form>
-            </Modal>
+            </Modal> */}
+
+             <UploadModal
+                opened={uploadModalOpened} 
+                close={closeUpload} 
+                patternId={targetId} 
+                uploadAction={uploadPatternImage}
+      />
 
             {/* FULL SIZE VIEWER */}
             <Modal opened={imageViewerOpened} onClose={closeImageViewer} withCloseButton={false} size="auto" centered padding={0}>
