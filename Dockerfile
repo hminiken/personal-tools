@@ -1,15 +1,16 @@
 FROM node:22-alpine AS base
 # 1. Install dependencies only when needed
+# 1. Install dependencies only when needed
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json pnpm-lock.yaml* ./
 
-# Enable pnpm and tell it to allow all build scripts for this container environment
-RUN corepack enable pnpm && pnpm config set supportedArchitectures.os ["linux"] && pnpm config set supportedArchitectures.cpu ["x64"]
+# Bypass corepack and force a stable version of pnpm (v9)
+RUN npm install -g pnpm@9
 
-# Run install with the bypass flag
-RUN pnpm i --frozen-lockfile --ignore-scripts=false
+# Run the install (it will now read your package.json whitelist correctly)
+RUN pnpm i --frozen-lockfile
 
 # 2. Rebuild the source code only when needed
 FROM base AS builder
