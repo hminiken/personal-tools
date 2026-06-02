@@ -4,8 +4,7 @@ import { TextInput, Group, Button, Stack, Badge } from '@mantine/core';
 import { IconExternalLink } from '@tabler/icons-react';
 import ItemGallery from '@/components/ItemGallery';
 import { Pattern } from '../types';
-import { createNewPattern } from '../_actions/actions';
-import { deletePattern } from '../[id]/_actions/actions';
+import { createNewPattern, deletePattern } from '../_actions/actions';
 
 export default function PatternGallery({ initialPatterns }: { initialPatterns: Pattern[] }) {
   return (

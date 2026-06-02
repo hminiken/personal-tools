@@ -12,7 +12,7 @@ import { RichTextEditor } from '@mantine/tiptap';
 import '@mantine/tiptap/styles.css';
 
 // Actions & Components
-import { saveRulerPosition, setProjectCoverImage, updateProject, updateProjectStatus, addQuickNote, deleteProject } from '../_actions/actions';
+import { saveRulerPosition, setProjectCoverImage, updateProject, updateProjectStatus, addQuickNote, deleteProject } from '../../_actions/actions';
 import { processWholePattern } from '@/utils/patternHighlighter';
 import ImageGallery from '@/components/PatternImageGallery';
 import { uploadProjectImage, deleteImage } from '@actions/patternActions';

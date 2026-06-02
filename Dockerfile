@@ -10,7 +10,7 @@ COPY package.json pnpm-lock.yaml* ./
 RUN npm install -g pnpm@9
 
 # Run the install (it will now read your package.json whitelist correctly)
-RUN pnpm i --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store pnpm i --frozen-lockfile
 
 # 2. Rebuild the source code only when needed
 FROM base AS builder
@@ -22,7 +22,7 @@ COPY . .
 RUN npm install -g pnpm@9
 
 # Run the build command directly
-RUN pnpm run build
+RUN --mount=type=cache,target=/app/.next/cache pnpm run build
 
 # 3. Production image, copy all the files and run next
 FROM base AS runner

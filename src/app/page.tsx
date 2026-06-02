@@ -1,7 +1,6 @@
 import { Paper, Title, SimpleGrid, Card, Text, Button } from '@mantine/core';
-import Link from 'next/link';
 import { getDashboardData } from './_actions/actions';
-
+export const dynamic = 'force-dynamic';
 export default async function Home() {
   const { latestProject, latestPattern } = await getDashboardData();
 

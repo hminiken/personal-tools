@@ -1,5 +1,5 @@
 // src/app/crafting/patterns/[id]/page.tsx
-import { getPatternById, getImagesForPattern } from './_actions/actions';
+import { getPatternById, getImagesForPattern } from './../_actions/actions';
 import PatternViewer from './_components/PatternViewer';
 import { notFound } from 'next/navigation';
 
