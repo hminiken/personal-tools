@@ -5,6 +5,7 @@ import { IconExternalLink } from '@tabler/icons-react';
 import ItemGallery from '@/components/ItemGallery';
 import { Pattern } from '../types';
 import { createNewPattern } from '../_actions/actions';
+import { deletePattern } from '../[id]/_actions/actions';
 
 export default function PatternGallery({ initialPatterns }: { initialPatterns: Pattern[] }) {
   return (
@@ -15,8 +16,8 @@ export default function PatternGallery({ initialPatterns }: { initialPatterns: P
       searchPlaceholder="Search patterns..."
       newItemText="New Pattern"
       createModalTitle="Add a New Pattern"
-      cardDescription="Click to view details and instructions."
-      
+      // cardDescription="Click to view details and instructions."
+      deleteAction={deletePattern}
       // 1. Inject the Pattern-specific badges
       renderBadges={(pattern) => (
         <Group gap="xs" mb="md">

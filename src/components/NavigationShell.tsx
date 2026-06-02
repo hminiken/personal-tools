@@ -52,12 +52,13 @@ export default function NavigationShell({ children }: { children: React.ReactNod
         // This forces the sidebar to hide on ALL screen sizes when closed
         collapsed: { desktop: !opened, mobile: !opened } 
       }}
-      padding={'xl'}
+      pl={'xl'}
+      pr={'xl'}
     >
      <AppShell.Header bg={"olive.8"}>
         <Group h="100%" px="md" justify="space-between">
           <Group>
-            <Burger opened={opened} onClick={toggle} size="sm" />
+            <Burger color={"neutrals.1"} opened={opened} onClick={toggle} size="sm" />
             <Title c={"neutrals.1"} order={3}>{getPageTitle()}</Title>
           </Group>
           

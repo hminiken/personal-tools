@@ -1,66 +1,50 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import { Paper, Title, SimpleGrid, Card, Text, Button } from '@mantine/core';
+import Link from 'next/link';
+import { getDashboardData } from './_actions/actions';
 
-export default function Home() {
+export default async function Home() {
+  const { latestProject, latestPattern } = await getDashboardData();
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <Paper p="xl">
+      <Title mb="xl">Crafting Dashboard</Title>
+      
+      <SimpleGrid cols={{ base: 1, md: 2 }}>
+        
+        {/* Latest Project Card */}
+        <Card shadow="sm" padding="lg" radius="md" withBorder>
+          <Title order={3}>Latest Project</Title>
+          {latestProject ? (
+            <>
+              <Text mt="md" fw={500}>{latestProject.title}</Text>
+              
+                <Button component="a" mt="md" fullWidth bg={"olive.6"}  href={`/crafting/projects/${latestProject.id}`}>
+                  Continue Project
+                </Button>
+            </>
+          ) : (
+            <Text mt="md" c="dimmed">No projects started yet.</Text>
+          )}
+        </Card>
+
+        {/* Latest Pattern Card */}
+        <Card shadow="sm" padding="lg" radius="md" withBorder>
+          <Title order={3}>Latest Pattern</Title>
+          {latestPattern ? (
+            <>
+              <Text mt="md" fw={500}>{latestPattern.title}</Text>
+              
+              {/* THE FIX: Wrap the button with Link and use legacyBehavior */}
+                <Button component="a" mt="md" fullWidth variant="light" bg={"olive.2"} href={`/crafting/patterns/${latestPattern.id}`}>
+                  View Pattern
+                </Button>
+            </>
+          ) : (
+            <Text mt="md" c="dimmed">No patterns added yet.</Text>
+          )}
+        </Card>
+
+      </SimpleGrid>
+    </Paper>
   );
 }

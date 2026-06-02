@@ -1,5 +1,5 @@
 // src/db/schema.ts
-// CORRECT: Everything comes from sqlite-core
+import { sql } from 'drizzle-orm';
 import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core';
 
 // 1. The Pattern (The Template)
@@ -24,6 +24,8 @@ hookSizes: text('hook_sizes'),
   yarnYardage: integer('yarn_yardage'), // Number for easy calculations later
   
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  updatedAt: text('updatedAt').default(sql`CURRENT_TIMESTAMP`)
+
 });
 
 // 2. The Images
@@ -54,4 +56,5 @@ export const projects = sqliteTable('projects', {
   rulerPosition: integer('ruler_position').default(0),
   coverImagePath: text('cover_image_path'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  updatedAt: text('updatedAt').default(sql`CURRENT_TIMESTAMP`)
 });

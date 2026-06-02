@@ -16,7 +16,7 @@ export default async function PatternsPage() {
 
   return (
     <main>
-      <PatternGallery initialPatterns={normalizedPatterns} />
+      <PatternGallery initialPatterns={allPatterns} />
     </main>
   );
 }

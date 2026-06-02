@@ -1,223 +1,122 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Title, Group, Badge, Paper, Switch,
-  Tabs, Divider, Box, Button, TextInput, Stack,
-  TagsInput, 
-  Typography,
-  useComputedColorScheme,
-  Anchor,
-  Select
-} from '@mantine/core';
+import { Title, Group, Paper, Switch, Tabs, Divider, Box, Button, TextInput, Stack, Typography, useComputedColorScheme, Modal } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { updatePattern, updatePatternStatus, uploadPatternImage } from '../_actions/actions';
 import Link from 'next/link';
-import { IconArrowLeft, IconExternalLink } from '@tabler/icons-react';
+import { IconArrowLeft } from '@tabler/icons-react';
+
 // Tiptap Imports
 import { useEditor } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import { Color } from '@tiptap/extension-color';
-import { TextStyle } from '@tiptap/extension-text-style';
+import { RichTextEditor } from '@mantine/tiptap';
 import '@mantine/tiptap/styles.css';
-import { processWholePattern } from '@/utils/patternHighlighter';
 
+// Actions & Components
+import { deletePattern, spawnProject, updatePattern, updatePatternStatus, uploadPatternImage } from '../_actions/actions';
+import { deleteImage, setCoverImage } from '@actions/patternActions';
+import { processWholePattern } from '@/utils/patternHighlighter';
 import { TabContent } from './TabContent';
 import ImageGallery from '@/components/PatternImageGallery';
 import { Pattern, PatternImage } from '../../types';
-import { deleteImage, setCoverImage } from '@actions/patternActions';
-import { RichTextEditor } from '@mantine/tiptap';
-import ResizeImage from 'tiptap-extension-resize-image';
-
-
-// Define outside the component
-const editorExtensions = [
-    StarterKit, 
-    TextStyle, 
-    Color, 
-    ResizeImage.configure({
-        allowBase64: true, // Keep this so your paste-to-inline feature still works
-        
-    })
-];
+import { CraftingMetadataForm } from '@/components/CraftingMetadataForm';
+import { craftingEditorExtensions } from '@/utils/editorExtensions';
+import { useRouter } from 'next/navigation';
+import { ConfirmDeleteModal } from '@components/ConfirmDeleteModal';
 
 export default function PatternViewer({ pattern, images }: { pattern: Pattern, images: PatternImage[] }) {
-  const [colorEnabled, setColorEnabled] = useState(false);
   const [isEditingDetails, setIsEditingDetails] = useState(false);
   const [isEditingTabs, setIsEditingTabs] = useState(false);
-
-  // Tags State
-  const [hookTags, setHookTags] = useState<string[]>(pattern.hookSizes ? pattern.hookSizes.split(',') : []);
-  const [weightTags, setWeightTags] = useState<string[]>(pattern.yarnWeights ? pattern.yarnWeights.split(',') : []);
-
-  const [projectModalOpened, { open: openProject, close: closeProject }] = useDisclosure(false);
-
-  // Editors
-  // const patternEditor = useEditor({ extensions: editorExtensions, content: pattern.patternText || '', immediatelyRender: false });
-  const patternEditor = useEditor({
-    extensions: editorExtensions,
-    content: pattern.patternText || '',
-    immediatelyRender: false,
-  });
-
-
-
-
-
-  const materialsEditor = useEditor({ extensions: editorExtensions, content: pattern.materials || '', immediatelyRender: false });
-  const abbreviationsEditor = useEditor({ extensions: editorExtensions, content: pattern.abbreviations || '', immediatelyRender: false });
-  const sizingEditor = useEditor({ extensions: editorExtensions, content: pattern.sizing || '', immediatelyRender: false });
-  const notesEditor = useEditor({ extensions: editorExtensions, content: pattern.patternNotes || '', immediatelyRender: false });
   const [rainbowEnabled, setRainbowEnabled] = useState(false);
   const computedColorScheme = useComputedColorScheme('light');
+  
+  const [projectModalOpened, { open: openProject, close: closeProject }] = useDisclosure(false);
+
+  // States
+  const [hookTags, setHookTags] = useState<string[]>(pattern.hookSizes ? pattern.hookSizes.split(',') : []);
+  const [weightTags, setWeightTags] = useState<string[]>(pattern.yarnWeights ? pattern.yarnWeights.split(',') : []);
   const [categoryTags, setCategoryTags] = useState<string[]>(pattern.categories ? pattern.categories.split(',') : []);
+  const [status, setStatus] = useState<string>(pattern.status || '');
 
-  const [status, setStatus] = useState<string>('');
-
-
-
-
+  // Editors
+  const patternEditor = useEditor({ extensions: craftingEditorExtensions, content: pattern.patternText || '', immediatelyRender: false });
+  const materialsEditor = useEditor({ extensions: craftingEditorExtensions, content: pattern.materials || '', immediatelyRender: false });
+  const abbreviationsEditor = useEditor({ extensions: craftingEditorExtensions, content: pattern.abbreviations || '', immediatelyRender: false });
+  const sizingEditor = useEditor({ extensions: craftingEditorExtensions, content: pattern.sizing || '', immediatelyRender: false });
+  const notesEditor = useEditor({ extensions: craftingEditorExtensions, content: pattern.patternNotes || '', immediatelyRender: false });
 
   const handleUpdateStatus = async (newStatus: string) => {
-    // 1. Store the previous status in case we need to roll back
     const previousStatus = status ?? pattern.status ?? '';
-
-    // 2. Optimistic Update: Set the UI state immediately
     setStatus(newStatus);
-
-    // 3. Call the server
     try {
       const result = await updatePatternStatus(pattern.id, newStatus);
-
-      if (!result.success) {
-        throw new Error('Database update failed');
-      }
+      if (!result.success) throw new Error('Database update failed');
     } catch {
-      // 4. Rollback on error
       setStatus(previousStatus);
       alert('Failed to save status. Reverting...');
     }
   };
 
+  const router = useRouter();
+  
+  // 2. Add the Modal State
+  const [deleteModalOpened, { open: openDelete, close: closeDelete }] = useDisclosure(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // 3. Create the execution function
+  const handleDelete = async () => {
+      setIsDeleting(true);
+      await deletePattern(pattern.id); // This server action should delete the DB row
+      setIsDeleting(false);
+      closeDelete();
+      router.push('/crafting/patterns'); // Boot them back to the list!
+  };
 
   return (
     <Paper pl="xl" radius="md">
-      <Button
-        component={Link}
-        href="/crafting/patterns"
-        variant="subtle"
-        color="gray"
-        leftSection={<IconArrowLeft size={16} />}
-        mb="md"
-        pl={0} // Removes the side padding so the icon aligns perfectly with your title
-      >
+      <Button component={Link} href="/crafting/patterns" variant="subtle" color="gray" leftSection={<IconArrowLeft size={16} />} mb="md" pl={0}>
         Back to Patterns
       </Button>
-      {/* FORM 1: METADATA */}
 
-      <form action={async (formData) => {
-        // Save the tags
-        formData.set('hookSizes', hookTags.join(','));
-        formData.set('yarnWeights', weightTags.join(','));
-        formData.set('categories', categoryTags.join(','));
+      {/* ABSTRACTION: Metadata Form */}
+      <CraftingMetadataForm 
+        idName="patternId"
+        idValue={pattern.id}
+        title={pattern.title}
+        sourceUrl={pattern.sourceUrl}
+        status={status}
+        statusOptions={[
+          { value: 'Not Started', label: 'Not Started' },
+          { value: 'WIP', label: 'WIP' },
+          { value: 'Completed', label: 'Completed' },
+          { value: 'On Hold', label: 'On Hold' },
+          { value: 'Did Not Like', label: 'Did Not Like' },
+        ]}
+        onUpdateStatus={handleUpdateStatus}
+        tags={{ hookTags, setHookTags, weightTags, setWeightTags, categoryTags, setCategoryTags }}
+        isEditing={isEditingDetails}
+        setIsEditing={setIsEditingDetails}
+        formAction={updatePattern}
+        actionButtons={<Button onClick={openProject}>Start New Project</Button>}
+        onDeleteClick={openDelete}
+      />
 
-        // Preserve the rich text so the server doesn't wipe it!
-
-        await updatePattern(formData);
-        setIsEditingDetails(false);
-      }}>
-        <input type="hidden" name="patternId" value={pattern.id} />
-
-        {/* 1. Header Row */}
-        <Group justify="space-between" align="flex-start" mb="sm">
-          {isEditingDetails ? (
-            /* RESTORED: The form inputs for editing! */
-            <Stack style={{ flexGrow: 1 }}>
-              <TextInput name="title" label="Project Name" defaultValue={pattern.title} required />
-              <TextInput name="sourceUrl" label="SourceUrl" defaultValue={pattern.sourceUrl ?? ''} />
-              <Group grow>
-                {/* <TextInput name="yarnUsed" label="Yarn Brand/Line" defaultValue={pattern.yarnUsed || ''} /> */}
-                {/* <TextInput name="colors" label="Colors" defaultValue={pattern.colors || ''} /> */}
-              </Group>
-              <Group grow align="flex-start">
-                <TagsInput label="Hook Sizes" placeholder="5mm" value={hookTags} onChange={setHookTags} clearable />
-                <TagsInput label="Yarn Weights" placeholder="Worsted" value={weightTags} onChange={setWeightTags} clearable />
-                <TagsInput label="Categories" placeholder="e.g., Blanket" value={categoryTags} onChange={setCategoryTags} clearable />
-              </Group>
-            </Stack>
-          ) : (
-            <Box>
-              <Group>
-                <Title order={2}>{pattern.title}</Title>
-                <Anchor fw={500} href={pattern.sourceUrl ?? ''} ml={4} target="_blank"
-                  rel="noopener noreferrer">
-                  <IconExternalLink />
-                </Anchor>
-              </Group>
-            </Box>
-          )}
-
-          {/* The Button & Status Action Group */}
-          <Stack align="flex-end">
-            <Group>
-              {!isEditingDetails && (
-                <Group gap="sm">
-                  <Select
-                    w={140}
-                    placeholder="Status"
-                    data={[
-                      { value: 'Not Started', label: 'Not Started' },
-                      { value: 'WIP', label: 'WIP' },
-                      { value: 'Completed', label: 'Completed' },
-                      { value: 'On Hold', label: 'On Hold' },
-                      { value: 'Did Not Like', label: 'Did Not Like' },
-                    ]}
-                    value={status || pattern.status}
-                    onChange={(val) => val && handleUpdateStatus(val)}
-                  />
-
-                </Group>
-              )}
-              <Button variant="outline" onClick={() => setIsEditingDetails(!isEditingDetails)}>
-                {isEditingDetails ? 'Cancel' : 'Edit Details'}
-              </Button>
-              <Button onClick={openProject}>Start New Project</Button>
-            </Group>
-
-            {isEditingDetails && (
-              <Button type="submit" color="olive.7">
-                Save Details
-              </Button>
-            )}
-          </Stack>
-        </Group>
-
-        {/* 2. Badge Row (Separated so it doesn't mess up button wrapping!) */}
-        {!isEditingDetails && (
-          <Group gap="xs" mb="md">
-            {pattern.status && <Badge color="neutrals.7" variant="outline" >Status: {status || pattern.status}</Badge>}
-            {/* {pattern.yarnUsed && <Badge color="neutrals.5" variant="outline" leftSection={<IconNeedleThread size={12} />}>{pattern.yarnUsed}</Badge>} */}
-            {categoryTags.map(tag => <Badge key={`cat-${tag}`} color="olive.6" variant="filled">{tag}</Badge>)}
-            {hookTags.map(tag => <Badge key={`hook-${tag}`} color="rust.5" variant="outline">Hook: {tag}</Badge>)}
-            {weightTags.map(tag => <Badge key={`weight-${tag}`} color="mustard.6" variant="outline">Weight: {tag}</Badge>)}
-
-          </Group>
-        )}
-      </form>
       <Divider my="sm" />
 
-      {/* FORM 2: PATTERN CONTENT */}
+      {/* TABS FORM */}
       <form action={async (formData) => {
         formData.set('patternText', patternEditor?.getHTML() || '');
         formData.set('materials', materialsEditor?.getHTML() || '');
         formData.set('abbreviations', abbreviationsEditor?.getHTML() || '');
         formData.set('sizing', sizingEditor?.getHTML() || '');
         formData.set('patternNotes', notesEditor?.getHTML() || '');
+        
         // Preserve metadata
         formData.set('title', pattern.title);
         formData.set('sourceUrl', pattern.sourceUrl ?? '');
         formData.set('hookSizes', hookTags.join(','));
         formData.set('yarnWeights', weightTags.join(','));
+        formData.set('categories', categoryTags.join(','));
+        
         await updatePattern(formData);
         setIsEditingTabs(false);
       }}>
@@ -242,48 +141,27 @@ export default function PatternViewer({ pattern, images }: { pattern: Pattern, i
             <Tabs.Tab value="notes">Notes</Tabs.Tab>
           </Tabs.List>
 
-          <Tabs.Panel value="pattern" p="md" bg={colorEnabled && !isEditingTabs ? 'gray.0' : 'transparent'}>
+          <Tabs.Panel value="pattern" p="md" >
             {!isEditingTabs && (
               <Group justify="flex-end" mb="sm">
-                <Switch
-                  checked={rainbowEnabled}
-                  onChange={(event) => setRainbowEnabled(event.currentTarget.checked)}
-                  label="Rainbow Steps"
-                  color="grape"
-                />
+                <Switch checked={rainbowEnabled} onChange={(event) => setRainbowEnabled(event.currentTarget.checked)} label="Rainbow Steps" color="grape" />
               </Group>
             )}
 
-
-            <Box
-
-            >
-
-
-              {/* THE CONDITIONAL RENDER: Show Rainbow HTML, or show Tiptap */}
+            <Box>
               {rainbowEnabled && !isEditingTabs ? (
-                // If Rainbow is ON and we aren't editing, show the highlighted version
                 <Typography style={{ lineHeight: 1.8 }}>
-                  <div dangerouslySetInnerHTML={{
-                    __html: processWholePattern(patternEditor?.getHTML() || '', computedColorScheme)
-                  }} />
+                  <div dangerouslySetInnerHTML={{ __html: processWholePattern(patternEditor?.getHTML() || '', computedColorScheme) }} />
                 </Typography>
               ) : (
-                // Otherwise, show the standard Tiptap Editor
-                <RichTextEditor editor={patternEditor} style={{ border: isEditingTabs ? undefined : 'none' }}
-                styles={{
+                <RichTextEditor 
+                  editor={patternEditor} 
+                  style={{ border: isEditingTabs ? undefined : 'none' }}
+                  styles={{
                     content: {
-                      '& .ProseMirror': {
-                        overflowX: 'hidden', 
-                      },
-                      '& .ProseMirror img': {
-                     maxWidth: '100%', 
-                      height: 'auto !important'
-                      },
-                      '& .ProseMirror span.resizeCursor': {
-                        display: 'inline-block',
-                        maxWidth: '100%',
-                      }
+                      '& .ProseMirror': { overflowX: 'hidden' },
+                      '& .ProseMirror img': { maxWidth: '100%', height: 'auto !important' },
+                      '& .ProseMirror span.resizeCursor': { display: 'inline-block', maxWidth: '100%' }
                     }
                   }}
                 >
@@ -323,7 +201,8 @@ export default function PatternViewer({ pattern, images }: { pattern: Pattern, i
         />
       </Box>
 
-      {/* <Modal opened={projectModalOpened} onClose={closeProject} title="Start a New Project" centered>
+      {/* Spawn Project Modal */}
+      <Modal opened={projectModalOpened} onClose={closeProject} title="Start a New Project" centered>
         <form action={spawnProject}>
           <input type="hidden" name="patternId" value={pattern.id} />
           <Stack>
@@ -336,8 +215,16 @@ export default function PatternViewer({ pattern, images }: { pattern: Pattern, i
             </Group>
           </Stack>
         </form>
-      </Modal> */}
-     
+      </Modal>
+
+      <ConfirmDeleteModal 
+          opened={deleteModalOpened}
+          close={closeDelete}
+          onConfirm={handleDelete}
+          itemName={pattern.title}
+          isDeleting={isDeleting}
+      />
+
     </Paper>
   );
 }

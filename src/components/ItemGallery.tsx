@@ -1,31 +1,33 @@
+/* eslint-disable react/no-unescaped-entities */
 'use client';
 
 import { useState } from 'react';
 import { 
-  SimpleGrid, Card, Text, Group, TextInput, Title, Button, Image, Modal 
+  SimpleGrid, Card, Text, Group, TextInput, Title, Button, Image, Modal, ActionIcon 
 } from '@mantine/core';
-import { IconSearch, IconPlus } from '@tabler/icons-react';
+import { IconSearch, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
+import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal'; // Make sure this path is correct!
 
-// 1. Define the absolute minimum fields every gallery item must have
 export interface BaseGalleryItem {
   id: number;
   title: string;
   coverImagePath?: string | null;
+  sourceUrl?: string | null; // Made optional to prevent errors if empty
 }
 
-// 2. Define the props for our reusable component
 interface ItemGalleryProps<T extends BaseGalleryItem> {
   title: string;
-  items: T[]; // Accepts an array of ANY type, as long as it has id, title, and coverImagePath
-  basePath: string; // e.g., '/crafting/patterns'
+  items: T[]; 
+  basePath: string; 
   searchPlaceholder?: string;
   newItemText?: string;
   createModalTitle?: string;
-  cardDescription?: string;
   
-  // Render Props: These allow the parent to inject custom UI for specific items
+  // NEW: Pass your server action down to handle the database deletion
+  deleteAction?: (id: number) => Promise<void>; 
+
   renderBadges?: (item: T) => React.ReactNode;
   renderCreateForm?: (closeModal: () => void) => React.ReactNode;
 }
@@ -37,7 +39,7 @@ export default function ItemGallery<T extends BaseGalleryItem>({
   searchPlaceholder = "Search...",
   newItemText = "New",
   createModalTitle = "Create New",
-  cardDescription = "Click to view details.",
+  deleteAction,
   renderBadges,
   renderCreateForm
 }: ItemGalleryProps<T>) {
@@ -45,15 +47,35 @@ export default function ItemGallery<T extends BaseGalleryItem>({
   const [searchQuery, setSearchQuery] = useState('');
   const [createModalOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
 
+  // NEW: Deletion States
+  const [itemToDelete, setItemToDelete] = useState<T | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Instantly filter the items
   const filteredItems = items.filter((item) =>
     item.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Execute the deletion
+  const handleDeleteConfirm = async () => {
+    if (!itemToDelete || !deleteAction) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteAction(itemToDelete.id);
+      setItemToDelete(null); // Close the modal on success
+    } catch (error) {
+      console.error("Failed to delete item", error);
+      alert("Failed to delete. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div>
       {/* HEADER & SEARCH BAR */}
-      <Group justify="space-between" align="center" mb="xl">
+      <Group justify="space-between" align="center" mb="xl" mt={'md'}>
         <Title order={2}>{title}</Title>
         <Group>
           <TextInput
@@ -86,7 +108,7 @@ export default function ItemGallery<T extends BaseGalleryItem>({
               radius="md" 
               withBorder 
               component={Link} 
-              href={`${basePath}/${item.id}`} // Dynamically links to /patterns/1 or /projects/1
+              href={`${basePath}/${item.id}`} 
               style={{ textDecoration: 'none', transition: 'transform 0.2s, box-shadow 0.2s' }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-4px)';
@@ -97,35 +119,59 @@ export default function ItemGallery<T extends BaseGalleryItem>({
                 e.currentTarget.style.boxShadow = 'var(--mantine-shadow-sm)';
               }}
             >
-              <Card.Section>
+              <Card.Section style={{ position: 'relative' }}>
                 <Image
                   src={item.coverImagePath || 'https://placehold.co/600x400?text=No+Cover'}
                   height={160}
                   alt={item.title}
                   fallbackSrc="https://placehold.co/600x400?text=No+Image"
                 />
+                
+                {/* NEW: The Absolute Positioned Delete Button */}
+                {deleteAction && (
+                  <ActionIcon
+                    variant="filled"
+                    color="red"
+                    size="md"
+                    radius="xl"
+                    style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}
+                    onClick={(e) => {
+                      e.preventDefault(); // STOPS the <Link> from triggering
+                      setItemToDelete(item); // Opens the modal
+                    }}
+                  >
+                    <IconTrash size={16} stroke={1.5} />
+                  </ActionIcon>
+                )}
               </Card.Section>
               
               <Text fw={500} size="lg" mt="sm" mb="xs" c="dark">
                 {item.title}
               </Text>
               
-              {/* Call the custom badge rendering function if it was provided */}
               {renderBadges && renderBadges(item)}
 
               <Text size="sm" c="dimmed" lineClamp={2}>
-                {cardDescription}
+                {item.sourceUrl}
               </Text>
             </Card>
           ))}
         </SimpleGrid>
       )}
 
-      {/* DYNAMIC MODAL */}
+      {/* DYNAMIC CREATE MODAL */}
       <Modal opened={createModalOpened} onClose={closeCreate} title={createModalTitle} centered>
-        {/* We pass 'closeCreate' down so the custom form can close the modal if needed */}
         {renderCreateForm && renderCreateForm(closeCreate)}
       </Modal>
+
+      {/* DYNAMIC DELETE MODAL */}
+      <ConfirmDeleteModal 
+        opened={!!itemToDelete}
+        close={() => setItemToDelete(null)}
+        onConfirm={handleDeleteConfirm}
+        itemName={itemToDelete?.title || "this item"}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 }

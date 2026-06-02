@@ -12,8 +12,6 @@ import { images } from '@/db/schema'; // Make sure images is imported from your 
 
 // 2. Add an action to silently save the highlighter position
 export async function saveRulerPosition(projectId: number, yPosition: number) {
-  // 1. Debugging: See what the server is actually receiving
-  console.log(`Saving ruler. Project ID: ${projectId}, Y: ${yPosition}`);
 
   // 2. Strict validation: If the ID is missing or invalid, abort safely
   if (!projectId || isNaN(projectId)) {
@@ -115,4 +113,10 @@ export async function updateProjectStatus(projectId: number, status: string ) {
     console.error('Database update failed:', error);
     return { success: false, error: 'Failed to update database' };
   }
+}
+
+
+export async function deleteProject(projectId: number) {
+    await db.delete(projects).where(eq(projects.id, projectId));
+    revalidatePath('/crafting/projects');
 }

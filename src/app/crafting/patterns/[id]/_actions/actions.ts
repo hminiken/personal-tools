@@ -141,3 +141,11 @@ export async function updatePatternStatus(patternId: number, status: string ) {
     return { success: false, error: 'Failed to update database' };
   }
 }
+
+
+export async function deletePattern(patternId: number) {
+    // Note: If you have foreign keys (like projects or images attached to this pattern),
+    // make sure you delete those first or have CASCADE setup in your SQLite schema!
+    await db.delete(patterns).where(eq(patterns.id, patternId));
+    revalidatePath('/crafting/patterns');
+}
