@@ -3,13 +3,13 @@ FROM node:22-alpine AS base
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
-RUN \
-  if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
-  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
-  elif [ -f package-lock.json ]; then npm install; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
+COPY package.json pnpm-lock.yaml* ./
+
+# Enable pnpm and tell it to allow all build scripts for this container environment
+RUN corepack enable pnpm && pnpm config set supportedArchitectures.os ["linux"] && pnpm config set supportedArchitectures.cpu ["x64"]
+
+# Run install with the bypass flag
+RUN pnpm i --frozen-lockfile --ignore-scripts=false
 
 # 2. Rebuild the source code only when needed
 FROM base AS builder
