@@ -15,7 +15,7 @@ export default function ProjectGallery({ initialProjects }: { initialProjects: P
       items={initialProjects}
       basePath="/crafting/projects"
       searchPlaceholder="Search projects..."
-      cardDescription="Click to view project notes and progress."
+      // cardDescription="Click to view project notes and progress."
       
       // Inject the Project-specific badges
       renderBadges={(project) => (
