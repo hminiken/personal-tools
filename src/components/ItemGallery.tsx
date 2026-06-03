@@ -14,7 +14,8 @@ export interface BaseGalleryItem {
   id: number;
   title: string;
   coverImagePath?: string | null;
-  sourceUrl?: string | null; // Made optional to prevent errors if empty
+  sourceUrl?: string | null; 
+  [key: string]: unknown;
 }
 
 interface ItemGalleryProps<T extends BaseGalleryItem> {
@@ -52,9 +53,38 @@ export default function ItemGallery<T extends BaseGalleryItem>({
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Instantly filter the items
-  const filteredItems = items.filter((item) =>
-    item.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+ // Advanced search filtering
+  const filteredItems = items.filter((item) => {
+    // If the search bar is empty, show everything
+    if (!searchQuery.trim()) return true;
+
+    // Split the search query by spaces to allow multiple filters at once
+    // e.g., "categories:cardigan colors:blue" becomes ["categories:cardigan", "colors:blue"]
+    const tokens = searchQuery.toLowerCase().split(/\s+/);
+
+    // .every() means ALL search conditions must be true for the item to appear
+    return tokens.every((token) => {
+      // 1. Check if the user is using the "key:value" syntax
+      if (token.includes(':')) {
+        const [key, value] = token.split(':', 2);
+        
+        // Grab the data from the item (e.g., item['categories'])
+        const itemValue = item[key]; 
+        
+        // If the item has this field, and it's a string, check if it includes our search value.
+        // Because your DB stores comma-separated strings, .includes() works perfectly!
+        if (itemValue && typeof itemValue === 'string') {
+          return itemValue.toLowerCase().includes(value);
+        }
+        
+        // If the key doesn't exist on the item, hide the item
+        return false; 
+      }
+
+      // 2. Fallback: If there is no colon, just do a normal title search
+      return item.title.toLowerCase().includes(token);
+    });
+  });
 
   // Execute the deletion
   const handleDeleteConfirm = async () => {

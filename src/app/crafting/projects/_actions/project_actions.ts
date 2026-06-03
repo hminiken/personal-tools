@@ -2,13 +2,9 @@
 'use server';
 
 import { db } from '@/db';
-import { patterns, projects } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { projects, projectYarns } from '@/db/schema';
+import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
-import { writeFile } from 'fs/promises';
-import path from 'path';
-import { images } from '@/db/schema'; // Make sure images is imported from your schema
 
 // 2. Add an action to silently save the highlighter position
 export async function saveRulerPosition(projectId: number, yPosition: number) {
@@ -49,10 +45,11 @@ export async function updateProject(formData: FormData) {
   const yarnWeights = formData.get('yarnWeights') as string;
   const projectNotes = formData.get('projectNotes') as string;
   const annotatedPattern = formData.get('annotatedPattern') as string; // Catch the edits
+  const categories = formData.get('categories') as string; // Catch the edits
 
   await db
     .update(projects)
-    .set({ title, yarnUsed, colors, hookSizes, yarnWeights, projectNotes, annotatedPattern, sourceUrl })
+    .set({ title, yarnUsed, colors, hookSizes, yarnWeights, projectNotes, annotatedPattern, sourceUrl, categories })
     .where(eq(projects.id, projectId));
 
   revalidatePath(`/crafting/projects/${projectId}`);
@@ -119,4 +116,23 @@ export async function updateProjectStatus(projectId: number, status: string ) {
 export async function deleteProject(projectId: number) {
     await db.delete(projects).where(eq(projects.id, projectId));
     revalidatePath('/crafting/projects');
+}
+
+
+
+export async function linkYarnToProject(projectId: number, yarnId: number) {
+  await db.insert(projectYarns).values({ projectId, yarnId });
+  revalidatePath(`/crafting/projects/${projectId}`);
+  revalidatePath(`/crafting/stash/${yarnId}`);
+}
+
+export async function unlinkYarnFromProject(projectId: number, yarnId: number) {
+  await db.delete(projectYarns).where(
+    and(
+      eq(projectYarns.projectId, projectId),
+      eq(projectYarns.yarnId, yarnId)
+    )
+  );
+  revalidatePath(`/crafting/projects/${projectId}`);
+  revalidatePath(`/crafting/stash/${yarnId}`);
 }

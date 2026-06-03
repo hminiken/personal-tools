@@ -119,13 +119,14 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
 
             {!props.isEditing && (
                 <Group gap="xs" mb="md">
-                    {props.status && <Badge color="neutrals.7" variant="outline">Status: {props.status}</Badge>}
-                    {props.yarnUsed && <Badge color="neutrals.5" variant="outline" leftSection={<IconNeedleThread size={12} />}>{props.yarnUsed}</Badge>}
-                    {props.colors && <Badge color="olive.7" variant="outline">Colors: {props.colors}</Badge>}
+                    {props.status && <Badge size='xs' color="neutrals.7" variant="outline">Status: {props.status}</Badge>}
+                    {props.yarnUsed && <Badge size='xs' color="neutrals.5" variant="outline" leftSection={<IconNeedleThread size={12} />}>{props.yarnUsed}</Badge>}
+                    {props.colors && <Badge size='xs' color="olive.7" variant="outline">Colors: {props.colors}</Badge>}
                     
-                    {tags.categoryTags.map(tag => <Badge key={`cat-${tag}`} color="violet.6" variant="filled">{tag}</Badge>)}
-                    {tags.hookTags.map(tag => <Badge key={`hook-${tag}`} color="rust.5" variant="outline">Hook: {tag}</Badge>)}
-                    {tags.weightTags.map(tag => <Badge key={`weight-${tag}`} color="mustard.6" variant="outline">Weight: {tag}</Badge>)}
+                    {tags.categoryTags.map(tag => <Badge size='xs' key={`cat-${tag}`} color="rust.6" variant="outline">Categories: {tag}</Badge>)}
+                    {tags.hookTags.map(tag => <Badge size='xs' key={`hook-${tag}`} color="rust.5" variant="outline">Hook: {tag}</Badge>)}
+                    {tags.weightTags.map(tag => <Badge size='xs' key={`weight-${tag}`} color="mustard.6" variant="outline">Weight: {tag}</Badge>)}
+                    
                 </Group>
             )}
         </form>

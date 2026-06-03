@@ -4,7 +4,7 @@ import { TextInput, Group, Button, Stack, Badge } from '@mantine/core';
 import { IconExternalLink } from '@tabler/icons-react';
 import ItemGallery from '@/components/ItemGallery';
 import { Pattern } from '../types';
-import { createNewPattern, deletePattern } from '../_actions/actions';
+import { createNewPattern, deletePattern } from '../_actions/pattern_actions';
 
 export default function PatternGallery({ initialPatterns }: { initialPatterns: Pattern[] }) {
   return (
@@ -17,7 +17,6 @@ export default function PatternGallery({ initialPatterns }: { initialPatterns: P
       createModalTitle="Add a New Pattern"
       // cardDescription="Click to view details and instructions."
       deleteAction={deletePattern}
-      // 1. Inject the Pattern-specific badges
       renderBadges={(pattern) => (
         <Group gap="xs" mb="md">
           {pattern.hookSizes && <Badge color="mustard" variant="light">{pattern.hookSizes}</Badge>}
@@ -27,7 +26,6 @@ export default function PatternGallery({ initialPatterns }: { initialPatterns: P
         </Group>
       )}
 
-      // 2. Inject the Pattern-specific creation form
       renderCreateForm={(closeModal) => (
         <form action={createNewPattern}>
           <Stack>

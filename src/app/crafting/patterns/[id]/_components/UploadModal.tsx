@@ -1,14 +1,47 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, Button, Group, FileInput, Box, Text } from '@mantine/core';
 import { IconPhotoPlus } from '@tabler/icons-react';
 
 // Assuming you are passing these props into your Gallery or Modal component:
 // opened, close (from useDisclosure), patternId, and uploadAction
 
-export function UploadModal({ opened, close, patternId, uploadAction }: any) {
-  // 1. Hold the selected or pasted file in state
+export function UploadModal({ 
+  opened, 
+  close, 
+  targetId, 
+  idFieldName,
+  uploadAction 
+}: any) {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Global Paste Listener
+  useEffect(() => {
+    if (!opened) return; // Only listen when the modal is visible
+
+    // We use the native ClipboardEvent here
+    const handleGlobalPaste = (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const pastedFile = item.getAsFile();
+          if (pastedFile) {
+            event.preventDefault();
+            const cleanFile = new File([pastedFile], `pasted_photo_${Date.now()}.png`, { type: pastedFile.type });
+            setFile(cleanFile);
+          }
+        }
+      }
+    };
+
+    // Attach to the whole document
+    document.addEventListener('paste', handleGlobalPaste);
+    
+    // Cleanup: Remove the listener when the modal closes
+    return () => document.removeEventListener('paste', handleGlobalPaste);
+  }, [opened]); // Re-run this effect whenever 'opened' changes
 
   // 2. Intercept the paste event
   const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
@@ -29,20 +62,21 @@ export function UploadModal({ opened, close, patternId, uploadAction }: any) {
       }
     }
   };
-
-  // 3. Handle the final submission to your server action
-  const handleSubmit = async () => {
+const handleSubmit = async () => {
     if (!file) return;
     
     setIsUploading(true);
     try {
       const formData = new FormData();
-      formData.append('patternId', String(patternId));
-      formData.append('image', file);
+      
+      // 2. Dynamically set the ID key based on where the modal is opened
+      formData.append(idFieldName, String(targetId));
+      
+      // 3. Change 'image' to 'file' to match ALL of your server actions
+      formData.append('file', file);
 
       await uploadAction(formData);
       
-      // Reset and close on success
       setFile(null);
       close();
     } catch (error) {
@@ -56,7 +90,7 @@ export function UploadModal({ opened, close, patternId, uploadAction }: any) {
   return (
     <Modal opened={opened} onClose={close} title="Upload Photo" centered>
       {/* The Box catches the paste event anywhere inside the modal */}
-      <Box onPaste={handlePaste} style={{ outline: 'none' }} tabIndex={-1}>
+      <Box onPaste={handlePaste} style={{ outline: 'none' }} tabIndex={0}>
         
         <FileInput
           label="Select Image"

@@ -17,6 +17,7 @@ import {
   IconCoffee
 } from '@tabler/icons-react';
 import { useWakeLock } from '@hooks/useWakeLock';
+import { useEffect } from 'react';
 
 
 export default function NavigationShell({ children }: { children: React.ReactNode }) {
@@ -39,8 +40,11 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     
     return 'Command Center'; // A safe fallback
   };
+useEffect(() => {
+    close(); 
+  }, [pathname, close]);
 
-
+  
   const { isAwake, setIsAwake, isSupported } = useWakeLock();
 
   return (

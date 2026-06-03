@@ -8,7 +8,7 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { IconTrash, IconPhotoStar, IconPlus } from '@tabler/icons-react';
 import { UploadModal } from '@app/crafting/patterns/[id]/_components/UploadModal';
-import { uploadPatternImage } from '@app/crafting/patterns/_actions/actions';
+import { uploadPatternImage } from '@app/crafting/patterns/_actions/pattern_actions';
 
 // Define the flexible props this component accepts
 interface ImageGalleryProps {
@@ -153,8 +153,9 @@ export default function ImageGallery({
              <UploadModal
                 opened={uploadModalOpened} 
                 close={closeUpload} 
-                patternId={targetId} 
-                uploadAction={uploadPatternImage}
+                targetId={targetId} 
+                idFieldName={idFieldName}
+                uploadAction={uploadAction}
       />
 
             {/* FULL SIZE VIEWER */}

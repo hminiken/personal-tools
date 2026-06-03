@@ -1,8 +1,8 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { Title, Text, Group, Paper, Switch, Tabs, Divider, Box, Button, TextInput, Stack, Typography, Anchor, Modal, useComputedColorScheme } from '@mantine/core';
-import { IconArrowLeft, IconPlus } from '@tabler/icons-react';
+import { Title, Text, Group, Paper, Switch, Tabs, Divider, Box, Button, TextInput, Stack, Typography, Anchor, Modal, useComputedColorScheme, ActionIcon, Card, SimpleGrid, Image, Badge } from '@mantine/core';
+import { IconArrowLeft, IconPlus, IconUnlink } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
 
@@ -12,15 +12,16 @@ import { RichTextEditor } from '@mantine/tiptap';
 import '@mantine/tiptap/styles.css';
 
 // Actions & Components
-import { saveRulerPosition, setProjectCoverImage, updateProject, updateProjectStatus, addQuickNote, deleteProject } from '../../_actions/actions';
+import { saveRulerPosition, setProjectCoverImage, updateProject, updateProjectStatus, addQuickNote, deleteProject, unlinkYarnFromProject } from '../../_actions/project_actions';
 import { processWholePattern } from '@/utils/patternHighlighter';
 import ImageGallery from '@/components/PatternImageGallery';
 import { uploadProjectImage, deleteImage } from '@actions/patternActions';
-import { Project, Pattern, PatternImage } from '../types';
+import { Project, Pattern, PatternImage, yarnStash, projectYarns } from '../types';
 import { CraftingMetadataForm } from '@/components/CraftingMetadataForm';
 import { craftingEditorExtensions } from '@/utils/editorExtensions';
 import { useRouter } from 'next/navigation';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
+import { StashBrowserModal } from './StashBrowserModal';
 function ReadOnlyHTML({ html, fallback }: { html: string | null, fallback: string }) {
     return (
         <Typography p={0}>
@@ -29,7 +30,7 @@ function ReadOnlyHTML({ html, fallback }: { html: string | null, fallback: strin
     );
 }
 
-export default function ProjectWorkspace({ project, pattern, images }: { project: Project & { categories?: string | null }, pattern: Pattern, images: PatternImage[] }) {
+export default function ProjectWorkspace({ project, pattern, images, linkedYarns, availableStash}: { project: Project & { categories?: string | null }, pattern: Pattern, images: PatternImage[], linkedYarns: projectYarns[], availableStash: yarnStash[] }) {
     // const [rulerEnabled, setRulerEnabled] = useState(true);
     // const [rulerY, setRulerY] = useState(project.rulerPosition || 0);
     const [rulerEnabled, setRulerEnabled] = useState(true);
@@ -100,6 +101,14 @@ export default function ProjectWorkspace({ project, pattern, images }: { project
             alert('Failed to save status. Reverting...');
         }
     };
+
+    const [stashModalOpened, { open: openStashModal, close: closeStashModal }] = useDisclosure(false);
+
+  const handleUnlinkYarn = async (yarnId: number) => {
+    if (confirm("Remove this yarn from the project?")) {
+      await unlinkYarnFromProject(project.id, yarnId);
+    }
+  };
 
     const handleRulerPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
         setIsDraggingRuler(true);
@@ -316,6 +325,96 @@ export default function ProjectWorkspace({ project, pattern, images }: { project
                     setCoverAction={setProjectCoverImage}
                 />
             </Box>
+            
+
+
+<Box mb="xl" mt="xl">
+    <Group justify="space-between" mb="md">
+        <Title order={4}>Project Yarn</Title>
+        <Button variant="light" size="sm" leftSection={<IconPlus size={16} />} onClick={openStashModal}>
+            Browse Stash
+        </Button>
+    </Group>
+
+ {linkedYarns.map((yarn: any) => (
+<Card 
+    key={yarn.yarnId || yarn.id || Math.random()} // <-- Bulletproof key!
+    withBorder 
+    shadow="sm" 
+    radius="md" 
+    component={Link} 
+    href={`/crafting/stash/${yarn.yarnId || yarn.id}`}
+    style={{ textDecoration: 'none', color: 'inherit' }}
+>
+        <Group wrap="nowrap" align="flex-start">
+            
+            {/* 1. THE IMAGE (Uncommented the sizing so it renders!) */}
+            <Image 
+                src={yarn.coverImagePath || 'https://placehold.co/100x100?text=No+Photo'} 
+                h={60} 
+                w={60} 
+                radius="md" 
+                fit="cover" 
+                alt={yarn.title}
+                fallbackSrc="https://placehold.co/100x100?text=No+Photo"
+            />
+            
+            {/* 2. THE DETAILS & BADGES */}
+            <Box style={{ flex: 1 }}>
+                <Text fw={500} lineClamp={1}>{yarn.title}</Text>
+                <Text size="xs" c="dimmed" mb={6}>
+                    {yarn.brand || 'Unknown Brand'}
+                </Text>
+
+                <Group gap={4}>
+                    {/* Weight */}
+                    {yarn.weight && (
+                        <Badge size="xs" color="mustard" variant="outline">
+                            {yarn.weight}
+                        </Badge>
+                    )}
+
+                    {/* Fibers */}
+                    {yarn.fiber_tags?.split(',').map((fiber: string) => {
+                        const cleanFiber = fiber.trim();
+                        if (!cleanFiber) return null;
+                        return (
+                            <Badge key={cleanFiber} size="xs" color="rust" variant="outline">
+                                {cleanFiber}
+                            </Badge>
+                        );
+                    })}
+
+                    {/* Colors */}
+                    {yarn.color_tags?.split(',').map((color: string) => {
+                        const cleanColor = color.trim();
+                        if (!cleanColor) return null;
+                        return (
+                            <Badge key={cleanColor} size="xs" color="olive" variant="outline">
+                                {cleanColor}
+                            </Badge>
+                        );
+                    })}
+                </Group>
+            </Box>
+
+            {/* 3. THE UNLINK BUTTON (With preventDefault added!) */}
+            <ActionIcon 
+                variant="subtle" 
+                color="red" 
+                onClick={(e) => {
+                    e.preventDefault(); // <--- Stops the card from linking when you click the trash icon
+                    handleUnlinkYarn(yarn.yarnId || yarn.id);
+                }}
+            >
+                <IconUnlink size={16} />
+            </ActionIcon>
+
+        </Group>
+    </Card>
+))}
+</Box>
+
 
             {/* Quick Note Modal */}
             <Modal opened={noteModalOpened} onClose={closeNote} title="Quick Note" centered transitionProps={{ onEntered: () => inputRef.current?.focus() }}>
@@ -335,6 +434,13 @@ export default function ProjectWorkspace({ project, pattern, images }: { project
                     <Button onClick={handleSaveNote}>Save Note</Button>
                 </Stack>
             </Modal>
+            <StashBrowserModal 
+        opened={stashModalOpened}
+        close={closeStashModal}
+        projectId={project.id}
+        availableStash={availableStash}
+        linkedYarns={linkedYarns}
+      />
             <ConfirmDeleteModal 
           opened={deleteModalOpened}
           close={closeDelete}
