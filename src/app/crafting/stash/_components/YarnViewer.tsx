@@ -221,67 +221,67 @@ export default function YarnViewer({
                 {linkedProjects.length === 0 ? (
                     <Text c="dimmed">This yarn isn't linked to any projects yet.</Text>
                 ) : (
-                    <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
+                    <SimpleGrid cols={{ base: 2, sm: 2, md: 3 }}>
                         {linkedProjects.map((project) => (
 
-                            <Card 
-  key={project.id} 
-  withBorder 
-  shadow="sm" 
-  radius="md" 
-  component={Link} 
-  href={`/crafting/projects/${project.id}`} 
-  style={{ textDecoration: 'none', color: 'inherit' }}
->
-  <Group wrap="nowrap" align="flex-start" justify="space-between">
-    
-    {/* COLUMN 1: Identity (Title & Status) */}
-    <Box w="35%">
-      <Text fw={600} lineClamp={2} size="sm">{project.title}</Text>
-      
-      <Badge 
-        mt="md" 
-        size="sm"
-        color={project.status === 'Complete' || project.status === 'Completed' ? 'olive' : 'rust'}
-      >
-        {project.status || 'Planned'}
-      </Badge>
-    </Box>
+                            <Card
+                                key={project.id}
+                                withBorder
+                                shadow="sm"
+                                radius="md"
+                                component={Link}
+                                href={`/crafting/projects/${project.id}`}
+                                style={{ textDecoration: 'none', color: 'inherit' }}
+                            >
+                                <Group wrap="nowrap" align="flex-start" justify="space-between">
 
-    {/* COLUMN 2: Details (Categories & Hooks) */}
-    <Box style={{ flex: 1, borderLeft: '1px solid var(--mantine-color-gray-2)' }} pl="sm">
-      <Group gap={4}>
-        {project.categories?.split(',').map((cat: string) => {
-          const cleanCat = cat.trim();
-          if (!cleanCat) return null;
-          return (
-            <Badge key={cleanCat} size="xs" color="mustard" variant="light">
-              {cleanCat}
-            </Badge>
-          );
-        })}
-      </Group>
+                                    {/* COLUMN 1: Identity (Title & Status) */}
+                                    <Box w="35%">
+                                        <Text fw={600} lineClamp={2} size="sm">{project.title}</Text>
 
-      {project.hooks && (
-        <Text size="xs" c="dimmed" mt={6}>
-          <strong>Hooks:</strong> {project.hooks.split(',').map(h => h.trim()).join(', ')}
-        </Text>
-      )}
-    </Box>
+                                        <Badge
+                                            mt="md"
+                                            size="sm"
+                                            color={project.status === 'Complete' || project.status === 'Completed' ? 'olive' : 'rust'}
+                                        >
+                                            {project.status || 'Planned'}
+                                        </Badge>
+                                    </Box>
 
-    {/* Unlink Button */}
-    <ActionIcon 
-      variant="subtle" 
-      color="red" 
-      onClick={(e) => {
-        e.preventDefault(); 
-        handleUnlinkProject(e, project.id);
-      }}
-    >
-      <IconUnlink size={16} />
-    </ActionIcon>
-  </Group>
-</Card>
+                                    {/* COLUMN 2: Details (Categories & Hooks) */}
+                                    <Box style={{ flex: 1, borderLeft: '1px solid var(--mantine-color-gray-2)' }} pl="sm">
+                                        <Group gap={4}>
+                                            {project.categories?.split(',').map((cat: string) => {
+                                                const cleanCat = cat.trim();
+                                                if (!cleanCat) return null;
+                                                return (
+                                                    <Badge key={cleanCat} size="xs" color="mustard" variant="light">
+                                                        {cleanCat}
+                                                    </Badge>
+                                                );
+                                            })}
+                                        </Group>
+
+                                        {project.hooks && (
+                                            <Text size="xs" c="dimmed" mt={6}>
+                                                <strong>Hooks:</strong> {project.hooks.split(',').map(h => h.trim()).join(', ')}
+                                            </Text>
+                                        )}
+                                    </Box>
+
+                                    {/* Unlink Button */}
+                                    <ActionIcon
+                                        variant="subtle"
+                                        color="red"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            handleUnlinkProject(e, project.id);
+                                        }}
+                                    >
+                                        <IconUnlink size={16} />
+                                    </ActionIcon>
+                                </Group>
+                            </Card>
 
 
                         ))}

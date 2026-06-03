@@ -18,7 +18,7 @@ import {
 } from '@tabler/icons-react';
 import { useWakeLock } from '@hooks/useWakeLock';
 import { useEffect } from 'react';
-
+import { useMediaQuery } from '@mantine/hooks';
 
 export default function NavigationShell({ children }: { children: React.ReactNode }) {
   // Start the sidebar closed by default
@@ -40,10 +40,13 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     
     return 'Command Center'; // A safe fallback
   };
-useEffect(() => {
-    close(); 
-  }, [pathname, close]);
+const isMobile = useMediaQuery('(max-width: 48em)'); // matches 'sm' breakpoint
 
+useEffect(() => {
+  if (isMobile) {
+    close();
+  }
+}, [pathname, close, isMobile]);
   
   const { isAwake, setIsAwake, isSupported } = useWakeLock();
 
@@ -53,8 +56,7 @@ useEffect(() => {
       navbar={{ 
         width: 260, 
         breakpoint: 'sm', 
-        // This forces the sidebar to hide on ALL screen sizes when closed
-        collapsed: { desktop: !opened, mobile: !opened } 
+       collapsed: { desktop: !opened, mobile: !opened }
       }}
       pl={{ base: 'xs', sm: 'xl'}}
       pr={{ base: 'xs', sm: 'xl'}}
