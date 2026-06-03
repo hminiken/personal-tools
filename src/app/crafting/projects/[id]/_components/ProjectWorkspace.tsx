@@ -30,7 +30,18 @@ function ReadOnlyHTML({ html, fallback }: { html: string | null, fallback: strin
     );
 }
 
-export default function ProjectWorkspace({ project, pattern, images, linkedYarns, availableStash}: { project: Project & { categories?: string | null }, pattern: Pattern, images: PatternImage[], linkedYarns: projectYarns[], availableStash: yarnStash[] }) {
+export interface LinkedYarn {
+  id: number;
+  yarnId: number;
+  title: string;
+  brand: string | null;
+  weight: string | null;
+  color_tags: string | null;
+  fiber_tags: string | null;
+  coverImagePath: string | null;
+}
+
+export default function ProjectWorkspace({ project, pattern, images, linkedYarns, availableStash}: { project: Project & { categories?: string | null }, pattern: Pattern, images: PatternImage[], linkedYarns: LinkedYarn[], availableStash: yarnStash[] }) {
     // const [rulerEnabled, setRulerEnabled] = useState(true);
     // const [rulerY, setRulerY] = useState(project.rulerPosition || 0);
     const [rulerEnabled, setRulerEnabled] = useState(true);
@@ -336,7 +347,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
         </Button>
     </Group>
 
- {linkedYarns.map((yarn: any) => (
+ {linkedYarns.map((yarn: LinkedYarn) => (
 <Card 
     key={yarn.yarnId || yarn.id || Math.random()} // <-- Bulletproof key!
     withBorder 

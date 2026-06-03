@@ -4,14 +4,15 @@ import { useState } from 'react';
 import { Modal, TextInput, ScrollArea, SimpleGrid, Card, Group, Image, Box, Text, Badge, Button } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
 import { linkYarnToProject } from '../../_actions/project_actions';
-import { projectYarns, yarnStash } from '../types';
+import {  yarnStash } from '../types';
+import { LinkedYarn } from './ProjectWorkspace';
 
 interface StashBrowserModalProps {
   opened: boolean;
   close: () => void;
   projectId: number;
   availableStash: yarnStash[];
-  linkedYarns: projectYarns[];
+  linkedYarns: LinkedYarn[];
 }
 
 export function StashBrowserModal({ 
@@ -38,11 +39,12 @@ export function StashBrowserModal({
     return tokens.every((token) => {
       if (token.includes(':')) {
         const [key, value] = token.split(':', 2);
-        const itemValue = item[key]; 
+        const typedKey = key as keyof typeof item;
+        const itemValue = item[typedKey];
         if (itemValue && typeof itemValue === 'string') {
           return itemValue.toLowerCase().includes(value);
         }
-        return false; 
+        return false;
       }
       return item.title.toLowerCase().includes(token);
     });
