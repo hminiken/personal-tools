@@ -4,6 +4,7 @@
 import { db } from '@/db';
 import { projects, projectYarns } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
+
 import { revalidatePath } from 'next/cache';
 
 // 2. Add an action to silently save the highlighter position
@@ -53,17 +54,6 @@ export async function updateProject(formData: FormData) {
     .where(eq(projects.id, projectId));
 
   revalidatePath(`/crafting/projects/${projectId}`);
-}
-
-
-export async function setProjectCoverImage(projectId: number, imagePath: string) {
-  await db
-    .update(projects)
-    .set({ coverImagePath: imagePath })
-    .where(eq(projects.id, projectId));
-    
-  revalidatePath(`/crafting/projects/${projectId}`);
-  revalidatePath(`/crafting/projects`); // Optional: If you build a Projects Gallery later!
 }
 
 
@@ -136,3 +126,4 @@ export async function unlinkYarnFromProject(projectId: number, yarnId: number) {
   revalidatePath(`/crafting/projects/${projectId}`);
   revalidatePath(`/crafting/stash/${yarnId}`);
 }
+

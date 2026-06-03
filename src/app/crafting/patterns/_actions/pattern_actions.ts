@@ -6,8 +6,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from 'next/cache';
 import { eq } from 'drizzle-orm';
 
-import { writeFile } from 'fs/promises';
-import path from 'path';
 import { images } from '@/db/schema'; // Make sure images is imported from your schema
 
 
@@ -44,7 +42,7 @@ export async function getPatternById(id: number) {
 
 
 export async function spawnProject(formData: FormData) {
- const patternId = Number(formData.get('patternId'));
+  const patternId = Number(formData.get('patternId'));
   const title = formData.get('title') as string;
   const yarnUsed = formData.get('yarnUsed') as string;
   const sourceUrl = formData.get('sourceUrl') as string;
@@ -63,7 +61,7 @@ export async function spawnProject(formData: FormData) {
     colors,
     hookSizes,
     yarnWeights,
-    sourceUrl ,
+    sourceUrl,
     annotatedPattern: masterPattern?.patternText || '', // The magic clone!
   }).returning();
 
@@ -79,7 +77,7 @@ export async function spawnProject(formData: FormData) {
       patternId: null,      // Explicitly detach from pattern so they are independent
       imagePath: img.imagePath, // Point to the exact same file on the hard drive
     }));
-    
+
     await db.insert(images).values(projectImagesToInsert);
   }
 
@@ -89,7 +87,7 @@ export async function spawnProject(formData: FormData) {
 // 1. The Text & Metadata Update Action
 export async function updatePattern(formData: FormData) {
   const patternId = Number(formData.get('patternId'));
-  
+
   // Extract Metadata
   const title = formData.get('title') as string;
   const hookSizes = formData.get('hookSizes') as string;
@@ -107,53 +105,26 @@ export async function updatePattern(formData: FormData) {
   // Save to Database
   await db
     .update(patterns)
-    .set({ 
-      title, hookSizes, yarnWeights, yarnYardage, sourceUrl, 
-      patternText, materials, abbreviations, sizing, patternNotes 
+    .set({
+      title, hookSizes, yarnWeights, yarnYardage, sourceUrl,
+      patternText, materials, abbreviations, sizing, patternNotes
     })
     .where(eq(patterns.id, patternId));
 
   revalidatePath(`/crafting/patterns/${patternId}`);
-  revalidatePath(`/crafting/patterns`); 
-}
-
-// 2. The Image Upload Action
-export async function uploadPatternImage(formData: FormData) {
-  const patternId = Number(formData.get('patternId'));
-  const imageFile = formData.get('image') as File | null;
-  
-  if (imageFile && imageFile.size > 0) {
-    const buffer = Buffer.from(await imageFile.arrayBuffer());
-    const filename = `${Date.now()}-${imageFile.name.replaceAll(' ', '_')}`;
-    const filepath = path.join(process.cwd(), 'public/uploads', filename);
-    
-    // Note: Make sure 'fs/promises' and 'path' are imported at the top of your file!
-    await writeFile(filepath, buffer);
-
-    const newImagePath = `/uploads/${filename}`;
-    await db.insert(images).values({
-      patternId,
-      imagePath: newImagePath,
-    });
-
-    // Auto-set as cover if none exists
-    const currentPattern = await db.select().from(patterns).where(eq(patterns.id, patternId)).get();
-    if (!currentPattern?.coverImagePath) {
-      await db.update(patterns).set({ coverImagePath: newImagePath }).where(eq(patterns.id, patternId));
-    }
-  }
-  revalidatePath(`/crafting/patterns/${patternId}`);
+  revalidatePath(`/crafting/patterns`);
 }
 
 
 
-export async function updatePatternStatus(patternId: number, status: string ) {
-    try {
+
+export async function updatePatternStatus(patternId: number, status: string) {
+  try {
     await db
       .update(patterns)
       .set({ status: status })
       .where(eq(patterns.id, patternId));
-      
+
     return { success: true };
   } catch (error) {
     console.error('Database update failed:', error);
@@ -163,10 +134,10 @@ export async function updatePatternStatus(patternId: number, status: string ) {
 
 
 export async function deletePattern(patternId: number) {
-    // Note: If you have foreign keys (like projects or images attached to this pattern),
-    // make sure you delete those first or have CASCADE setup in your SQLite schema!
-    await db.delete(patterns).where(eq(patterns.id, patternId));
-    revalidatePath('/crafting/patterns');
+  // Note: If you have foreign keys (like projects or images attached to this pattern),
+  // make sure you delete those first or have CASCADE setup in your SQLite schema!
+  await db.delete(patterns).where(eq(patterns.id, patternId));
+  revalidatePath('/crafting/patterns');
 }
 
 

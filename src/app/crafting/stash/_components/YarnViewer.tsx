@@ -17,7 +17,8 @@ import { craftingEditorExtensions } from '@/utils/editorExtensions';
 // Components & Actions (You will need to create these actions similar to your pattern actions!)
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 import ImageGallery from '@/components/PatternImageGallery'; // Reusing your gallery!
-import { updateYarn, deleteYarn, deleteYarnImage, setYarnCoverImage, uploadYarnImage, unlinkProjectFromYarn } from '../_actions/stash_actions';
+import { updateYarn, deleteYarn,  unlinkProjectFromYarn } from '../_actions/stash_actions';
+import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
 
 // Interfaces
 interface Yarn {
@@ -299,10 +300,10 @@ export default function YarnViewer({
                     targetId={yarn.id}
                     idFieldName="yarnId" // Crucial for making your reusable component save to the right table
                     revalidateUrl={`/crafting/stash/${yarn.id}`}
-                    uploadAction={uploadYarnImage}
-                    deleteAction={deleteYarnImage}
+                    uploadAction={uploadImage}
+                    deleteAction={deleteImage}
                     coverImagePath={yarn.coverImagePath}
-                    setCoverAction={setYarnCoverImage}
+                    setCoverAction={(id, path) => setCoverImage(id, path, 'yarn')}
                 />
             </Box>
 

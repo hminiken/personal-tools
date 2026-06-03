@@ -12,16 +12,16 @@ import { RichTextEditor } from '@mantine/tiptap';
 import '@mantine/tiptap/styles.css';
 
 // Actions & Components
-import { saveRulerPosition, setProjectCoverImage, updateProject, updateProjectStatus, addQuickNote, deleteProject, unlinkYarnFromProject } from '../../_actions/project_actions';
+import { saveRulerPosition,  updateProject, updateProjectStatus, addQuickNote, deleteProject, unlinkYarnFromProject } from '../../_actions/project_actions';
 import { processWholePattern } from '@/utils/patternHighlighter';
 import ImageGallery from '@/components/PatternImageGallery';
-import { uploadProjectImage, deleteImage } from '@actions/patternActions';
-import { Project, Pattern, PatternImage, yarnStash, projectYarns } from '../types';
+import { Project, Pattern, PatternImage, yarnStash } from '../types';
 import { CraftingMetadataForm } from '@/components/CraftingMetadataForm';
 import { craftingEditorExtensions } from '@/utils/editorExtensions';
 import { useRouter } from 'next/navigation';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 import { StashBrowserModal } from './StashBrowserModal';
+import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
 function ReadOnlyHTML({ html, fallback }: { html: string | null, fallback: string }) {
     return (
         <Typography p={0}>
@@ -330,10 +330,10 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                     targetId={project.id}
                     idFieldName="projectId"
                     revalidateUrl={`/crafting/projects/${project.id}`}
-                    uploadAction={uploadProjectImage}
+                    uploadAction={uploadImage}
                     deleteAction={deleteImage}
                     coverImagePath={project.coverImagePath}
-                    setCoverAction={setProjectCoverImage}
+                    setCoverAction={(id, path) => setCoverImage(id, path, 'project')}
                 />
             </Box>
             
@@ -349,6 +349,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
 
  {linkedYarns.map((yarn: LinkedYarn) => (
 <Card 
+    // eslint-disable-next-line react-hooks/purity
     key={yarn.yarnId || yarn.id || Math.random()} // <-- Bulletproof key!
     withBorder 
     shadow="sm" 

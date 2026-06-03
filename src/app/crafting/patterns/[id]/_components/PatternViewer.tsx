@@ -12,8 +12,7 @@ import { RichTextEditor } from '@mantine/tiptap';
 import '@mantine/tiptap/styles.css';
 
 // Actions & Components
-import { deletePattern, spawnProject, updatePattern, updatePatternStatus, uploadPatternImage } from '../../_actions/pattern_actions';
-import { deleteImage, setCoverImage } from '@actions/patternActions';
+import { deletePattern, spawnProject, updatePattern, updatePatternStatus } from '../../_actions/pattern_actions';
 import { processWholePattern } from '@/utils/patternHighlighter';
 import { TabContent } from './TabContent';
 import ImageGallery from '@/components/PatternImageGallery';
@@ -22,6 +21,7 @@ import { CraftingMetadataForm } from '@/components/CraftingMetadataForm';
 import { craftingEditorExtensions } from '@/utils/editorExtensions';
 import { useRouter } from 'next/navigation';
 import { ConfirmDeleteModal } from '@components/ConfirmDeleteModal';
+import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
 
 export default function PatternViewer({ pattern, images }: { pattern: Pattern, images: PatternImage[] }) {
   const [isEditingDetails, setIsEditingDetails] = useState(false);
@@ -194,10 +194,10 @@ export default function PatternViewer({ pattern, images }: { pattern: Pattern, i
           targetId={pattern.id}
           idFieldName="patternId"
           revalidateUrl={`/crafting/patterns/${pattern.id}`}
-          uploadAction={uploadPatternImage}
+          uploadAction={uploadImage}
           deleteAction={deleteImage}
           coverImagePath={pattern.coverImagePath}
-          setCoverAction={setCoverImage}
+          setCoverAction={(id, path) => setCoverImage(id, path, 'pattern')}
         />
       </Box>
 

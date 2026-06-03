@@ -2,13 +2,13 @@
 
 import { startTransition, useState } from 'react';
 import {
-    Accordion, Title, Group, Button, SimpleGrid,
-    Image, Box, FileInput, Modal, Stack, Text, ActionIcon
+    Accordion, Title, Group, SimpleGrid,
+    Image, Box, Modal, Text, ActionIcon
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconTrash, IconPhotoStar, IconPlus } from '@tabler/icons-react';
-import { UploadModal } from '@app/crafting/patterns/[id]/_components/UploadModal';
-import { uploadPatternImage } from '@app/crafting/patterns/_actions/pattern_actions';
+// import { UploadModal } from '@app/crafting/patterns/[id]/_components/UploadModal';
+import { UploadModal } from './UploadModal';
 
 // Define the flexible props this component accepts
 interface ImageGalleryProps {
@@ -53,7 +53,7 @@ export default function ImageGallery({
 
                             <ActionIcon
                                 component="div"
-                                variant="filled" 
+                                variant="filled"
                                 color="rust.7"
                                 size="sm"
                                 onClick={(e) => {
@@ -131,32 +131,13 @@ export default function ImageGallery({
                 </Accordion.Item>
             </Accordion>
 
-            {/* <Modal opened={uploadModalOpened} onClose={closeUpload} title="Upload Photo" centered>
-                <form action={async (formData) => {
-                    await uploadAction(formData);
-                    closeUpload();
-                }}>
-                    <input type="hidden" name={idFieldName} value={targetId} />
-                    <Stack>
-                        <FileInput
-                            label="Select Image" name="image" placeholder="Click to browse"
-                            accept="image/png,image/jpeg,image/webp" required
-                        />
-                        <Group justify="flex-end" mt="md">
-                            <Button variant="default" onClick={closeUpload}>Cancel</Button>
-                            <Button type="submit">Upload</Button>
-                        </Group>
-                    </Stack>
-                </form>
-            </Modal> */}
-
-             <UploadModal
-                opened={uploadModalOpened} 
-                close={closeUpload} 
-                targetId={targetId} 
+            <UploadModal
+                opened={uploadModalOpened}
+                close={closeUpload}
+                targetId={targetId}
                 idFieldName={idFieldName}
                 uploadAction={uploadAction}
-      />
+            />
 
             {/* FULL SIZE VIEWER */}
             <Modal opened={imageViewerOpened} onClose={closeImageViewer} withCloseButton={false} size="auto" centered padding={0}>
