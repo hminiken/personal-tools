@@ -19,11 +19,12 @@ export default function StashClient({ stashItems }: StashClientProps) {
       searchPlaceholder="Search 'colors:blue' or 'weight:worsted'"
       newItemText="Add Yarn"
       createModalTitle="Log New Yarn"
+      categoryField="fibers"
       deleteAction={deleteYarn}
       renderBadges={(item) => (
         <Group gap="xs" mt="xs">
-          {item.weight && <Badge color="mustard.7" variant="outline">{item.weight}</Badge>}
-          {item.color_tags?.split(',').map((color: string) => (
+          {item.weights && <Badge color="mustard.7" variant="outline">{item.weights}</Badge>}
+          {item.colors?.split(',').map((color: string) => (
             color.trim() && <Badge key={color} color="olive.5" variant="outline">{color.trim()}</Badge>
           ))}
         </Group>

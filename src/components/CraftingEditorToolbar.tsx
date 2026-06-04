@@ -1,6 +1,10 @@
 import { RichTextEditor } from '@mantine/tiptap';
+import { IconPhoto } from '@tabler/icons-react';
+import { ActionIcon } from '@mantine/core';
+import { useRichTextEditorContext } from '@mantine/tiptap';
 
 export function CraftingEditorToolbar() {
+  const { editor } = useRichTextEditorContext();
   return (
     <RichTextEditor.Toolbar sticky stickyOffset={60}>
       
@@ -25,6 +29,21 @@ export function CraftingEditorToolbar() {
         <RichTextEditor.BulletList />
         <RichTextEditor.OrderedList />
       </RichTextEditor.ControlsGroup>
+
+      <RichTextEditor.ControlsGroup>
+  <RichTextEditor.Control
+    onClick={() => {
+      const url = window.prompt('Enter Image URL');
+      if (url) {
+        editor?.chain().focus().setImage({ src: url }).run();
+      }
+    }}
+    aria-label="Insert image"
+    title="Insert image"
+  >
+    <IconPhoto stroke={1.5} size="1rem" />
+  </RichTextEditor.Control>
+</RichTextEditor.ControlsGroup>
 
     </RichTextEditor.Toolbar>
   );

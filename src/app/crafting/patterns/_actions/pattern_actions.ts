@@ -151,3 +151,23 @@ export async function deletePattern(patternId: number) {
   await db.delete(patterns).where(eq(patterns.id, patternId));
   revalidatePath('/crafting/patterns');
 }
+
+
+
+export async function createPatternFromImport(data: any) {
+  const [newPattern] = await db.insert(patterns).values({
+    title: data.title || 'Untitled Import',
+    sourceUrl: data.sourceUrl,
+    materials: data.materials,
+    sizing: data.sizing,
+    abbreviations: data.abbreviations,
+    notes: data.notes,
+    content: data.content,
+    categories: data.categories,
+    hooks: data.hooks,
+    weights: data.weights,
+    status: 'planned', // Give it a default status
+  }).returning({ id: patterns.id });
+
+  return newPattern.id;
+}

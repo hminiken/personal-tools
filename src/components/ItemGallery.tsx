@@ -11,6 +11,8 @@ import Link from 'next/link';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 import GalleryGrid from './GalleryGrid';
 import SearchHelpBox from './SearchHelpBox';
+import { GalleryControls } from './GalleryControls';
+import { FloatingAddButton } from './FloatingAddButton';
 
 // ==========================================
 // 1. TYPES & INTERFACES
@@ -188,63 +190,30 @@ export default function ItemGallery<T extends BaseGalleryItem>({
   return (
     <div>
       {/* HEADER */}
-      <Group justify="space-between" align="center" mb="md" mt="md">
-        <Title order={2}>{title}</Title>
-        {renderCreateForm && (
+      <Group  mb="md" mt="0">
+        {/* <Title order={2}>{title}</Title> */}
+        {/* {renderCreateForm && (
           <Button leftSection={<IconPlus size={16} />} onClick={openCreate} bg="olive.5">
             {newItemText}
           </Button>
-        )}
+        )} */}
       </Group>
+      {renderCreateForm && (
+        <FloatingAddButton onClick={openCreate} text={newItemText} />
+      )}
 
       {/* CONTROLS BAR */}
-      {/* CONTROLS BAR */}
-        <Group 
-          wrap="nowrap" 
-          w={{ base: '100%', md: 'auto' }} 
-          style={{ flexGrow: 1 }} 
-          bg="light-dark(var(--mantine-color-neutrals-0), var(--mantine-color-dark-7))" 
-          bdrs="md" 
-          p="sm" 
-          mb="sm"
-        >
-        <Group>
-          <TextInput
-            styles={universalInputStyles}
-            placeholder={searchPlaceholder}
-            leftSection={<IconSearch size={16} color="var(--mantine-color-neutrals-9)" />}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.currentTarget.value)}
-            w={{ base: '100%', sm: 300 }}
-            rightSection={searchQuery.length > 0 ? <CloseButton size="sm" onClick={() => setSearchQuery('')} aria-label="Clear search" /> : null}
-          />
-          <ActionIcon variant="subtle" color="neutrals.8" size="lg" onClick={() => setShowSearchHelp((prev) => !prev)}>
-            <IconInfoCircle size={20} />
-          </ActionIcon>
-        </Group>
-
-        <Group justify="space-between" w={{ base: '100%', md: 'auto' }}>
-          <Switch 
-            color="neutrals.7" c="neutrals.9" label="Group by Category" checked={isGrouped}
-            onChange={(event) => setIsGrouped(event.currentTarget.checked)}
-            styles={{ track: { backgroundColor: 'var(--mantine-color-neutrals-2)', color: 'var(--mantine-color-neutrals-2)' } }}
-          />
-          <Select
-            leftSection={<IconSortAscending size={16} color="var(--mantine-color-neutrals-9)" />}
-            styles={universalInputStyles}
-            placeholder="Sort by"
-            value={sortOption}
-            onChange={setSortOption}
-            data={[
-              { value: 'title-asc', label: 'Title (A-Z)' },
-              { value: 'title-desc', label: 'Title (Z-A)' },
-              { value: 'created-desc', label: 'Newest First' },
-              { value: 'updated-desc', label: 'Recently Updated' },
-            ]}
-            w={200}
-          />
-        </Group>
-      </Group>
+        <GalleryControls 
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        searchPlaceholder={searchPlaceholder}
+        isGrouped={isGrouped}
+        setIsGrouped={setIsGrouped}
+        sortOption={sortOption}
+        setSortOption={setSortOption}
+        setShowSearchHelp={setShowSearchHelp}
+        universalInputStyles={universalInputStyles}
+      />
 
       <SearchHelpBox opened={showSearchHelp} onClose={() => setShowSearchHelp(false)} availableFields={availableFields} />
 

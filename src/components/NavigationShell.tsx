@@ -36,7 +36,8 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     // AND the individual item (/patterns/1) show the correct category!
     if (pathname.includes('/crafting/patterns')) return 'Pattern Library';
     if (pathname.includes('/crafting/projects')) return 'Active Projects';
-    if (pathname.includes('/crafting/inventory')) return 'Yarn Stash'; // Just in case you add this later!
+    if (pathname.includes('/crafting/stash')) return 'Yarn Stash'; // Just in case you add this later!
+    if (pathname.includes('/crafting/media')) return 'Manage Media'; // Just in case you add this later!
     
     return 'Command Center'; // A safe fallback
   };
@@ -145,6 +146,12 @@ useEffect(() => {
               href="/crafting/stash" 
               label="Yarn Stash" 
               active={pathname.includes('/stash')}
+            />
+             <NavLink 
+              component={Link} 
+              href="/crafting/media" 
+              label="Media" 
+              active={pathname.includes('/media')}
             />
           </NavLink>
 

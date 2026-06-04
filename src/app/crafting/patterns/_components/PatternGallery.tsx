@@ -1,13 +1,27 @@
 'use client';
 
 import { TextInput, Group, Button, Stack, Badge } from '@mantine/core';
-import { IconExternalLink } from '@tabler/icons-react';
+import { IconDownload, IconExternalLink } from '@tabler/icons-react';
 import ItemGallery from '@/components/ItemGallery';
 import { Pattern } from '../types';
 import { createNewPattern, deletePattern } from '../_actions/pattern_actions';
+import { useDisclosure } from '@mantine/hooks';
+import { ImportPatternModal } from '@components/ImportPatternModal';
 
 export default function PatternGallery({ initialPatterns }: { initialPatterns: Pattern[] }) {
+  const [importModalOpened, { open: openImport, close: closeImport }] = useDisclosure(false);
   return (
+    <>
+    <Group justify="flex-end" mb="md">
+        <Button 
+          leftSection={<IconDownload size={16} />} 
+          variant="light" 
+          color="olive"
+          onClick={openImport}
+        >
+          Smart Import
+        </Button>
+      </Group>
     <ItemGallery
       title="Pattern Library"
       items={initialPatterns}
@@ -46,5 +60,7 @@ export default function PatternGallery({ initialPatterns }: { initialPatterns: P
         </form>
       )}
     />
+    <ImportPatternModal opened={importModalOpened} close={closeImport} />
+    </>
   );
 }

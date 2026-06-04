@@ -1,4 +1,5 @@
 // src/db/schema.ts
+import { relations } from 'drizzle-orm/relations';
 import { sqliteTable, integer, text, primaryKey } from 'drizzle-orm/sqlite-core';
 
 // ==========================================
@@ -100,4 +101,10 @@ export const projectYarns = sqliteTable('project_yarns', {
   yarnId: integer('yarn_id').notNull().references(() => yarns.id, { onDelete: 'cascade' }),
 }, (t) => ({
   pk: primaryKey({ columns: [t.projectId, t.yarnId] }), 
+}));
+
+export const imagesRelations = relations(images, ({ one }) => ({
+    pattern: one(patterns, { fields: [images.patternId], references: [patterns.id] }),
+    project: one(projects, { fields: [images.projectId], references: [projects.id] }),
+    yarn: one(yarns, { fields: [images.yarnId], references: [yarns.id] }),
 }));

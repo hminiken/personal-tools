@@ -160,11 +160,11 @@ export function UploadModal({
                                         key={`lib-${img.id || index}`} 
                                         style={{ position: 'relative', cursor: isLinking ? 'wait' : 'pointer' }}
                                         onClick={() => {
-                                            if (!isLinking) handleLinkImage(img.imagePath);
+                                            if (!isLinking) handleLinkImage(img.path);
                                         }}
                                     >
                                         <Image
-                                            src={img.imagePath}
+                                            src={img.path}
                                             alt="Library Image"
                                             radius="md"
                                             h={100}
