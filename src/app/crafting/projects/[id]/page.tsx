@@ -1,6 +1,6 @@
 // src/app/crafting/projects/[id]/page.tsx
 import { db } from '@/db';
-import { patterns, projects, images, projectYarns, yarnStash} from '@/db/schema';
+import { patterns, projects, images, projectYarns, yarns} from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import ProjectWorkspace from  './_components/ProjectWorkspace'
@@ -26,21 +26,21 @@ const id = parseInt(resolvedParams.id, 10);
   const linkedYarns = await db
     .select({
       // Explicitly map these so your component can find them!
-      id: yarnStash.id,
-      yarnId: yarnStash.id, 
-      title: yarnStash.title,
-      brand: yarnStash.brand,
-      weight: yarnStash.weight,
-      color_tags: yarnStash.color_tags,
-      fiber_tags: yarnStash.fiber_tags,
-      coverImagePath: yarnStash.coverImagePath,
+      id: yarns.id,
+      yarnId: yarns.id, 
+      title: yarns.title,
+      brand: yarns.brand,
+      weight: yarns.weights,
+      color_tags: yarns.colors,
+      fiber_tags: yarns.fibers,
+      coverImagePath: yarns.coverImage,
     })
     .from(projectYarns)
-    .innerJoin(yarnStash, eq(projectYarns.yarnId, yarnStash.id))
+    .innerJoin(yarns, eq(projectYarns.yarnId, yarns.id))
     .where(eq(projectYarns.projectId, id));
 
   // 2. Fetch the entire available stash for the modal to browse
-  const entireStash = await db.select().from(yarnStash);
+  const entireStash = await db.select().from(yarns);
 
   if (!pattern) notFound();
 

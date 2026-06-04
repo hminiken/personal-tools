@@ -19,8 +19,8 @@ export default function PatternGallery({ initialPatterns }: { initialPatterns: P
       deleteAction={deletePattern}
       renderBadges={(pattern) => (
         <Group gap="xs" mb="md">
-          {pattern.hookSizes && <Badge color="mustard" variant="light">{pattern.hookSizes}</Badge>}
-          {pattern.yarnWeights && <Badge color="rust" variant="light">{pattern.yarnWeights}</Badge>}
+          {pattern.hooks && <Badge color="mustard" variant="light">{pattern.hooks}</Badge>}
+          {pattern.weights && <Badge color="rust" variant="light">{pattern.weights}</Badge>}
           {pattern.status && <Badge color="olive" variant="light">{pattern.status}</Badge>}
         
         </Group>

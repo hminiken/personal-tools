@@ -1,6 +1,7 @@
+/* eslint-disable react/no-unescaped-entities */
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import {
     Title, Text, Group, Paper, Switch, Tabs, Divider, Box, Button,
     TextInput, Stack, Typography, Anchor, Modal, useComputedColorScheme, ActionIcon, Card, Image, Badge
@@ -10,7 +11,6 @@ import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
 
 // Tiptap Imports
-import { useEditor } from '@tiptap/react';
 import { RichTextEditor } from '@mantine/tiptap';
 import '@mantine/tiptap/styles.css';
 
@@ -20,7 +20,6 @@ import { processWholePattern } from '@/utils/patternHighlighter';
 import ImageGallery from '@/components/PatternImageGallery';
 import { Project, Pattern, PatternImage, yarnStash } from '../types';
 import { CraftingMetadataForm } from '@/components/CraftingMetadataForm';
-import { craftingEditorExtensions } from '@/utils/editorExtensions';
 import { useRouter } from 'next/navigation';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 import { StashBrowserModal } from './StashBrowserModal';
@@ -50,7 +49,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
     // const [rulerEnabled, setRulerEnabled] = useState(true);
     // const [rulerY, setRulerY] = useState(project.rulerPosition || 0);
     const [rulerEnabled, setRulerEnabled] = useState(true);
-    const [rulerY, setRulerY] = useState(project.rulerPosition || 0);
+    const [rulerY, setRulerY] = useState(project.ruler || 0);
     const [isDraggingRuler, setIsDraggingRuler] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -64,13 +63,13 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
     const inputRef = useRef<HTMLInputElement>(null);
 
     // States
-    const [hookTags, setHookTags] = useState<string[]>(project.hookSizes ? project.hookSizes.split(',') : []);
-    const [weightTags, setWeightTags] = useState<string[]>(project.yarnWeights ? project.yarnWeights.split(',') : []);
+    const [hookTags, setHookTags] = useState<string[]>(project.hooks ? project.hooks.split(',') : []);
+    const [weightTags, setWeightTags] = useState<string[]>(project.weights ? project.weights.split(',') : []);
     const [categoryTags, setCategoryTags] = useState<string[]>(project.categories ? project.categories.split(',') : []);
     const [status, setStatus] = useState<string>(project.status || '');
 
-    const notesEditor = useCraftingEditor(project.projectNotes, isEditingTabs);
-    const patternEditor = useCraftingEditor(project.annotatedPattern || pattern.patternText, isEditingTabs);
+    const notesEditor = useCraftingEditor(project.notes, isEditingTabs);
+    const patternEditor = useCraftingEditor(project.content || pattern.content, isEditingTabs);
 
 
 
@@ -157,7 +156,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                 idValue={project.id}
                 title={project.title}
                 sourceUrl={project.sourceUrl}
-                yarnUsed={project.yarnUsed} // Project specific
+                yarnUsed={project.yarn} // Project specific
                 colors={project.colors}     // Project specific
                 status={status}
                 statusOptions={[
@@ -183,8 +182,8 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                 }
                 // We wrap the standard updateProject action so it preserves the rich text blocks
                 formAction={async (formData) => {
-                    formData.set('projectNotes', project.projectNotes || '');
-                    formData.set('annotatedPattern', project.annotatedPattern || '');
+                    formData.set('projectNotes', project.notes || '');
+                    formData.set('annotatedPattern', project.content || '');
                     await updateProject(formData);
                 }}
             />
@@ -198,7 +197,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
 
                 // Preserve metadata
                 formData.set('title', project.title);
-                formData.set('yarnUsed', project.yarnUsed || '');
+                formData.set('yarnUsed', project.yarn || '');
                 formData.set('colors', project.colors || '');
                 formData.set('hookSizes', hookTags.join(','));
                 formData.set('yarnWeights', weightTags.join(','));
@@ -287,7 +286,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                     <Tabs.Panel value="materials" p={{ base: 'xs', sm: 'md' }}><ReadOnlyHTML html={pattern.materials} fallback="No materials listed in master pattern." /></Tabs.Panel>
                     <Tabs.Panel value="abbreviations" p={{ base: 'xs', sm: 'md' }}><ReadOnlyHTML html={pattern.abbreviations} fallback="No abbreviations listed in master pattern." /></Tabs.Panel>
                     <Tabs.Panel value="sizing" p={{ base: 'xs', sm: 'md' }}><ReadOnlyHTML html={pattern.sizing} fallback="No sizing info in master pattern." /></Tabs.Panel>
-                    <Tabs.Panel value="patternNotes" p={{ base: 'xs', sm: 'md' }}><ReadOnlyHTML html={pattern.patternNotes} fallback="No master notes available." /></Tabs.Panel>
+                    <Tabs.Panel value="patternNotes" p={{ base: 'xs', sm: 'md' }}><ReadOnlyHTML html={pattern.notes} fallback="No master notes available." /></Tabs.Panel>
 
                     {/* ✨ ADDED light-dark() FOR DARK MODE COMPATIBILITY */}
                     <Tabs.Panel value="projectNotes" p={{ base: 'xs', sm: 'md' }} bg={isEditingTabs ? 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))' : 'transparent'}>
@@ -298,7 +297,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                                 <RichTextEditor.Content />
                             </RichTextEditor>
                         ) : (
-                            <ReadOnlyHTML html={project.projectNotes} fallback="Click 'Edit Text' to start adding notes!" />
+                            <ReadOnlyHTML html={project.notes} fallback="Click 'Edit Text' to start adding notes!" />
                         )}
                     </Tabs.Panel>
                 </Tabs>
@@ -314,7 +313,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                     revalidateUrl={`/crafting/projects/${project.id}`}
                     uploadAction={uploadImage}
                     deleteAction={deleteImage}
-                    coverImagePath={project.coverImagePath}
+                    coverImagePath={project.coverImage}
                     setCoverAction={(id, path) => setCoverImage(id, path, 'project')}
                 />
             </Box>

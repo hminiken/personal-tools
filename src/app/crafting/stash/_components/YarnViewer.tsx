@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Title, Group, Paper, Divider, Box, Button, TextInput, Stack, Select, TagsInput, Text, Badge, SimpleGrid, Card, ActionIcon } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
@@ -9,10 +9,8 @@ import { IconArrowLeft, IconEdit, IconCheck, IconUnlink } from '@tabler/icons-re
 import { useRouter } from 'next/navigation';
 
 // Tiptap Imports
-import { useEditor } from '@tiptap/react';
 import { RichTextEditor } from '@mantine/tiptap';
 import '@mantine/tiptap/styles.css';
-import { craftingEditorExtensions } from '@/utils/editorExtensions';
 
 // Components & Actions (You will need to create these actions similar to your pattern actions!)
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
@@ -42,13 +40,22 @@ interface LinkedProject {
     categories?: string | null;
 }
 
+interface YarnImage {
+    id: number;
+    createdAt: Date;
+    patternId: number | null;
+    projectId: number | null;
+    yarnId: number | null;
+    path: string;
+}
+
 export default function YarnViewer({
     yarn,
     images,
     linkedProjects
 }: {
     yarn: Yarn;
-    images: unknown[];
+    images: YarnImage[];
     linkedProjects: LinkedProject[]
 }) {
     const router = useRouter();

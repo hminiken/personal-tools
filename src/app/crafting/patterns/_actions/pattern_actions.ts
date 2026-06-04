@@ -1,18 +1,15 @@
 'use server'
 
 import { db } from "@db";
-import { patterns, projects } from "@db/schema";
+import { patterns, projects, images } from "@db/schema"; 
 import { redirect } from "next/navigation";
 import { revalidatePath } from 'next/cache';
 import { eq } from 'drizzle-orm';
 
-import { images } from '@/db/schema'; // Make sure images is imported from your schema
+// ==========================================
+// CREATE & FETCH
+// ==========================================
 
-
-
-
-
-// Add this to the bottom of actions.ts
 export async function createNewPattern(formData: FormData) {
   const title = formData.get('title') as string;
   const sourceUrl = formData.get('sourceUrl') as string;
@@ -27,28 +24,28 @@ export async function createNewPattern(formData: FormData) {
   redirect(`/crafting/patterns/${newPattern[0].id}`);
 }
 
+export async function getPatternById(id: number) {
+  return await db.select().from(patterns).where(eq(patterns.id, id)).get();
+}
 
-
-// Add this function at the bottom
 export async function getImagesForPattern(patternId: number) {
   return await db.select().from(images).where(eq(images.patternId, patternId)).all();
 }
 
-export async function getPatternById(id: number) {
-  const result = await db.select().from(patterns).where(eq(patterns.id, id)).get();
-  return result;
-}
-
-
+// ==========================================
+// PROJECTS
+// ==========================================
 
 export async function spawnProject(formData: FormData) {
   const patternId = Number(formData.get('patternId'));
   const title = formData.get('title') as string;
-  const yarnUsed = formData.get('yarnUsed') as string;
   const sourceUrl = formData.get('sourceUrl') as string;
   const colors = formData.get('colors') as string;
-  const hookSizes = formData.get('hookSizes') as string;
-  const yarnWeights = formData.get('yarnWeights') as string;
+  
+  // Mapping old form inputs to new schema names
+  const yarn = formData.get('yarnUsed') as string; 
+  const hooks = formData.get('hookSizes') as string; 
+  const weights = formData.get('yarnWeights') as string; 
 
   // Grab the master pattern to copy its text
   const masterPattern = await db.select().from(patterns).where(eq(patterns.id, patternId)).get();
@@ -57,12 +54,12 @@ export async function spawnProject(formData: FormData) {
   const newProject = await db.insert(projects).values({
     patternId,
     title,
-    yarnUsed,
+    yarn,         // ✨ NEW SCHEMA NAME
     colors,
-    hookSizes,
-    yarnWeights,
+    hooks,        // ✨ NEW SCHEMA NAME
+    weights,      // ✨ NEW SCHEMA NAME
     sourceUrl,
-    annotatedPattern: masterPattern?.patternText || '', // The magic clone!
+    content: masterPattern?.content || '', // ✨ NEW SCHEMA NAME (The magic clone!)
   }).returning();
 
   const projectId = newProject[0].id;
@@ -74,8 +71,7 @@ export async function spawnProject(formData: FormData) {
   if (patternImages.length > 0) {
     const projectImagesToInsert = patternImages.map(img => ({
       projectId: projectId, // Link to the new project
-      patternId: null,      // Explicitly detach from pattern so they are independent
-      imagePath: img.imagePath, // Point to the exact same file on the hard drive
+      path: img.path,       // ✨ NEW SCHEMA NAME (was imagePath)
     }));
 
     await db.insert(images).values(projectImagesToInsert);
@@ -84,40 +80,52 @@ export async function spawnProject(formData: FormData) {
   redirect(`/crafting/projects/${projectId}`);
 }
 
-// 1. The Text & Metadata Update Action
+// ==========================================
+// UPDATES
+// ==========================================
+
 export async function updatePattern(formData: FormData) {
   const patternId = Number(formData.get('patternId'));
 
-  // Extract Metadata
+  // Extract Metadata & Map to new schema
   const title = formData.get('title') as string;
-  const hookSizes = formData.get('hookSizes') as string;
-  const yarnWeights = formData.get('yarnWeights') as string;
-  const yarnYardage = formData.get('yarnYardage') ? Number(formData.get('yarnYardage')) : null;
   const sourceUrl = formData.get('sourceUrl') as string;
   const categories = formData.get('categories') as string;
+  const hooks = formData.get('hookSizes') as string; 
+  const weights = formData.get('yarnWeights') as string;
+  
+  // Checking for both the old 'yarnYardage' or new 'yardage' in case you update the frontend form later
+  const yardageStr = formData.get('yarnYardage') || formData.get('yardage');
+  const yardage = yardageStr ? Number(yardageStr) : null;
 
-  // Extract Rich Text
-  const patternText = formData.get('patternText') as string;
+  // Extract Rich Text & Map to new schema
+  const content = formData.get('patternText') as string; 
+  const notes = formData.get('patternNotes') as string; 
   const materials = formData.get('materials') as string;
   const abbreviations = formData.get('abbreviations') as string;
   const sizing = formData.get('sizing') as string;
-  const patternNotes = formData.get('patternNotes') as string;
 
-  // Save to Database
+  // Save to Database using the exact new schema column names
   await db
     .update(patterns)
     .set({
-      title, hookSizes, yarnWeights, yarnYardage, sourceUrl,
-      patternText, materials, abbreviations, sizing, patternNotes, categories
+      title, 
+      hooks, 
+      weights, 
+      yardage, 
+      sourceUrl,
+      content, 
+      materials, 
+      abbreviations, 
+      sizing, 
+      notes, 
+      categories
     })
     .where(eq(patterns.id, patternId));
 
   revalidatePath(`/crafting/patterns/${patternId}`);
   revalidatePath(`/crafting/patterns`);
 }
-
-
-
 
 export async function updatePatternStatus(patternId: number, status: string) {
   try {
@@ -133,12 +141,13 @@ export async function updatePatternStatus(patternId: number, status: string) {
   }
 }
 
+// ==========================================
+// DELETE
+// ==========================================
 
 export async function deletePattern(patternId: number) {
-  // Note: If you have foreign keys (like projects or images attached to this pattern),
-  // make sure you delete those first or have CASCADE setup in your SQLite schema!
+  // Since you have cascading deletes setup on your images table now, 
+  // deleting the pattern will cleanly wipe its associated images too!
   await db.delete(patterns).where(eq(patterns.id, patternId));
   revalidatePath('/crafting/patterns');
 }
-
-

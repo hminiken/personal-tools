@@ -141,35 +141,6 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
                 </Group>
                 )}
 
-                {/* <Stack align="flex-end">
-                    <Group>
-                        {!props.isEditing && (
-                            <Group gap="sm">
-                                <Select
-                                    w={140}
-                                    placeholder="Status"
-                                    data={props.statusOptions}
-                                    value={props.status}
-                                    onChange={(val) => val && props.onUpdateStatus(val)}
-                                />
-                                {props.actionButtons}
-                            </Group>
-                        )}
-                        <Button variant="outline" onClick={() => props.setIsEditing(!props.isEditing)}>
-                            {props.isEditing ? 'Cancel' : 'Edit Details'}
-                        </Button>
-                    </Group>
-                    {props.isEditing && (
-                        <Group justify="space-between" w="100%">
-                            {props.onDeleteClick ? (
-                                <Button color="rust.9" variant="subtle" onClick={props.onDeleteClick}>
-                                    Delete {props.idName === 'patternId' ? 'Pattern' : 'Project'}
-                                </Button>
-                            ) : <div />}
-                            <Button type="submit" color="olive.7">Save Details</Button>
-                        </Group>
-                    )}
-                </Stack> */}
             </Group>
 
             {!props.isEditing && (

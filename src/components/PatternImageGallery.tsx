@@ -32,7 +32,6 @@ export default function ImageGallery({
     revalidateUrl,
     uploadAction,
     deleteAction,
-    libraryImages = [],
     linkLibraryImageAction,
     coverImagePath,
     setCoverAction
@@ -108,7 +107,7 @@ export default function ImageGallery({
                                 {images.map((img, index) => (
                                     <Box key={img.id} style={{ position: 'relative' }}>
                                         <Image
-                                            src={img.imagePath}
+                                            src={img.path}
                                             alt="Reference"
                                             radius="md"
                                             h={120}
@@ -116,7 +115,7 @@ export default function ImageGallery({
                                             style={{
                                                 cursor: 'pointer',
                                                 transition: 'transform 0.2s',
-                                                outline: coverImagePath === img.imagePath ? '2px solid var(--mantine-color-olive-6)' : 'none'
+                                                outline: coverImagePath === img.path ? '2px solid var(--mantine-color-olive-6)' : 'none'
                                             }}
                                             onClick={() => {
                                                 // ✨ CHANGED: Set index instead of URL
@@ -146,7 +145,7 @@ export default function ImageGallery({
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     startTransition(async () => {
-                                                        await setCoverAction(targetId, img.imagePath);
+                                                        await setCoverAction(targetId, img.path);
                                                     });
                                                 }}
                                             >
@@ -197,7 +196,7 @@ export default function ImageGallery({
                         )}
 
                         <Image 
-                            src={images[selectedIndex].imagePath} 
+                            src={images[selectedIndex].path} 
                             alt="Full size" 
                             style={{ maxHeight: '90vh', maxWidth: '90vw', objectFit: 'contain' }} 
                         />

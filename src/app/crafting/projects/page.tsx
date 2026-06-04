@@ -11,7 +11,7 @@ export default async function PatternsPage() {
   // Ensure fields that the PatternGallery expects as non-nullable are provided
   const normalizedPatterns = allProjects.map(p => ({
     ...p,
-    coverImagePath: p.coverImagePath ?? '',
+    coverImagePath: p.coverImage ?? '',
   }));
 
   return (

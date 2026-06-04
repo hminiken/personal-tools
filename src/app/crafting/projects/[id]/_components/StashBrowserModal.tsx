@@ -89,13 +89,13 @@ export function StashBrowserModal({
               <Card key={yarn.id} withBorder padding="sm" radius="md">
                 <Group wrap="nowrap">
                   <Image 
-                    src={yarn.coverImagePath || 'https://placehold.co/100x100?text=No+Photo'} 
+                    src={yarn.coverImage || 'https://placehold.co/100x100?text=No+Photo'} 
                     h={80} w={80} radius="md" fit="cover" alt={yarn.title}
                   />
                   <Box style={{ flex: 1 }}>
                     <Text fw={500} lineClamp={1}>{yarn.title}</Text>
                     <Group gap={4} mt={4}>
-                      {yarn.color_tags?.split(',').slice(0, 2).map((color: string) => (
+                      {yarn.colors?.split(',').slice(0, 2).map((color: string) => (
                         color.trim() && <Badge key={color} size="xs" color="teal" variant="dot">{color}</Badge>
                       ))}
                     </Group>

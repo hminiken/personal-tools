@@ -1,7 +1,7 @@
 'use server'
 
 import { db } from "@/db";
-import { images, patterns, projects, yarnStash } from "@/db/schema";
+import { images, patterns, projects, yarns } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { writeFile } from 'fs/promises';
 import { revalidatePath } from "next/cache";
@@ -35,7 +35,7 @@ export async function uploadImage(formData: FormData) {
 
   // Insert into the database, linking whichever ID is present
   await db.insert(images).values({
-    imagePath: newImagePath,
+    path: newImagePath,
     patternId,
     projectId,
     yarnId,
@@ -44,22 +44,22 @@ export async function uploadImage(formData: FormData) {
   // Auto-set the cover image if one doesn't exist
   if (patternId) {
     const current = await db.select().from(patterns).where(eq(patterns.id, patternId)).get();
-    if (!current?.coverImagePath) {
-      await db.update(patterns).set({ coverImagePath: newImagePath }).where(eq(patterns.id, patternId));
+    if (!current?.coverImage) {
+      await db.update(patterns).set({ coverImage: newImagePath }).where(eq(patterns.id, patternId));
     }
     revalidatePath(`/crafting/patterns/${patternId}`);
   } 
   else if (projectId) {
     const current = await db.select().from(projects).where(eq(projects.id, projectId)).get();
-    if (!current?.coverImagePath) {
-      await db.update(projects).set({ coverImagePath: newImagePath }).where(eq(projects.id, projectId));
+    if (!current?.coverImage) {
+      await db.update(projects).set({ coverImage: newImagePath }).where(eq(projects.id, projectId));
     }
     revalidatePath(`/crafting/projects/${projectId}`);
   }
   else if (yarnId) {
-    const current = await db.select().from(yarnStash).where(eq(yarnStash.id, yarnId)).get();
-    if (!current?.coverImagePath) {
-      await db.update(yarnStash).set({ coverImagePath: newImagePath }).where(eq(yarnStash.id, yarnId));
+    const current = await db.select().from(yarns).where(eq(yarns.id, yarnId)).get();
+    if (!current?.coverImage) {
+      await db.update(yarns).set({ coverImage: newImagePath }).where(eq(yarns.id, yarnId));
     }
     revalidatePath(`/crafting/stash/${yarnId}`);
   }
@@ -70,15 +70,15 @@ export async function uploadImage(formData: FormData) {
 // ------------------------------------------------------------------
 export async function setCoverImage(id: number, imagePath: string, type: 'pattern' | 'project' | 'yarn') {
   if (type === 'pattern') {
-    await db.update(patterns).set({ coverImagePath: imagePath }).where(eq(patterns.id, id));
+    await db.update(patterns).set({ coverImage: imagePath }).where(eq(patterns.id, id));
     revalidatePath(`/crafting/patterns/${id}`);
   } 
   else if (type === 'project') {
-    await db.update(projects).set({ coverImagePath: imagePath }).where(eq(projects.id, id));
+    await db.update(projects).set({ coverImage: imagePath }).where(eq(projects.id, id));
     revalidatePath(`/crafting/projects/${id}`);
   } 
   else if (type === 'yarn') {
-    await db.update(yarnStash).set({ coverImagePath: imagePath }).where(eq(yarnStash.id, id));
+    await db.update(yarns).set({ coverImage: imagePath }).where(eq(yarns.id, id));
     revalidatePath(`/crafting/stash/${id}`);
   }
 }
@@ -98,7 +98,7 @@ export async function linkLibraryImageAction(
     revalidateUrl: string // ✨ NEW
 ) {
     await db.insert(images).values({
-        imagePath: imageUrl,
+        path: imageUrl,
         [entityColumn]: targetId,
     });
     
@@ -108,6 +108,6 @@ export async function linkLibraryImageAction(
 
 export async function getAllLibraryImages() {
     return await db.query.images.findMany({
-        orderBy: [desc(images.created_at)],
+        orderBy: [desc(images.createdAt)],
     });
 }

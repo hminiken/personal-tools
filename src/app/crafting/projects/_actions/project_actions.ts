@@ -26,7 +26,7 @@ export async function saveRulerPosition(projectId: number, yPosition: number) {
   try {
     await db
       .update(projects)
-      .set({ rulerPosition: Math.round(yPosition) }) // Ensure integer for SQLite
+      .set({ ruler: Math.round(yPosition) }) // Ensure integer for SQLite
       .where(eq(projects.id, projectId));
   } catch (error) {
     console.error("Database error saving ruler:", error);
@@ -40,17 +40,17 @@ export async function updateProject(formData: FormData) {
   const projectId = Number(formData.get('projectId'));
   const title = formData.get('title') as string;
   const sourceUrl = formData.get('sourceUrl') as string;
-  const yarnUsed = formData.get('yarnUsed') as string;
+  const yarn = formData.get('yarnUsed') as string;
   const colors = formData.get('colors') as string;
-  const hookSizes = formData.get('hookSizes') as string;
-  const yarnWeights = formData.get('yarnWeights') as string;
-  const projectNotes = formData.get('projectNotes') as string;
-  const annotatedPattern = formData.get('annotatedPattern') as string; // Catch the edits
+  const hooks = formData.get('hookSizes') as string;
+  const weights = formData.get('yarnWeights') as string;
+  const notes = formData.get('projectNotes') as string;
+  const content = formData.get('annotatedPattern') as string; // Catch the edits
   const categories = formData.get('categories') as string; // Catch the edits
 
   await db
     .update(projects)
-    .set({ title, yarnUsed, colors, hookSizes, yarnWeights, projectNotes, annotatedPattern, sourceUrl, categories })
+    .set({ title, yarn, colors, hooks, weights, notes, content, sourceUrl, categories })
     .where(eq(projects.id, projectId));
 
   revalidatePath(`/crafting/projects/${projectId}`);
@@ -60,7 +60,7 @@ export async function updateProject(formData: FormData) {
 
 export async function addQuickNote(projectId: number, newNote: string) {
   // 1. Get the current notes
-  const project = await db.select({ notes: projects.projectNotes })
+  const project = await db.select({ notes: projects.notes })
     .from(projects)
     .where(eq(projects.id, projectId))
     .get();
@@ -81,7 +81,7 @@ const updatedNotes = (project?.notes || '') + formattedNote;
 
   // 3. Save
   await db.update(projects)
-    .set({ projectNotes: updatedNotes })
+    .set({ notes: updatedNotes })
     .where(eq(projects.id, projectId));
 
   revalidatePath(`/crafting/projects/${projectId}`);

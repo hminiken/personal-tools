@@ -9,8 +9,8 @@ export async function getTagSuggestions() {
         // 1. Fetch only the specific columns we need using Drizzle
         const items = await db.select({
             categories: patterns.categories,
-            hookSizes: patterns.hookSizes,
-            yarnWeights: patterns.yarnWeights,
+            hookSizes: patterns.hooks,
+            yarnWeights: patterns.weights,
         }).from(patterns);
 
         // 2. Helper function to process comma-separated strings into unique arrays

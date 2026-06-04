@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/db'; // Adjust path if your db.ts is elsewhere
-import { projectYarns, yarnStash } from '@/db/schema';
+import { projectYarns, yarns } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { writeFile, mkdir } from 'fs/promises';
@@ -9,12 +9,12 @@ import { join } from 'path';
 
 // 1. Fetch all yarn
 export async function getYarnStash() {
-  return await db.select().from(yarnStash).orderBy(yarnStash.createdAt);
+  return await db.select().from(yarns).orderBy(yarns.createdAt);
 }
 
 // 2. Delete a yarn (Project connections will auto-delete thanks to our 'cascade' rule!)
 export async function deleteYarn(id: number) {
-  await db.delete(yarnStash).where(eq(yarnStash.id, id));
+  await db.delete(yarns).where(eq(yarns.id, id));
   revalidatePath('/crafting/stash');
 }
 
@@ -31,7 +31,7 @@ export async function createYarn(formData: FormData) {
 
   // Handle the Image Upload
   const file = formData.get('photo') as File | null;
-  let coverImagePath = null;
+  let coverImage = null;
 
   if (file && file.size > 0) {
     const bytes = await file.arrayBuffer();
@@ -51,18 +51,18 @@ export async function createYarn(formData: FormData) {
     await writeFile(filepath, buffer);
     
     // Save the relative URL path for the database
-    coverImagePath = `/uploads/${uniqueFilename}`;
+    coverImage = `/uploads/${uniqueFilename}`;
   }
 
   // Insert into SQLite
-  await db.insert(yarnStash).values({
+  await db.insert(yarns).values({
     title,
     brand,
-    weight,
-    fiber_tags: fiberTags,
-    color_tags: colorTags,
+    weights: weight,
+    fibers: fiberTags,
+    colors: colorTags,
     notes,
-    coverImagePath,
+    coverImage,
   });
 
   // Tell Next.js to refresh the page so the new yarn instantly appears
@@ -79,7 +79,7 @@ export async function updateYarn(formData: FormData) {
   // Extract the text fields
   const title = formData.get('title') as string;
   const brand = formData.get('brand') as string;
-  const weight = formData.get('weight') as string;
+  const weights = formData.get('weight') as string;
   const notes = formData.get('notes') as string;
   
   // Extract tags
@@ -87,17 +87,17 @@ export async function updateYarn(formData: FormData) {
   const colorTags = formData.get('colorTags') as string;
 
   // Execute the update in SQLite
-  await db.update(yarnStash)
+  await db.update(yarns)
     .set({
       title,
       brand,
-      weight,
-      fiber_tags: fiberTags,
-      color_tags: colorTags,
+      weights,
+      fibers: fiberTags,
+      colors: colorTags,
       notes,
-      updatedAt: new Date().toISOString(), // Optional: Keeps track of when you last edited it
+      updatedAt: new Date(), // Optional: Keeps track of when you last edited it
     })
-    .where(eq(yarnStash.id, id));
+    .where(eq(yarns.id, id));
 
   // Revalidate both the main list and the specific item page so the UI updates instantly
   revalidatePath('/crafting/stash');

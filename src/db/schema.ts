@@ -1,90 +1,103 @@
 // src/db/schema.ts
-import { sql } from 'drizzle-orm';
 import { sqliteTable, integer, text, primaryKey } from 'drizzle-orm/sqlite-core';
 
-// 1. The Pattern (The Template)
+// ==========================================
+// 1. PATTERNS
+// ==========================================
 export const patterns = sqliteTable('patterns', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   title: text('title').notNull(),
   sourceUrl: text('source_url'), 
   sourceLinks: text('source_links', { mode: 'json' }).$type<string[]>(), 
-  coverImagePath: text('cover_image_path'),
+  coverImage: text('cover_image'),
+  
   // The 5 Tab Fields
-  patternText: text('pattern_text'), 
+  content: text('content'), 
   materials: text('materials'),
   abbreviations: text('abbreviations'),
   sizing: text('sizing'),
-  patternNotes: text('pattern_notes'),
+  notes: text('notes'),
+  
+  // Classifications
   categories: text('categories'),
   status: text('status'),
+  hooks: text('hooks'), 
+  weights: text('weights'),
+  yardage: integer('yardage'), 
   
-  // Extra Info
-  hookSizes: text('hook_sizes'), 
-  yarnWeights: text('yarn_weights'),
-  yarnYardage: integer('yarn_yardage'), 
-  
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: text('updatedAt').default(sql`CURRENT_TIMESTAMP`)
+  // Timestamps
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
 });
 
-// 2. The Projects
+// ==========================================
+// 2. PROJECTS
+// ==========================================
 export const projects = sqliteTable('projects', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  sourceUrl: text('source_url'), 
-
   patternId: integer('pattern_id').references(() => patterns.id).notNull(),
   title: text('title').notNull(),
-  yarnUsed: text('yarn_used'),
+  sourceUrl: text('source_url'), 
+  
+  // Materials & Classifications
+  yarn: text('yarn'), // Kept singular to denote the string input vs the 'yarns' relation table
   colors: text('colors'),
   categories: text('categories'),
   status: text('status'),
+  hooks: text('hooks'), 
+  weights: text('weights'),
   
-  // NEW COLUMNS:
-  hookSizes: text('hook_sizes'), 
-  yarnWeights: text('yarn_weights'),
-  annotatedPattern: text('annotated_pattern'), 
+  // Workspace
+  content: text('content'), 
+  notes: text('notes'),
+  ruler: integer('ruler').default(0),
+  coverImage: text('cover_image'),
   
-  projectNotes: text('project_notes'),
-  rulerPosition: integer('ruler_position').default(0),
-  coverImagePath: text('cover_image_path'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: text('updatedAt').default(sql`CURRENT_TIMESTAMP`)
+  // Timestamps
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
 });
 
-// 3. The Yarn Stash
-export const yarnStash = sqliteTable('yarn_stash', {
+// ==========================================
+// 3. YARNS (Renamed from yarnStash for consistency)
+// ==========================================
+export const yarns = sqliteTable('yarns', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   title: text('title').notNull(), 
   brand: text('brand'), 
-  weight: text('weight'), 
-  fiber: text('fiber_tags'), 
-  color: text('color_tags'), 
+  weights: text('weights'), 
+  fibers: text('fibers'), 
+  colors: text('colors'), 
   notes: text('notes'), 
-  coverImagePath: text('cover_image_path'), 
+  coverImage: text('cover_image'), 
   
-  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
-  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  // Timestamps
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
 });
 
 
 // ==========================================
-// RELATIONAL TABLES (Must go at the bottom!)
+// RELATIONAL TABLES 
 // ==========================================
 
-// 4. The Images (Moved down so it can see patterns, projects, and yarnStash)
+// 4. IMAGES
 export const images = sqliteTable('images', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   patternId: integer('pattern_id').references(() => patterns.id, { onDelete: 'cascade' }),
   projectId: integer('project_id').references(() => projects.id, { onDelete: 'cascade' }),
-  yarnId: integer('yarn_id').references(() => yarnStash.id, { onDelete: 'cascade' }),
-  imagePath: text('image_path').notNull(),
-  created_at: text('created_at').notNull(),
+  yarnId: integer('yarn_id').references(() => yarns.id, { onDelete: 'cascade' }),
+  
+  path: text('path').notNull(),
+  
+  // Only needs creation time, images don't usually get "updated"
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
-// 5. Project/Yarn Connections
+// 5. PROJECT -> YARN CONNECTIONS
 export const projectYarns = sqliteTable('project_yarns', {
   projectId: integer('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
-  yarnId: integer('yarn_id').notNull().references(() => yarnStash.id, { onDelete: 'cascade' }),
+  yarnId: integer('yarn_id').notNull().references(() => yarns.id, { onDelete: 'cascade' }),
 }, (t) => ({
   pk: primaryKey({ columns: [t.projectId, t.yarnId] }), 
 }));

@@ -163,8 +163,8 @@ export default function ItemGallery<T extends BaseGalleryItem>({
     if (!items || items.length === 0) return [];
     return Object.entries(items[0])
       .map(([key, value]) => {
-        let type = typeof value;
-        if (type === 'string' && !isNaN(Date.parse(value as string))) type = 'date';
+        const rawType = typeof value as 'string' | 'number' | 'boolean' | 'object' | 'undefined' | 'function' | 'symbol' | 'bigint';
+        const type = rawType === 'string' && !isNaN(Date.parse(value as string)) ? 'date' : rawType;
         return { key, type };
       })
       .filter(f => ['string', 'number', 'boolean', 'date'].includes(f.type));

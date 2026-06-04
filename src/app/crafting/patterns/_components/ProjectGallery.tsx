@@ -22,9 +22,9 @@ export default function ProjectGallery({ initialProjects }: { initialProjects: P
       renderBadges={(project) => (
         <Group gap="xs" mb="md">
           {project.status && <Badge color="mustard" variant="light">{project.status}</Badge>}
-          {project.yarnUsed && <Badge color="mustard" variant="outline">{project.yarnUsed}</Badge>}
-          {project.hookSizes && <Badge color="rust" variant="outline">{project.hookSizes}</Badge>}
-          {project.yarnWeights && <Badge color="olive" variant="outline">{project.yarnWeights}</Badge>}
+          {project.yarn && <Badge color="mustard" variant="outline">{project.yarn}</Badge>}
+          {project.hooks && <Badge color="rust" variant="outline">{project.hooks}</Badge>}
+          {project.weights && <Badge color="olive" variant="outline">{project.weights}</Badge>}
           {project.categories && <Badge color="olive" variant="outline">{project.categories}</Badge>}
         </Group>
       )}

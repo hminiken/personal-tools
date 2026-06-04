@@ -32,19 +32,17 @@ export default function PatternViewer({ pattern, images }: { pattern: Pattern, i
   const [projectModalOpened, { open: openProject, close: closeProject }] = useDisclosure(false);
 
   // States
-  const [hookTags, setHookTags] = useState<string[]>(pattern.hookSizes ? pattern.hookSizes.split(',') : []);
-  const [weightTags, setWeightTags] = useState<string[]>(pattern.yarnWeights ? pattern.yarnWeights.split(',') : []);
+  const [hookTags, setHookTags] = useState<string[]>(pattern.hooks ? pattern.hooks.split(',') : []);
+  const [weightTags, setWeightTags] = useState<string[]>(pattern.weights ? pattern.weights.split(',') : []);
   const [categoryTags, setCategoryTags] = useState<string[]>(pattern.categories ? pattern.categories.split(',') : []);
   const [status, setStatus] = useState<string>(pattern.status || '');
 
-const patternImages = []; 
-    const allLibraryImages = [];
 
-  const patternEditor = useCraftingEditor(pattern.patternText, isEditingTabs);
+  const patternEditor = useCraftingEditor(pattern.content, isEditingTabs);
 const materialsEditor = useCraftingEditor(pattern.materials, isEditingTabs);
 const abbreviationsEditor = useCraftingEditor(pattern.abbreviations, isEditingTabs);
 const sizingEditor = useCraftingEditor(pattern.sizing, isEditingTabs);
-const notesEditor = useCraftingEditor(pattern.patternNotes, isEditingTabs);
+const notesEditor = useCraftingEditor(pattern.notes, isEditingTabs);
       
   const handleUpdateStatus = async (newStatus: string) => {
     const previousStatus = status ?? pattern.status ?? '';
@@ -177,7 +175,7 @@ const notesEditor = useCraftingEditor(pattern.patternNotes, isEditingTabs);
           <Tabs.Panel value="materials" p="md"><TabContent editor={materialsEditor} isEditing={isEditingTabs} originalContent={pattern.materials} fallbackText="No materials listed." /></Tabs.Panel>
           <Tabs.Panel value="abbreviations" p="md"><TabContent editor={abbreviationsEditor} isEditing={isEditingTabs} originalContent={pattern.abbreviations} fallbackText="No abbreviations listed." /></Tabs.Panel>
           <Tabs.Panel value="sizing" p="md"><TabContent editor={sizingEditor} isEditing={isEditingTabs} originalContent={pattern.sizing} fallbackText="No sizing info added." /></Tabs.Panel>
-          <Tabs.Panel value="notes" p="md"><TabContent editor={notesEditor} isEditing={isEditingTabs} originalContent={pattern.patternNotes} fallbackText="No notes added." /></Tabs.Panel>
+          <Tabs.Panel value="notes" p="md"><TabContent editor={notesEditor} isEditing={isEditingTabs} originalContent={pattern.notes} fallbackText="No notes added." /></Tabs.Panel>
         </Tabs>
       </form>
 
@@ -191,9 +189,8 @@ const notesEditor = useCraftingEditor(pattern.patternNotes, isEditingTabs);
           revalidateUrl={`/crafting/patterns/${pattern.id}`}
           uploadAction={uploadImage}
           deleteAction={deleteImage}
-          coverImagePath={pattern.coverImagePath}
+          coverImagePath={pattern.coverImage}
           setCoverAction={(id, path) => setCoverImage(id, path, 'pattern')}
-          linkLibraryImageAction={boundLink}
         />
       </Box>
 

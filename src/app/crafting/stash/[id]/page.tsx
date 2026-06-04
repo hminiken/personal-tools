@@ -1,5 +1,5 @@
 import { db } from '@/db';
-import { yarnStash, images, projectYarns, projects } from '@/db/schema';
+import { yarns, images, projectYarns, projects } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import YarnViewer from '../_components/YarnViewer';
@@ -13,7 +13,7 @@ export default async function YarnItemPage({ params }: { params: Promise<{ id: s
   const id = parseInt(resolvedParams.id, 10);
 
   // ... the rest of your database fetching code stays exactly the same!
-  const [yarn] = await db.select().from(yarnStash).where(eq(yarnStash.id, id));
+  const [yarn] = await db.select().from(yarns).where(eq(yarns.id, id));
   
   if (!yarn) {
     return notFound(); 
@@ -28,7 +28,7 @@ export default async function YarnItemPage({ params }: { params: Promise<{ id: s
       title: projects.title,
       status: projects.status,
       categories: projects.categories,
-      hooks: projects.hookSizes
+      hooks: projects.hooks
 
     })
     .from(projectYarns)
