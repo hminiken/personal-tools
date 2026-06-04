@@ -57,8 +57,8 @@ export const yarnStash = sqliteTable('yarn_stash', {
   title: text('title').notNull(), 
   brand: text('brand'), 
   weight: text('weight'), 
-  fiber_tags: text('fiber_tags'), 
-  color_tags: text('color_tags'), 
+  fiber: text('fiber_tags'), 
+  color: text('color_tags'), 
   notes: text('notes'), 
   coverImagePath: text('cover_image_path'), 
   
@@ -78,6 +78,7 @@ export const images = sqliteTable('images', {
   projectId: integer('project_id').references(() => projects.id, { onDelete: 'cascade' }),
   yarnId: integer('yarn_id').references(() => yarnStash.id, { onDelete: 'cascade' }),
   imagePath: text('image_path').notNull(),
+  created_at: text('created_at').notNull(),
 });
 
 // 5. Project/Yarn Connections

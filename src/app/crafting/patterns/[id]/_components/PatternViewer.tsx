@@ -7,7 +7,6 @@ import Link from 'next/link';
 import { IconArrowLeft } from '@tabler/icons-react';
 
 // Tiptap Imports
-import { useEditor } from '@tiptap/react';
 import { RichTextEditor } from '@mantine/tiptap';
 import '@mantine/tiptap/styles.css';
 
@@ -18,10 +17,11 @@ import { TabContent } from './TabContent';
 import ImageGallery from '@/components/PatternImageGallery';
 import { Pattern, PatternImage } from '../../types';
 import { CraftingMetadataForm } from '@/components/CraftingMetadataForm';
-import { craftingEditorExtensions } from '@/utils/editorExtensions';
 import { useRouter } from 'next/navigation';
 import { ConfirmDeleteModal } from '@components/ConfirmDeleteModal';
 import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
+import { useCraftingEditor } from '@hooks/useCraftingEditor';
+import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
 
 export default function PatternViewer({ pattern, images }: { pattern: Pattern, images: PatternImage[] }) {
   const [isEditingDetails, setIsEditingDetails] = useState(false);
@@ -37,13 +37,15 @@ export default function PatternViewer({ pattern, images }: { pattern: Pattern, i
   const [categoryTags, setCategoryTags] = useState<string[]>(pattern.categories ? pattern.categories.split(',') : []);
   const [status, setStatus] = useState<string>(pattern.status || '');
 
-  // Editors
-  const patternEditor = useEditor({ extensions: craftingEditorExtensions, content: pattern.patternText || '', immediatelyRender: false });
-  const materialsEditor = useEditor({ extensions: craftingEditorExtensions, content: pattern.materials || '', immediatelyRender: false });
-  const abbreviationsEditor = useEditor({ extensions: craftingEditorExtensions, content: pattern.abbreviations || '', immediatelyRender: false });
-  const sizingEditor = useEditor({ extensions: craftingEditorExtensions, content: pattern.sizing || '', immediatelyRender: false });
-  const notesEditor = useEditor({ extensions: craftingEditorExtensions, content: pattern.patternNotes || '', immediatelyRender: false });
+const patternImages = []; 
+    const allLibraryImages = [];
 
+  const patternEditor = useCraftingEditor(pattern.patternText, isEditingTabs);
+const materialsEditor = useCraftingEditor(pattern.materials, isEditingTabs);
+const abbreviationsEditor = useCraftingEditor(pattern.abbreviations, isEditingTabs);
+const sizingEditor = useCraftingEditor(pattern.sizing, isEditingTabs);
+const notesEditor = useCraftingEditor(pattern.patternNotes, isEditingTabs);
+      
   const handleUpdateStatus = async (newStatus: string) => {
     const previousStatus = status ?? pattern.status ?? '';
     setStatus(newStatus);
@@ -165,14 +167,7 @@ export default function PatternViewer({ pattern, images }: { pattern: Pattern, i
                     }
                   }}
                 >
-                  {isEditingTabs && (
-                    <RichTextEditor.Toolbar sticky stickyOffset={60}>
-                      <RichTextEditor.ControlsGroup>
-                        <RichTextEditor.Bold /><RichTextEditor.Italic /><RichTextEditor.Strikethrough /><RichTextEditor.Highlight />
-                        <RichTextEditor.ColorPicker colors={['#fa5252', '#4c6ef5', '#12b886', '#fab005']} />
-                      </RichTextEditor.ControlsGroup>
-                    </RichTextEditor.Toolbar>
-                  )}
+                 {isEditingTabs && <CraftingEditorToolbar />}
                   <RichTextEditor.Content />
                 </RichTextEditor>
               )}
@@ -198,6 +193,7 @@ export default function PatternViewer({ pattern, images }: { pattern: Pattern, i
           deleteAction={deleteImage}
           coverImagePath={pattern.coverImagePath}
           setCoverAction={(id, path) => setCoverImage(id, path, 'pattern')}
+          linkLibraryImageAction={boundLink}
         />
       </Box>
 

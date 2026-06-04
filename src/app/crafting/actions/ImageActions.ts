@@ -2,10 +2,14 @@
 
 import { db } from "@/db";
 import { images, patterns, projects, yarnStash } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { writeFile } from 'fs/promises';
 import { revalidatePath } from "next/cache";
 import path from "path";
+
+// Reusable Type for knowing which column to update
+type EntityColumn = 'patternId' | 'projectId' | 'yarnId';
+type EntityTable = 'pattern' | 'project' | 'yarn';
 
 // ------------------------------------------------------------------
 // 1. UNIVERSAL UPLOAD ACTION
@@ -85,4 +89,25 @@ export async function setCoverImage(id: number, imagePath: string, type: 'patter
 export async function deleteImage(imageId: number, revalidateUrl: string) {
   await db.delete(images).where(eq(images.id, imageId));
   revalidatePath(revalidateUrl);
+}
+
+export async function linkLibraryImageAction(
+    entityColumn: string, 
+    imageUrl: string, 
+    targetId: number, 
+    revalidateUrl: string // ✨ NEW
+) {
+    await db.insert(images).values({
+        imagePath: imageUrl,
+        [entityColumn]: targetId,
+    });
+    
+    // ✨ MAGIC REFRESH TRIGGER
+    revalidatePath(revalidateUrl); 
+}
+
+export async function getAllLibraryImages() {
+    return await db.query.images.findMany({
+        orderBy: [desc(images.created_at)],
+    });
 }

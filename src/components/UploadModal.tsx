@@ -1,25 +1,46 @@
-import { useEffect, useRef, useState } from 'react';
-import { Modal, Button, Group, FileInput, Box, Text } from '@mantine/core';
+import { useEffect, useState } from 'react';
+import { Modal, Button, Group, FileInput, Box, Text, Accordion, SimpleGrid, Image, Loader, ScrollArea } from '@mantine/core';
 import { IconPhotoPlus } from '@tabler/icons-react';
 
-// Assuming you are passing these props into your Gallery or Modal component:
-// opened, close (from useDisclosure), patternId, and uploadAction
+// Import server actions directly
+import { getAllLibraryImages, linkLibraryImageAction } from '@app/crafting/actions/ImageActions'; 
 
 export function UploadModal({ 
   opened, 
   close, 
   targetId, 
   idFieldName,
-  uploadAction 
+  uploadAction,
+  revalidateUrl
 }: any) {
+  
+  // Upload States
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Global Paste Listener
-  useEffect(() => {
-    if (!opened) return; // Only listen when the modal is visible
+  // Library States
+  const [libraryImages, setLibraryImages] = useState<any[]>([]);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
+  const [isLinking, setIsLinking] = useState(false);
 
-    // We use the native ClipboardEvent here
+  // Fetch library images automatically when the modal is opened
+  useEffect(() => {
+    if (opened) {
+      setIsLoadingLibrary(true);
+      getAllLibraryImages()
+        .then((data: any) => setLibraryImages(data || []))
+        .catch((err: any) => console.error("Failed to fetch library", err))
+        .finally(() => setIsLoadingLibrary(false));
+    } else {
+      setLibraryImages([]);
+      setFile(null);
+    }
+  }, [opened]);
+
+  // 1. Global Paste Listener (catches paste events anywhere on the screen while open)
+  useEffect(() => {
+    if (!opened) return;
+
     const handleGlobalPaste = (event: ClipboardEvent) => {
       const items = event.clipboardData?.items;
       if (!items) return;
@@ -36,14 +57,11 @@ export function UploadModal({
       }
     };
 
-    // Attach to the whole document
     document.addEventListener('paste', handleGlobalPaste);
-    
-    // Cleanup: Remove the listener when the modal closes
     return () => document.removeEventListener('paste', handleGlobalPaste);
-  }, [opened]); // Re-run this effect whenever 'opened' changes
+  }, [opened]);
 
-  // 2. Intercept the paste event
+  // 2. React Native Paste Listener (intercepts paste events focused inside the modal)
   const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
     const items = event.clipboardData?.items;
     if (!items) return;
@@ -53,30 +71,23 @@ export function UploadModal({
         const pastedFile = item.getAsFile();
         if (pastedFile) {
           event.preventDefault();
-          // Create a clean file object with a guaranteed timestamped name
           const cleanFile = new File([pastedFile], `pasted_photo_${Date.now()}.png`, { type: pastedFile.type });
-          
-          // Set it to the input state
           setFile(cleanFile);
         }
       }
     }
   };
-const handleSubmit = async () => {
+
+  const handleSubmit = async () => {
     if (!file) return;
-    
     setIsUploading(true);
     try {
       const formData = new FormData();
-      
-      // 2. Dynamically set the ID key based on where the modal is opened
       formData.append(idFieldName, String(targetId));
-      
-      // 3. Change 'image' to 'file' to match ALL of your server actions
       formData.append('file', file);
+      formData.append('revalidateUrl', revalidateUrl); // Keep next.js router updated
 
       await uploadAction(formData);
-      
       setFile(null);
       close();
     } catch (error) {
@@ -87,42 +98,90 @@ const handleSubmit = async () => {
     }
   };
 
+  const handleLinkImage = async (imageUrl: string) => {
+    setIsLinking(true);
+    try {
+      await linkLibraryImageAction(idFieldName, imageUrl, targetId, revalidateUrl);
+      close(); 
+    } catch (error) {
+      console.error("Failed to link image", error);
+      alert("Failed to link image.");
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
   return (
-    <Modal opened={opened} onClose={close} title="Upload Photo" centered>
-      {/* The Box catches the paste event anywhere inside the modal */}
+    <Modal opened={opened} onClose={close} title="Add Photo" centered size="lg">
+      {/* ✨ FIXED: Added onPaste back to the main container Box so local pastes trigger perfectly! */}
       <Box onPaste={handlePaste} style={{ outline: 'none' }} tabIndex={0}>
         
-        <FileInput
-          label="Select Image"
-          withAsterisk
-          placeholder="Click to browse or paste image (Ctrl+V)"
-          value={file}
-          onChange={setFile}
-          accept="image/*"
-          clearable
-          leftSection={<IconPhotoPlus size={16} />}
-          mb="md"
-        />
+        {/* Upload New Section */}
+        <Box mb="xl">
+            <Text size="sm" fw={500} mb="xs">Upload New</Text>
+            <FileInput
+                placeholder="Click to browse or paste image (Ctrl+V)"
+                value={file}
+                onChange={setFile}
+                accept="image/*"
+                clearable
+                leftSection={<IconPhotoPlus size={16} />}
+                mb="md"
+            />
 
-        {file && (
-          <Text size="sm" c="dimmed" mb="md">
-            Ready to upload: <strong>{file.name}</strong>
-          </Text>
-        )}
+            {file && (
+              <Text size="sm" c="dimmed" mb="md">
+                Ready to upload: <strong>{file.name}</strong>
+              </Text>
+            )}
 
-        <Group justify="flex-end" mt="xl">
-          <Button variant="default" onClick={close} disabled={isUploading}>
-            Cancel
-          </Button>
-          <Button 
-            color="olive.7" 
-            onClick={handleSubmit} 
-            disabled={!file} 
-            loading={isUploading}
-          >
-            Upload
-          </Button>
-        </Group>
+            <Group justify="flex-end">
+                <Button variant="default" onClick={close} disabled={isUploading || isLinking}>Cancel</Button>
+                <Button color="olive.7" onClick={handleSubmit} disabled={!file || isLinking} loading={isUploading}>Upload</Button>
+            </Group>
+        </Box>
+
+        {/* Existing Media Library Accordion */}
+        <Accordion variant="separated">
+            <Accordion.Item value="library">
+                <Accordion.Control>
+                    <Text size="sm" fw={500}>Browse Existing Library</Text>
+                </Accordion.Control>
+                <Accordion.Panel>
+                    {isLoadingLibrary ? (
+                        <Group justify="center" p="xl">
+                            <Loader color="olive.7" />
+                        </Group>
+                    ) : libraryImages.length > 0 ? (
+                        <ScrollArea h={300} type="always" offsetScrollbars>
+                            <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="sm">
+                                {libraryImages.map((img: any, index: number) => (
+                                    <Box 
+                                        key={`lib-${img.id || index}`} 
+                                        style={{ position: 'relative', cursor: isLinking ? 'wait' : 'pointer' }}
+                                        onClick={() => {
+                                            if (!isLinking) handleLinkImage(img.imagePath);
+                                        }}
+                                    >
+                                        <Image
+                                            src={img.imagePath}
+                                            alt="Library Image"
+                                            radius="md"
+                                            h={100}
+                                            fit="cover"
+                                            style={{ transition: 'opacity 0.2s', opacity: isLinking ? 0.5 : 1 }}
+                                            fallbackSrc="https://placehold.co/100x100?text=Error"
+                                        />
+                                    </Box>
+                                ))}
+                            </SimpleGrid>
+                        </ScrollArea>
+                    ) : (
+                        <Text c="dimmed" ta="center" py="md">No images found in your library.</Text>
+                    )}
+                </Accordion.Panel>
+            </Accordion.Item>
+        </Accordion>
 
       </Box>
     </Modal>

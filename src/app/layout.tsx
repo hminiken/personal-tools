@@ -1,7 +1,7 @@
 // src/app/layout.tsx
 
 import '@mantine/core/styles.css';
-import {  MantineProvider, createTheme, MantineColorsTuple } from '@mantine/core';
+import {  MantineProvider, createTheme, MantineColorsTuple, ColorSchemeScript } from '@mantine/core';
 import NavigationShell from '@/components/NavigationShell';
 
 const themeColors: MantineColorsTuple = [
@@ -80,7 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <head>
         {/* Tells Mantine to inject the script that checks for the user's system preference to prevent flashing */}
-        {/* <ColorSchemeScript defaultColorScheme="auto" /> */}
+        <ColorSchemeScript defaultColorScheme="auto" />
       </head>
       <body>
         <MantineProvider theme={theme} defaultColorScheme="auto">

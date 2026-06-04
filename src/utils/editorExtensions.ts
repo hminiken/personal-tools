@@ -5,10 +5,15 @@ import Highlight from '@tiptap/extension-highlight';
 import ResizeImage from 'tiptap-extension-resize-image';
 
 export const craftingEditorExtensions = [
-    StarterKit,
+    StarterKit.configure({
+        // Configure the heading extension bundled in StarterKit
+        heading: {
+            levels: [1, 2, 3], 
+        },
+    }),
     TextStyle,
     Color,
-    Highlight, // From ProjectWorkspace
+    Highlight,
     ResizeImage.configure({
         allowBase64: true, 
     })

@@ -17,8 +17,10 @@ import { craftingEditorExtensions } from '@/utils/editorExtensions';
 // Components & Actions (You will need to create these actions similar to your pattern actions!)
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 import ImageGallery from '@/components/PatternImageGallery'; // Reusing your gallery!
-import { updateYarn, deleteYarn,  unlinkProjectFromYarn } from '../_actions/stash_actions';
+import { updateYarn, deleteYarn, unlinkProjectFromYarn } from '../_actions/stash_actions';
 import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
+import { useCraftingEditor } from '@hooks/useCraftingEditor';
+import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
 
 // Interfaces
 interface Yarn {
@@ -66,18 +68,8 @@ export default function YarnViewer({
     const [deleteModalOpened, { open: openDelete, close: closeDelete }] = useDisclosure(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // --- Editor ---
-    const notesEditor = useEditor({
-        extensions: craftingEditorExtensions,
-        content: yarn.notes || '',
-        immediatelyRender: false,
-        editable: false
-    });
-    useEffect(() => {
-        if (notesEditor) {
-            notesEditor.setEditable(isEditingNotes);
-        }
-    }, [isEditingNotes, notesEditor]);
+    const notesEditor = useCraftingEditor(yarn.notes, isEditingNotes);
+
     // --- Handlers ---
     const handleUpdateMetadata = async () => {
         setIsSaving(true);
@@ -164,8 +156,8 @@ export default function YarnViewer({
                                 <Text size="lg" c="dimmed" mb="sm">{yarn.brand || 'Unknown Brand'} {yarn.weight ? `• ${yarn.weight}` : ''}</Text>
 
                                 <Group gap="xs" mt="sm">
-                                    {fiberTags.map(f => f.trim() && <Badge key={f} color="neutrals.4" variant="outline">{f}</Badge>)}
-                                    {colorTags.map(c => c.trim() && <Badge key={c} color="rust.8" variant="dot">{c}</Badge>)}
+                                    {fiberTags.map(f => f.trim() && <Badge key={f} color="rust.6" variant="outline">{f}</Badge>)}
+                                    {colorTags.map(c => c.trim() && <Badge key={c} color="mustard.7" variant="outline">{c}</Badge>)}
                                 </Group>
                             </>
                         )}
@@ -173,10 +165,10 @@ export default function YarnViewer({
 
                     {!isEditingDetails && (
                         <Group>
-                            <Button variant="light" color='olive.1' onClick={() => setIsEditingDetails(true)} leftSection={<IconEdit size={16} />}>
+                            <Button  color='olive.6' onClick={() => setIsEditingDetails(true)} leftSection={<IconEdit size={16} />}>
                                 Edit Details
                             </Button>
-                            <Button variant="light" color="rust.2" onClick={openDelete}>Delete Yarn</Button>
+                            <Button  color="rust.6" onClick={openDelete}>Delete Yarn</Button>
                         </Group>
                     )}
                 </Group>
@@ -202,14 +194,9 @@ export default function YarnViewer({
                     editor={notesEditor}
                     style={{ border: isEditingNotes ? undefined : 'none' }}
                 >
-                    {isEditingNotes && (
-                        <RichTextEditor.Toolbar sticky stickyOffset={60}>
-                            <RichTextEditor.ControlsGroup>
-                                <RichTextEditor.Bold /><RichTextEditor.Italic /><RichTextEditor.Strikethrough /><RichTextEditor.Highlight />
-                                <RichTextEditor.ColorPicker colors={['#fa5252', '#4c6ef5', '#12b886', '#fab005']} />
-                            </RichTextEditor.ControlsGroup>
-                        </RichTextEditor.Toolbar>
-                    )}
+                    {/* ✨ REPLACED THE ENTIRE TOOLBAR BLOCK WITH OUR SINGLE COMPONENT */}
+                    {isEditingNotes && <CraftingEditorToolbar />}
+
                     <RichTextEditor.Content />
                 </RichTextEditor>
             </Box>

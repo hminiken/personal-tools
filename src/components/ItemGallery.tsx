@@ -1,99 +1,182 @@
 /* eslint-disable react/no-unescaped-entities */
 'use client';
 
-import { useState } from 'react';
-import { 
-  SimpleGrid, Card, Text, Group, TextInput, Title, Button, Image, Modal, ActionIcon 
+import { useState, useMemo } from 'react';
+import {
+  SimpleGrid, Card, Text, Group, TextInput, Title, Button, Image, Modal, ActionIcon, Select, Switch, Accordion, Box, List, CloseButton, Collapse, Paper
 } from '@mantine/core';
-import { IconSearch, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconSearch, IconPlus, IconTrash, IconSortAscending, IconInfoCircle } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
-import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal'; // Make sure this path is correct!
+import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
+import GalleryGrid from './GalleryGrid';
+import SearchHelpBox from './SearchHelpBox';
 
+// ==========================================
+// 1. TYPES & INTERFACES
+// ==========================================
 export interface BaseGalleryItem {
   id: number;
   title: string;
   coverImagePath?: string | null;
-  sourceUrl?: string | null; 
-  [key: string]: unknown;
+  sourceUrl?: string | null;
+  createdAt?: string | Date | null;
+  updatedAt?: string | Date | null;
+  [key: string]: any;
 }
 
 interface ItemGalleryProps<T extends BaseGalleryItem> {
   title: string;
-  items: T[]; 
-  basePath: string; 
+  items: T[];
+  basePath: string;
   searchPlaceholder?: string;
   newItemText?: string;
   createModalTitle?: string;
-  
-  // NEW: Pass your server action down to handle the database deletion
-  deleteAction?: (id: number) => Promise<void>; 
-
+  categoryField?: string;
+  deleteAction?: (id: number) => Promise<void>;
   renderBadges?: (item: T) => React.ReactNode;
   renderCreateForm?: (closeModal: () => void) => React.ReactNode;
 }
 
-export default function ItemGallery<T extends BaseGalleryItem>({
-  title,
-  items,
-  basePath,
-  searchPlaceholder = "Search...",
-  newItemText = "New",
-  createModalTitle = "Create New",
-  deleteAction,
-  renderBadges,
-  renderCreateForm
-}: ItemGalleryProps<T>) {
+// ==========================================
+// 2. SHARED STYLES & HELPERS
+// ==========================================
+const universalInputStyles = {
+  input: {
+    // Light text in dark mode, dark text in light mode
+    color: 'light-dark(var(--mantine-color-neutrals-9), var(--mantine-color-dark-0))',
+    
+    // Subtle borders that match the current theme
+    borderColor: 'light-dark(var(--mantine-color-neutrals-2), var(--mantine-color-dark-4))',
+    
+    // Ensure the input background matches the theme
+    backgroundColor: 'light-dark(var(--mantine-color-white), var(--mantine-color-dark-6))',
+    
+    '&:focusWithin': { 
+      borderColor: 'var(--mantine-color-neutrals-6)' 
+    },
+    '&::placeholder': { 
+      color: 'var(--mantine-color-neutrals-5)', 
+      opacity: 1 
+    },
+  },
+};
+
+// Extracted the complex Regex logic out of the component to keep the file clean
+function applyAdvancedSearch<T extends BaseGalleryItem>(items: T[], searchQuery: string): T[] {
+  if (!searchQuery.trim()) return items;
+  const tokens = searchQuery.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
   
-  const [searchQuery, setSearchQuery] = useState('');
-  const [createModalOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
-
-  // NEW: Deletion States
-  const [itemToDelete, setItemToDelete] = useState<T | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // Instantly filter the items
- // Advanced search filtering
-  const filteredItems = items.filter((item) => {
-    // If the search bar is empty, show everything
-    if (!searchQuery.trim()) return true;
-
-    // Split the search query by spaces to allow multiple filters at once
-    // e.g., "categories:cardigan colors:blue" becomes ["categories:cardigan", "colors:blue"]
-    const tokens = searchQuery.toLowerCase().split(/\s+/);
-
-    // .every() means ALL search conditions must be true for the item to appear
+  return items.filter((item) => {
     return tokens.every((token) => {
-      // 1. Check if the user is using the "key:value" syntax
-      if (token.includes(':')) {
-        const [key, value] = token.split(':', 2);
-        
-        // Grab the data from the item (e.g., item['categories'])
-        const itemValue = item[key]; 
-        
-        // If the item has this field, and it's a string, check if it includes our search value.
-        // Because your DB stores comma-separated strings, .includes() works perfectly!
-        if (itemValue && typeof itemValue === 'string') {
-          return itemValue.toLowerCase().includes(value);
-        }
-        
-        // If the key doesn't exist on the item, hide the item
-        return false; 
-      }
+      const cleanToken = token.replace(/(^"|"$)/g, '');
+      const match = cleanToken.match(/^(\w+)(>=|<=|>|<|=|:)(.+)$/);
 
-      // 2. Fallback: If there is no colon, just do a normal title search
-      return item.title.toLowerCase().includes(token);
+      if (match) {
+        const [, field, operator, searchVal] = match;
+        const itemVal = item[field];
+        if (itemVal == null) return false;
+
+        const isDate = (val: any) => isNaN(Number(val)) && !isNaN(Date.parse(val));
+        const numSearchVal = isDate(searchVal) ? new Date(searchVal).getTime() : Number(searchVal);
+        const numItemVal = isDate(itemVal) ? new Date(itemVal as string).getTime() : Number(itemVal);
+
+        switch (operator) {
+          case ':': return String(itemVal).toLowerCase().includes(String(searchVal).toLowerCase());
+          case '=': return String(itemVal).toLowerCase() === String(searchVal).toLowerCase();
+          case '>': return !isNaN(numItemVal) && numItemVal > numSearchVal;
+          case '<': return !isNaN(numItemVal) && numItemVal < numSearchVal;
+          case '>=': return !isNaN(numItemVal) && numItemVal >= numSearchVal;
+          case '<=': return !isNaN(numItemVal) && numItemVal <= numSearchVal;
+          default: return false;
+        }
+      }
+      return String(item.title || '').toLowerCase().includes(cleanToken.toLowerCase());
     });
   });
+}
 
-  // Execute the deletion
+// ==========================================
+// 3. MAIN COMPONENT
+// ==========================================
+export default function ItemGallery<T extends BaseGalleryItem>({
+  title, items, basePath, searchPlaceholder = "Search...", newItemText = "New",
+  createModalTitle = "Create New", categoryField = 'categories', deleteAction,
+  renderBadges, renderCreateForm
+}: ItemGalleryProps<T>) {
+
+  // State Management
+  const [searchQuery, setSearchQuery] = useState('');
+  const [createModalOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
+  const [itemToDelete, setItemToDelete] = useState<T | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [sortOption, setSortOption] = useState<string | null>('title-asc');
+  const [isGrouped, setIsGrouped] = useState(false);
+  const [showSearchHelp, setShowSearchHelp] = useState(false);
+
+  // Derived Data (Memoized)
+  const filteredItems = useMemo(() => applyAdvancedSearch(items, searchQuery), [items, searchQuery]);
+
+  const sortedItems = useMemo(() => {
+    return [...filteredItems].sort((a, b) => {
+      if (sortOption === 'title-asc') return a.title.localeCompare(b.title);
+      if (sortOption === 'title-desc') return b.title.localeCompare(a.title);
+      if (sortOption === 'created-desc') {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      }
+      if (sortOption === 'updated-desc') {
+        const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return dateB - dateA;
+      }
+      return 0;
+    });
+  }, [filteredItems, sortOption]);
+
+  const groupedItems = useMemo(() => {
+    if (!isGrouped) return {};
+    const groups: Record<string, T[]> = {};
+    const uncategorized: T[] = [];
+
+    sortedItems.forEach(item => {
+      const catString = item[categoryField];
+      if (typeof catString === 'string' && catString.trim()) {
+        catString.split(',').map(c => c.trim()).filter(Boolean).forEach(cat => {
+          if (!groups[cat]) groups[cat] = [];
+          groups[cat].push(item);
+        });
+      } else {
+        uncategorized.push(item);
+      }
+    });
+
+    if (uncategorized.length > 0) groups['Uncategorized'] = uncategorized;
+    return Object.keys(groups).sort().reduce((obj, key) => {
+      obj[key] = groups[key];
+      return obj;
+    }, {} as Record<string, T[]>);
+  }, [sortedItems, isGrouped, categoryField]);
+
+  const availableFields = useMemo(() => {
+    if (!items || items.length === 0) return [];
+    return Object.entries(items[0])
+      .map(([key, value]) => {
+        let type = typeof value;
+        if (type === 'string' && !isNaN(Date.parse(value as string))) type = 'date';
+        return { key, type };
+      })
+      .filter(f => ['string', 'number', 'boolean', 'date'].includes(f.type));
+  }, [items]);
+
+  // Actions
   const handleDeleteConfirm = async () => {
     if (!itemToDelete || !deleteAction) return;
-    
     setIsDeleting(true);
     try {
       await deleteAction(itemToDelete.id);
-      setItemToDelete(null); // Close the modal on success
+      setItemToDelete(null);
     } catch (error) {
       console.error("Failed to delete item", error);
       alert("Failed to delete. Please try again.");
@@ -104,104 +187,96 @@ export default function ItemGallery<T extends BaseGalleryItem>({
 
   return (
     <div>
-      {/* HEADER & SEARCH BAR */}
-      <Group justify="space-between" align="center" mb="xl" mt={'md'}>
+      {/* HEADER */}
+      <Group justify="space-between" align="center" mb="md" mt="md">
         <Title order={2}>{title}</Title>
+        {renderCreateForm && (
+          <Button leftSection={<IconPlus size={16} />} onClick={openCreate} bg="olive.5">
+            {newItemText}
+          </Button>
+        )}
+      </Group>
+
+      {/* CONTROLS BAR */}
+      {/* CONTROLS BAR */}
+        <Group 
+          wrap="nowrap" 
+          w={{ base: '100%', md: 'auto' }} 
+          style={{ flexGrow: 1 }} 
+          bg="light-dark(var(--mantine-color-neutrals-0), var(--mantine-color-dark-7))" 
+          bdrs="md" 
+          p="sm" 
+          mb="sm"
+        >
         <Group>
           <TextInput
+            styles={universalInputStyles}
             placeholder={searchPlaceholder}
-            leftSection={<IconSearch size={16} />}
+            leftSection={<IconSearch size={16} color="var(--mantine-color-neutrals-9)" />}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.currentTarget.value)}
             w={{ base: '100%', sm: 300 }}
+            rightSection={searchQuery.length > 0 ? <CloseButton size="sm" onClick={() => setSearchQuery('')} aria-label="Clear search" /> : null}
           />
-          {renderCreateForm && (
-            <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
-              {newItemText}
-            </Button>
-          )}
+          <ActionIcon variant="subtle" color="neutrals.8" size="lg" onClick={() => setShowSearchHelp((prev) => !prev)}>
+            <IconInfoCircle size={20} />
+          </ActionIcon>
+        </Group>
+
+        <Group justify="space-between" w={{ base: '100%', md: 'auto' }}>
+          <Switch 
+            color="neutrals.7" c="neutrals.9" label="Group by Category" checked={isGrouped}
+            onChange={(event) => setIsGrouped(event.currentTarget.checked)}
+            styles={{ track: { backgroundColor: 'var(--mantine-color-neutrals-2)', color: 'var(--mantine-color-neutrals-2)' } }}
+          />
+          <Select
+            leftSection={<IconSortAscending size={16} color="var(--mantine-color-neutrals-9)" />}
+            styles={universalInputStyles}
+            placeholder="Sort by"
+            value={sortOption}
+            onChange={setSortOption}
+            data={[
+              { value: 'title-asc', label: 'Title (A-Z)' },
+              { value: 'title-desc', label: 'Title (Z-A)' },
+              { value: 'created-desc', label: 'Newest First' },
+              { value: 'updated-desc', label: 'Recently Updated' },
+            ]}
+            w={200}
+          />
         </Group>
       </Group>
 
-      {/* THE GALLERY GRID */}
-      {filteredItems.length === 0 ? (
-        <Text c="dimmed" ta="center" mt="xl">
-          No items found matching "{searchQuery}".
-        </Text>
-      ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="lg">
-          {filteredItems.map((item) => (
-            <Card 
-              key={item.id} 
-              shadow="sm" 
-              padding="lg" 
-              radius="md" 
-              withBorder 
-              component={Link} 
-              href={`${basePath}/${item.id}`} 
-              style={{ textDecoration: 'none', transition: 'transform 0.2s, box-shadow 0.2s' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = 'var(--mantine-shadow-md)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = 'var(--mantine-shadow-sm)';
-              }}
-            >
-              <Card.Section style={{ position: 'relative' }}>
-                <Image
-                  src={item.coverImagePath || 'https://placehold.co/600x400?text=No+Cover'}
-                  height={160}
-                  alt={item.title}
-                  fallbackSrc="https://placehold.co/600x400?text=No+Image"
-                />
-                
-                {/* NEW: The Absolute Positioned Delete Button */}
-                {deleteAction && (
-                  <ActionIcon
-                    variant="filled"
-                    color="red"
-                    size="md"
-                    radius="xl"
-                    style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}
-                    onClick={(e) => {
-                      e.preventDefault(); // STOPS the <Link> from triggering
-                      setItemToDelete(item); // Opens the modal
-                    }}
-                  >
-                    <IconTrash size={16} stroke={1.5} />
-                  </ActionIcon>
-                )}
-              </Card.Section>
-              
-              <Text fw={500} size="lg" mt="sm" mb="xs" c="dark">
-                {item.title}
-              </Text>
-              
-              {renderBadges && renderBadges(item)}
+      <SearchHelpBox opened={showSearchHelp} onClose={() => setShowSearchHelp(false)} availableFields={availableFields} />
 
-              <Text size="sm" c="dimmed" lineClamp={2}>
-                {item.sourceUrl}
-              </Text>
-            </Card>
-          ))}
-        </SimpleGrid>
-      )}
+      {/* GALLERY GRID */}
+      <Box mt="xl">
+        {sortedItems.length === 0 ? (
+          <Text c="dimmed" ta="center" mt="xl">No items found matching "{searchQuery}".</Text>
+        ) : isGrouped ? (
+          <Accordion multiple variant="separated">
+            {Object.entries(groupedItems).map(([groupName, groupItems]) => (
+              <Accordion.Item key={groupName} value={groupName}>
+                <Accordion.Control><Text fw={600}>{groupName} ({groupItems.length})</Text></Accordion.Control>
+                <Accordion.Panel>
+                  <GalleryGrid items={groupItems} basePath={basePath} deleteAction={deleteAction} setItemToDelete={setItemToDelete} renderBadges={renderBadges} />
+                </Accordion.Panel>
+              </Accordion.Item>
+            ))}
+          </Accordion>
+        ) : (
+          <GalleryGrid items={sortedItems} basePath={basePath} deleteAction={deleteAction} setItemToDelete={setItemToDelete} renderBadges={renderBadges} />
+        )}
+      </Box>
 
-      {/* DYNAMIC CREATE MODAL */}
+      {/* MODALS */}
       <Modal opened={createModalOpened} onClose={closeCreate} title={createModalTitle} centered>
         {renderCreateForm && renderCreateForm(closeCreate)}
       </Modal>
-
-      {/* DYNAMIC DELETE MODAL */}
-      <ConfirmDeleteModal 
-        opened={!!itemToDelete}
-        close={() => setItemToDelete(null)}
-        onConfirm={handleDeleteConfirm}
-        itemName={itemToDelete?.title || "this item"}
-        isDeleting={isDeleting}
-      />
+      <ConfirmDeleteModal opened={!!itemToDelete} close={() => setItemToDelete(null)} onConfirm={handleDeleteConfirm} itemName={itemToDelete?.title || "this item"} isDeleting={isDeleting} />
     </div>
   );
 }
+
+// ==========================================
+// 4. SUB-COMPONENTS
+// ==========================================

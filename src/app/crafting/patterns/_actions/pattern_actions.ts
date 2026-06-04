@@ -94,6 +94,7 @@ export async function updatePattern(formData: FormData) {
   const yarnWeights = formData.get('yarnWeights') as string;
   const yarnYardage = formData.get('yarnYardage') ? Number(formData.get('yarnYardage')) : null;
   const sourceUrl = formData.get('sourceUrl') as string;
+  const categories = formData.get('categories') as string;
 
   // Extract Rich Text
   const patternText = formData.get('patternText') as string;
@@ -107,7 +108,7 @@ export async function updatePattern(formData: FormData) {
     .update(patterns)
     .set({
       title, hookSizes, yarnWeights, yarnYardage, sourceUrl,
-      patternText, materials, abbreviations, sizing, patternNotes
+      patternText, materials, abbreviations, sizing, patternNotes, categories
     })
     .where(eq(patterns.id, patternId));
 

@@ -22,9 +22,9 @@ export default function StashClient({ stashItems }: StashClientProps) {
       deleteAction={deleteYarn}
       renderBadges={(item) => (
         <Group gap="xs" mt="xs">
-          {item.weight && <Badge color="indigo" variant="light">{item.weight}</Badge>}
+          {item.weight && <Badge color="mustard.7" variant="outline">{item.weight}</Badge>}
           {item.color_tags?.split(',').map((color: string) => (
-            color.trim() && <Badge key={color} color="teal" variant="dot">{color.trim()}</Badge>
+            color.trim() && <Badge key={color} color="olive.5" variant="outline">{color.trim()}</Badge>
           ))}
         </Group>
       )}

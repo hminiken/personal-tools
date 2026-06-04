@@ -1,7 +1,10 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { Title, Text, Group, Paper, Switch, Tabs, Divider, Box, Button, TextInput, Stack, Typography, Anchor, Modal, useComputedColorScheme, ActionIcon, Card, SimpleGrid, Image, Badge } from '@mantine/core';
+import {
+    Title, Text, Group, Paper, Switch, Tabs, Divider, Box, Button,
+    TextInput, Stack, Typography, Anchor, Modal, useComputedColorScheme, ActionIcon, Card, Image, Badge
+} from '@mantine/core';
 import { IconArrowLeft, IconPlus, IconUnlink } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
@@ -12,7 +15,7 @@ import { RichTextEditor } from '@mantine/tiptap';
 import '@mantine/tiptap/styles.css';
 
 // Actions & Components
-import { saveRulerPosition,  updateProject, updateProjectStatus, addQuickNote, deleteProject, unlinkYarnFromProject } from '../../_actions/project_actions';
+import { saveRulerPosition, updateProject, updateProjectStatus, addQuickNote, deleteProject, unlinkYarnFromProject } from '../../_actions/project_actions';
 import { processWholePattern } from '@/utils/patternHighlighter';
 import ImageGallery from '@/components/PatternImageGallery';
 import { Project, Pattern, PatternImage, yarnStash } from '../types';
@@ -22,6 +25,8 @@ import { useRouter } from 'next/navigation';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 import { StashBrowserModal } from './StashBrowserModal';
 import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
+import { useCraftingEditor } from '@hooks/useCraftingEditor';
+import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
 function ReadOnlyHTML({ html, fallback }: { html: string | null, fallback: string }) {
     return (
         <Typography p={0}>
@@ -31,17 +36,17 @@ function ReadOnlyHTML({ html, fallback }: { html: string | null, fallback: strin
 }
 
 export interface LinkedYarn {
-  id: number;
-  yarnId: number;
-  title: string;
-  brand: string | null;
-  weight: string | null;
-  color_tags: string | null;
-  fiber_tags: string | null;
-  coverImagePath: string | null;
+    id: number;
+    yarnId: number;
+    title: string;
+    brand: string | null;
+    weight: string | null;
+    color_tags: string | null;
+    fiber_tags: string | null;
+    coverImagePath: string | null;
 }
 
-export default function ProjectWorkspace({ project, pattern, images, linkedYarns, availableStash}: { project: Project & { categories?: string | null }, pattern: Pattern, images: PatternImage[], linkedYarns: LinkedYarn[], availableStash: yarnStash[] }) {
+export default function ProjectWorkspace({ project, pattern, images, linkedYarns, availableStash }: { project: Project & { categories?: string | null }, pattern: Pattern, images: PatternImage[], linkedYarns: LinkedYarn[], availableStash: yarnStash[] }) {
     // const [rulerEnabled, setRulerEnabled] = useState(true);
     // const [rulerY, setRulerY] = useState(project.rulerPosition || 0);
     const [rulerEnabled, setRulerEnabled] = useState(true);
@@ -64,27 +69,11 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
     const [categoryTags, setCategoryTags] = useState<string[]>(project.categories ? project.categories.split(',') : []);
     const [status, setStatus] = useState<string>(project.status || '');
 
-    // Editors
-    // Editors - Start them as read-only!
-    const notesEditor = useEditor({
-        extensions: craftingEditorExtensions,
-        content: project.projectNotes || '',
-        immediatelyRender: false,
-        editable: false
-    });
+    const notesEditor = useCraftingEditor(project.projectNotes, isEditingTabs);
+    const patternEditor = useCraftingEditor(project.annotatedPattern || pattern.patternText, isEditingTabs);
 
-    const patternEditor = useEditor({
-        extensions: craftingEditorExtensions,
-        content: project.annotatedPattern || pattern.patternText || '',
-        immediatelyRender: false,
-        editable: false
-    });
 
-    // Toggle edit mode seamlessly without re-rendering the whole editor component
-    useEffect(() => {
-        if (patternEditor) patternEditor.setEditable(isEditingTabs);
-        if (notesEditor) notesEditor.setEditable(isEditingTabs);
-    }, [isEditingTabs, patternEditor, notesEditor]);
+
 
     const handleTextClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (!rulerEnabled || !project?.id) return;
@@ -115,11 +104,11 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
 
     const [stashModalOpened, { open: openStashModal, close: closeStashModal }] = useDisclosure(false);
 
-  const handleUnlinkYarn = async (yarnId: number) => {
-    if (confirm("Remove this yarn from the project?")) {
-      await unlinkYarnFromProject(project.id, yarnId);
-    }
-  };
+    const handleUnlinkYarn = async (yarnId: number) => {
+        if (confirm("Remove this yarn from the project?")) {
+            await unlinkYarnFromProject(project.id, yarnId);
+        }
+    };
 
     const handleRulerPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
         setIsDraggingRuler(true);
@@ -145,20 +134,20 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
     };
 
     const router = useRouter();
-  const [deleteModalOpened, { open: openDelete, close: closeDelete }] = useDisclosure(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteModalOpened, { open: openDelete, close: closeDelete }] = useDisclosure(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDelete = async () => {
-      setIsDeleting(true);
-      await deleteProject(project.id); 
-      setIsDeleting(false);
-      closeDelete();
-      router.push('/crafting/projects'); 
-  };
+    const handleDelete = async () => {
+        setIsDeleting(true);
+        await deleteProject(project.id);
+        setIsDeleting(false);
+        closeDelete();
+        router.push('/crafting/projects');
+    };
 
     return (
         <Paper pl={{ base: '0', sm: 'xl' }} pr={{ base: 'xs', sm: 'xl' }} radius="md">
-            <Button  component={Link} href="/crafting/projects" variant="subtle" color="gray" leftSection={<IconArrowLeft size={16} />} mb="md" pl={0}>
+            <Button component={Link} href="/crafting/projects" variant="subtle" color="gray" leftSection={<IconArrowLeft size={16} />} mb="md" pl={0}>
                 Back to Projects
             </Button>
 
@@ -242,7 +231,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
 
                     <Tabs.Panel value="pattern" p={{ base: 'xs', sm: 'md' }}>
                         <Group justify="space-between" mb="sm">
-                            <Text size="sm" c="dimmed" fs="italic">This is your project&apos;s clone of the pattern. Mark it up!</Text>
+                            <Text size="sm" c="dimmed" fs="italic">This is your project's clone of the pattern. Mark it up!</Text>
                         </Group>
                         <Group>
                             <Switch checked={rainbowEnabled} onChange={(event) => setRainbowEnabled(event.currentTarget.checked)} label="Rainbow Steps" color="grape" />
@@ -250,8 +239,8 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                         </Group>
 
                         <Box
-                            ref={containerRef} // NEW: Attach the ref here
-                            style={{ position: 'relative', cursor: rulerEnabled ? 'crosshair' : 'auto' }}
+                            ref={containerRef}
+                            style={{ position: 'relative', cursor: rulerEnabled && !isEditingTabs ? 'crosshair' : 'auto' }}
                             onClick={handleTextClick}
                         >
                             {rulerEnabled && !isEditingTabs && (
@@ -259,10 +248,9 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                                     position: 'absolute', top: `${rulerY - 15}px`, left: -10, right: -10, height: '35px',
                                     backgroundColor: 'rgba(255, 224, 102, 0.4)', borderLeft: '4px solid var(--mantine-color-yellow-filled)',
                                     zIndex: 5, borderRadius: '4px',
-                                    pointerEvents: 'auto', // Changed from 'none' so you can actually touch it
-                                    touchAction: 'none', // Prevents the whole page from scrolling when you swipe the ruler
+                                    pointerEvents: 'auto',
+                                    touchAction: 'none',
                                     cursor: isDraggingRuler ? 'grabbing' : 'grab',
-                                    // Remove the transition while dragging so it sticks perfectly to your finger
                                     transition: isDraggingRuler ? 'none' : 'top 0.2s ease-out',
                                 }}
                                     onPointerDown={handleRulerPointerDown}
@@ -288,14 +276,8 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                                         }
                                     }}
                                 >
-                                    {isEditingTabs && (
-                                        <RichTextEditor.Toolbar sticky stickyOffset={60}>
-                                            <RichTextEditor.ControlsGroup>
-                                                <RichTextEditor.Bold /><RichTextEditor.Italic /><RichTextEditor.Strikethrough /><RichTextEditor.Highlight />
-                                                <RichTextEditor.ColorPicker colors={['#fa5252', '#4c6ef5', '#12b886', '#fab005']} />
-                                            </RichTextEditor.ControlsGroup>
-                                        </RichTextEditor.Toolbar>
-                                    )}
+                                    {/* ✨ REPLACED THE ENTIRE TOOLBAR BLOCK WITH OUR SINGLE COMPONENT */}
+                                    {isEditingTabs && <CraftingEditorToolbar />}
                                     <RichTextEditor.Content />
                                 </RichTextEditor>
                             )}
@@ -307,12 +289,12 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                     <Tabs.Panel value="sizing" p={{ base: 'xs', sm: 'md' }}><ReadOnlyHTML html={pattern.sizing} fallback="No sizing info in master pattern." /></Tabs.Panel>
                     <Tabs.Panel value="patternNotes" p={{ base: 'xs', sm: 'md' }}><ReadOnlyHTML html={pattern.patternNotes} fallback="No master notes available." /></Tabs.Panel>
 
-                    <Tabs.Panel value="projectNotes" p={{ base: 'xs', sm: 'md' }} bg={isEditingTabs ? 'gray.0' : 'transparent'}>
+                    {/* ✨ ADDED light-dark() FOR DARK MODE COMPATIBILITY */}
+                    <Tabs.Panel value="projectNotes" p={{ base: 'xs', sm: 'md' }} bg={isEditingTabs ? 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))' : 'transparent'}>
                         {isEditingTabs ? (
                             <RichTextEditor editor={notesEditor}>
-                                <RichTextEditor.Toolbar sticky stickyOffset={60}>
-                                    <RichTextEditor.ControlsGroup><RichTextEditor.Bold /><RichTextEditor.Italic /><RichTextEditor.Strikethrough /><RichTextEditor.ClearFormatting /></RichTextEditor.ControlsGroup>
-                                </RichTextEditor.Toolbar>
+                                {/* ✨ REPLACED THE ENTIRE TOOLBAR BLOCK WITH OUR SINGLE COMPONENT */}
+                                <CraftingEditorToolbar />
                                 <RichTextEditor.Content />
                             </RichTextEditor>
                         ) : (
@@ -336,96 +318,96 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                     setCoverAction={(id, path) => setCoverImage(id, path, 'project')}
                 />
             </Box>
-            
 
 
-<Box mb="xl" mt="xl">
-    <Group justify="space-between" mb="md">
-        <Title order={4}>Project Yarn</Title>
-        <Button variant="light" size="sm" leftSection={<IconPlus size={16} />} onClick={openStashModal}>
-            Browse Stash
-        </Button>
-    </Group>
 
- {linkedYarns.map((yarn: LinkedYarn) => (
-<Card 
-    // eslint-disable-next-line react-hooks/purity
-    key={yarn.yarnId || yarn.id || Math.random()} // <-- Bulletproof key!
-    withBorder 
-    shadow="sm" 
-    radius="md" 
-    component={Link} 
-    href={`/crafting/stash/${yarn.yarnId || yarn.id}`}
-    style={{ textDecoration: 'none', color: 'inherit' }}
->
-        <Group wrap="nowrap" align="flex-start">
-            
-            {/* 1. THE IMAGE (Uncommented the sizing so it renders!) */}
-            <Image 
-                src={yarn.coverImagePath || 'https://placehold.co/100x100?text=No+Photo'} 
-                h={60} 
-                w={60} 
-                radius="md" 
-                fit="cover" 
-                alt={yarn.title}
-                fallbackSrc="https://placehold.co/100x100?text=No+Photo"
-            />
-            
-            {/* 2. THE DETAILS & BADGES */}
-            <Box style={{ flex: 1 }}>
-                <Text fw={500} lineClamp={1}>{yarn.title}</Text>
-                <Text size="xs" c="dimmed" mb={6}>
-                    {yarn.brand || 'Unknown Brand'}
-                </Text>
-
-                <Group gap={4}>
-                    {/* Weight */}
-                    {yarn.weight && (
-                        <Badge size="xs" color="mustard" variant="outline">
-                            {yarn.weight}
-                        </Badge>
-                    )}
-
-                    {/* Fibers */}
-                    {yarn.fiber_tags?.split(',').map((fiber: string) => {
-                        const cleanFiber = fiber.trim();
-                        if (!cleanFiber) return null;
-                        return (
-                            <Badge key={cleanFiber} size="xs" color="rust" variant="outline">
-                                {cleanFiber}
-                            </Badge>
-                        );
-                    })}
-
-                    {/* Colors */}
-                    {yarn.color_tags?.split(',').map((color: string) => {
-                        const cleanColor = color.trim();
-                        if (!cleanColor) return null;
-                        return (
-                            <Badge key={cleanColor} size="xs" color="olive" variant="outline">
-                                {cleanColor}
-                            </Badge>
-                        );
-                    })}
+            <Box mb="xl" mt="xl">
+                <Group justify="space-between" mb="md">
+                    <Title order={4}>Project Yarn</Title>
+                    <Button variant="light" size="sm" leftSection={<IconPlus size={16} />} onClick={openStashModal}>
+                        Browse Stash
+                    </Button>
                 </Group>
+
+                {linkedYarns.map((yarn: LinkedYarn) => (
+                    <Card
+                        // eslint-disable-next-line react-hooks/purity
+                        key={yarn.yarnId || yarn.id || Math.random()} // <-- Bulletproof key!
+                        withBorder
+                        shadow="sm"
+                        radius="md"
+                        component={Link}
+                        href={`/crafting/stash/${yarn.yarnId || yarn.id}`}
+                        style={{ textDecoration: 'none', color: 'inherit' }}
+                    >
+                        <Group wrap="nowrap" align="flex-start">
+
+                            {/* 1. THE IMAGE (Uncommented the sizing so it renders!) */}
+                            <Image
+                                src={yarn.coverImagePath || 'https://placehold.co/100x100?text=No+Photo'}
+                                h={60}
+                                w={60}
+                                radius="md"
+                                fit="cover"
+                                alt={yarn.title}
+                                fallbackSrc="https://placehold.co/100x100?text=No+Photo"
+                            />
+
+                            {/* 2. THE DETAILS & BADGES */}
+                            <Box style={{ flex: 1 }}>
+                                <Text fw={500} lineClamp={1}>{yarn.title}</Text>
+                                <Text size="xs" c="dimmed" mb={6}>
+                                    {yarn.brand || 'Unknown Brand'}
+                                </Text>
+
+                                <Group gap={4}>
+                                    {/* Weight */}
+                                    {yarn.weight && (
+                                        <Badge size="xs" color="mustard" variant="outline">
+                                            {yarn.weight}
+                                        </Badge>
+                                    )}
+
+                                    {/* Fibers */}
+                                    {yarn.fiber_tags?.split(',').map((fiber: string) => {
+                                        const cleanFiber = fiber.trim();
+                                        if (!cleanFiber) return null;
+                                        return (
+                                            <Badge key={cleanFiber} size="xs" color="rust" variant="outline">
+                                                {cleanFiber}
+                                            </Badge>
+                                        );
+                                    })}
+
+                                    {/* Colors */}
+                                    {yarn.color_tags?.split(',').map((color: string) => {
+                                        const cleanColor = color.trim();
+                                        if (!cleanColor) return null;
+                                        return (
+                                            <Badge key={cleanColor} size="xs" color="olive" variant="outline">
+                                                {cleanColor}
+                                            </Badge>
+                                        );
+                                    })}
+                                </Group>
+                            </Box>
+
+                            {/* 3. THE UNLINK BUTTON (With preventDefault added!) */}
+                            <ActionIcon
+                                variant="subtle"
+                                color="red"
+                                onClick={(e) => {
+                                    e.preventDefault(); // <--- Stops the card from linking when you click the trash icon
+                                    handleUnlinkYarn(yarn.yarnId || yarn.id);
+                                }}
+                            >
+                                <IconUnlink size={16} />
+                            </ActionIcon>
+
+                        </Group>
+                    </Card>
+                ))}
             </Box>
-
-            {/* 3. THE UNLINK BUTTON (With preventDefault added!) */}
-            <ActionIcon 
-                variant="subtle" 
-                color="red" 
-                onClick={(e) => {
-                    e.preventDefault(); // <--- Stops the card from linking when you click the trash icon
-                    handleUnlinkYarn(yarn.yarnId || yarn.id);
-                }}
-            >
-                <IconUnlink size={16} />
-            </ActionIcon>
-
-        </Group>
-    </Card>
-))}
-</Box>
 
 
             {/* Quick Note Modal */}
@@ -446,20 +428,20 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                     <Button onClick={handleSaveNote}>Save Note</Button>
                 </Stack>
             </Modal>
-            <StashBrowserModal 
-        opened={stashModalOpened}
-        close={closeStashModal}
-        projectId={project.id}
-        availableStash={availableStash}
-        linkedYarns={linkedYarns}
-      />
-            <ConfirmDeleteModal 
-          opened={deleteModalOpened}
-          close={closeDelete}
-          onConfirm={handleDelete}
-          itemName={project.title}
-          isDeleting={isDeleting}
-      />
+            <StashBrowserModal
+                opened={stashModalOpened}
+                close={closeStashModal}
+                projectId={project.id}
+                availableStash={availableStash}
+                linkedYarns={linkedYarns}
+            />
+            <ConfirmDeleteModal
+                opened={deleteModalOpened}
+                close={closeDelete}
+                onConfirm={handleDelete}
+                itemName={project.title}
+                isDeleting={isDeleting}
+            />
         </Paper>
     );
 }
