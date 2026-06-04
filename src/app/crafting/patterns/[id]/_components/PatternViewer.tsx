@@ -96,7 +96,7 @@ const notesEditor = useCraftingEditor(pattern.notes, isEditingTabs);
         isEditing={isEditingDetails}
         setIsEditing={setIsEditingDetails}
         formAction={updatePattern}
-        actionButtons={<Button onClick={openProject}>Start New Project</Button>}
+        actionButtons={<Button bg={'olive.7'} onClick={openProject}>Start New Project</Button>}
         onDeleteClick={openDelete}
       />
 
@@ -128,7 +128,7 @@ const notesEditor = useCraftingEditor(pattern.notes, isEditingTabs);
             <Button variant="light" onClick={() => setIsEditingTabs(!isEditingTabs)}>
               {isEditingTabs ? 'Cancel Editing' : 'Edit Text'}
             </Button>
-            {isEditingTabs && <Button type="submit" color="green">Save Text</Button>}
+            {isEditingTabs && <Button type="submit" color="olive.5">Save Text</Button>}
           </Group>
         </Group>
 

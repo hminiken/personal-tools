@@ -64,7 +64,7 @@ export function MediaGrid({ media }: { media: any[] }) {
 }, [filteredMedia, isGrouped]);
 
     return (
-        <Box>
+        <Box mt={'xs'}>
             <GalleryControls 
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}

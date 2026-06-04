@@ -7,12 +7,13 @@ import { Pattern } from '../types';
 import { createNewPattern, deletePattern } from '../_actions/pattern_actions';
 import { useDisclosure } from '@mantine/hooks';
 import { ImportPatternModal } from '@components/ImportPatternModal';
+import { FloatingAddButton } from '@components/FloatingAddButton';
 
 export default function PatternGallery({ initialPatterns }: { initialPatterns: Pattern[] }) {
   const [importModalOpened, { open: openImport, close: closeImport }] = useDisclosure(false);
   return (
     <>
-    <Group justify="flex-end" mb="md">
+    {/* <Group justify="flex-end" mb="md">
         <Button 
           leftSection={<IconDownload size={16} />} 
           variant="light" 
@@ -21,7 +22,8 @@ export default function PatternGallery({ initialPatterns }: { initialPatterns: P
         >
           Smart Import
         </Button>
-      </Group>
+      </Group> */}
+      <FloatingAddButton onClick={openImport} text={"Smart Import"} botOffset={50} color={'mustard'}/>
     <ItemGallery
       title="Pattern Library"
       items={initialPatterns}

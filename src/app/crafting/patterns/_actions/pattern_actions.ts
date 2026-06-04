@@ -168,6 +168,6 @@ export async function createPatternFromImport(data: any) {
     weights: data.weights,
     status: 'planned', // Give it a default status
   }).returning({ id: patterns.id });
-
+revalidatePath('/crafting/patterns');
   return newPattern.id;
 }

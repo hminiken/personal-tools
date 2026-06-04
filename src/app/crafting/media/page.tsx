@@ -19,7 +19,6 @@ export default async function MediaLibraryPage() {
     return (
         <main>
             {/* Added a small helper to filter orphans */}
-            <h1>Media Library</h1>
             <MediaGrid media={allMedia} />
         </main>
     );

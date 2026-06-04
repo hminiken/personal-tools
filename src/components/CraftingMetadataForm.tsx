@@ -134,7 +134,7 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
                             onChange={(val) => val && props.onUpdateStatus(val)}
                         />
                         {props.actionButtons}
-                        <Button variant="outline" onClick={() => props.setIsEditing(true)}>
+                        <Button c={'olive.6'} variant="outline" onClick={() => props.setIsEditing(true)}>
                             Edit Details
                         </Button>
                     </Group>
