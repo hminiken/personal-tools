@@ -72,14 +72,18 @@ export async function setCoverImage(id: number, imagePath: string, type: 'patter
   if (type === 'pattern') {
     await db.update(patterns).set({ coverImage: imagePath }).where(eq(patterns.id, id));
     revalidatePath(`/crafting/patterns/${id}`);
+    revalidatePath(`/crafting/patterns`)
   } 
   else if (type === 'project') {
     await db.update(projects).set({ coverImage: imagePath }).where(eq(projects.id, id));
     revalidatePath(`/crafting/projects/${id}`);
+    revalidatePath(`/crafting/projects`)
   } 
   else if (type === 'yarn') {
     await db.update(yarns).set({ coverImage: imagePath }).where(eq(yarns.id, id));
     revalidatePath(`/crafting/stash/${id}`);
+    revalidatePath(`/crafting/stash`)
+
   }
 }
 
