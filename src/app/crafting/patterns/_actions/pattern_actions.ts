@@ -5,6 +5,7 @@ import { patterns, projects, images } from "@db/schema";
 import { redirect } from "next/navigation";
 import { revalidatePath } from 'next/cache';
 import { eq } from 'drizzle-orm';
+import { sanitizePatternHtml } from "@/utils/sanitizeHtml";
 
 // ==========================================
 // CREATE & FETCH
@@ -87,41 +88,33 @@ export async function spawnProject(formData: FormData) {
 export async function updatePattern(formData: FormData) {
   const patternId = Number(formData.get('patternId'));
 
-  // Extract Metadata & Map to new schema
-  const title = formData.get('title') as string;
-  const sourceUrl = formData.get('sourceUrl') as string;
-  const categories = formData.get('categories') as string;
-  const hooks = formData.get('hookSizes') as string; 
-  const weights = formData.get('yarnWeights') as string;
-  
-  // Checking for both the old 'yarnYardage' or new 'yardage' in case you update the frontend form later
-  const yardageStr = formData.get('yarnYardage') || formData.get('yardage');
-  const yardage = yardageStr ? Number(yardageStr) : null;
+  // Build a PARTIAL update: only write columns whose fields were actually
+  // submitted. The "Edit Details" form omits the rich-text fields, so writing
+  // them unconditionally (as this used to) wiped content/materials/etc. to
+  // null every time you saved details. Guarding each field prevents that.
+  const updateData: Partial<typeof patterns.$inferInsert> = {};
 
-  // Extract Rich Text & Map to new schema
-  const content = formData.get('patternText') as string; 
-  const notes = formData.get('patternNotes') as string; 
-  const materials = formData.get('materials') as string;
-  const abbreviations = formData.get('abbreviations') as string;
-  const sizing = formData.get('sizing') as string;
+  // Metadata (mapping form keys -> schema columns)
+  if (formData.has('title')) updateData.title = formData.get('title') as string;
+  if (formData.has('sourceUrl')) updateData.sourceUrl = formData.get('sourceUrl') as string;
+  if (formData.has('categories')) updateData.categories = formData.get('categories') as string;
+  if (formData.has('hookSizes')) updateData.hooks = formData.get('hookSizes') as string;
+  if (formData.has('yarnWeights')) updateData.weights = formData.get('yarnWeights') as string;
 
-  // Save to Database using the exact new schema column names
-  await db
-    .update(patterns)
-    .set({
-      title, 
-      hooks, 
-      weights, 
-      yardage, 
-      sourceUrl,
-      content, 
-      materials, 
-      abbreviations, 
-      sizing, 
-      notes, 
-      categories
-    })
-    .where(eq(patterns.id, patternId));
+  // Supports both the old 'yarnYardage' and new 'yardage' keys
+  const yardageStr = formData.get('yarnYardage') ?? formData.get('yardage');
+  if (yardageStr !== null) updateData.yardage = yardageStr ? Number(yardageStr) : null;
+
+  // Rich text (only present when submitted from the tabs/content form)
+  if (formData.has('patternText')) updateData.content = formData.get('patternText') as string;
+  if (formData.has('patternNotes')) updateData.notes = formData.get('patternNotes') as string;
+  if (formData.has('materials')) updateData.materials = formData.get('materials') as string;
+  if (formData.has('abbreviations')) updateData.abbreviations = formData.get('abbreviations') as string;
+  if (formData.has('sizing')) updateData.sizing = formData.get('sizing') as string;
+
+  if (Object.keys(updateData).length > 0) {
+    await db.update(patterns).set(updateData).where(eq(patterns.id, patternId));
+  }
 
   revalidatePath(`/crafting/patterns/${patternId}`);
   revalidatePath(`/crafting/patterns`);
@@ -158,11 +151,11 @@ export async function createPatternFromImport(data: any) {
   const [newPattern] = await db.insert(patterns).values({
     title: data.title || 'Untitled Import',
     sourceUrl: data.sourceUrl,
-    materials: data.materials,
-    sizing: data.sizing,
-    abbreviations: data.abbreviations,
-    notes: data.notes,
-    content: data.content,
+    materials: sanitizePatternHtml(data.materials),
+    sizing: sanitizePatternHtml(data.sizing),
+    abbreviations: sanitizePatternHtml(data.abbreviations),
+    notes: sanitizePatternHtml(data.notes),
+    content: sanitizePatternHtml(data.content),
     categories: data.categories,
     hooks: data.hooks,
     weights: data.weights,

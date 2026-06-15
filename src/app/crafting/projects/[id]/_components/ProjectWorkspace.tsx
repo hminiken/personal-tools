@@ -28,10 +28,11 @@ import { StashBrowserModal } from './StashBrowserModal';
 import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
 import { useCraftingEditor } from '@hooks/useCraftingEditor';
 import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
+import { sanitizePatternHtml } from '@/utils/sanitizeHtml';
 function ReadOnlyHTML({ html, fallback }: { html: string | null, fallback: string }) {
     return (
         <Typography p={0}>
-            <div dangerouslySetInnerHTML={{ __html: html || `<p>${fallback}</p>` }} />
+            <div dangerouslySetInnerHTML={{ __html: sanitizePatternHtml(html) || `<p>${fallback}</p>` }} />
         </Typography>
     );
 }

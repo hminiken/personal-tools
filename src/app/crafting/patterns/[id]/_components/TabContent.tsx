@@ -6,6 +6,7 @@
 import { Typography } from "@mantine/core";
 import { RichTextEditor } from "@mantine/tiptap";
 import { Editor } from "@tiptap/react";
+import { sanitizePatternHtml } from "@/utils/sanitizeHtml";
 
 // This keeps us from copying the Toolbar 5 times!
 export function TabContent({ 
@@ -55,7 +56,7 @@ export function TabContent({
 
   return (
     <Typography p={0}>
-      <div dangerouslySetInnerHTML={{ __html: originalContent || `<p>${fallbackText}</p>` }} />
+      <div dangerouslySetInnerHTML={{ __html: sanitizePatternHtml(originalContent) || `<p>${fallbackText}</p>` }} />
     </Typography>
   );
 }

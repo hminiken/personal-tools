@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useEditor } from '@tiptap/react';
 import { craftingEditorExtensions } from '@/utils/editorExtensions'; // Adjust import path if needed
+import { sanitizePatternHtml } from '@/utils/sanitizeHtml';
 
 /**
  * A custom hook that standardizes the Tiptap editor across the app.
@@ -9,7 +10,7 @@ import { craftingEditorExtensions } from '@/utils/editorExtensions'; // Adjust i
 export function useCraftingEditor(initialContent: string | null | undefined, isEditing: boolean = false) {
   const editor = useEditor({
     extensions: craftingEditorExtensions,
-    content: initialContent || '',
+    content: sanitizePatternHtml(initialContent) || '',
     immediatelyRender: false,
     editable: isEditing, // Start in the correct state
   });

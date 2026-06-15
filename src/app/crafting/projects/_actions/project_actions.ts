@@ -38,20 +38,25 @@ export async function saveRulerPosition(projectId: number, yPosition: number) {
 // Add this to your existing actions.ts file
 export async function updateProject(formData: FormData) {
   const projectId = Number(formData.get('projectId'));
-  const title = formData.get('title') as string;
-  const sourceUrl = formData.get('sourceUrl') as string;
-  const yarn = formData.get('yarnUsed') as string;
-  const colors = formData.get('colors') as string;
-  const hooks = formData.get('hookSizes') as string;
-  const weights = formData.get('yarnWeights') as string;
-  const notes = formData.get('projectNotes') as string;
-  const content = formData.get('annotatedPattern') as string; // Catch the edits
-  const categories = formData.get('categories') as string; // Catch the edits
 
-  await db
-    .update(projects)
-    .set({ title, yarn, colors, hooks, weights, notes, content, sourceUrl, categories })
-    .where(eq(projects.id, projectId));
+  // PARTIAL update: only write columns whose fields were actually submitted,
+  // so a form that omits the rich-text fields (e.g. an "edit details" save)
+  // can't wipe the annotated pattern or project notes to null.
+  const updateData: Partial<typeof projects.$inferInsert> = {};
+
+  if (formData.has('title')) updateData.title = formData.get('title') as string;
+  if (formData.has('sourceUrl')) updateData.sourceUrl = formData.get('sourceUrl') as string;
+  if (formData.has('yarnUsed')) updateData.yarn = formData.get('yarnUsed') as string;
+  if (formData.has('colors')) updateData.colors = formData.get('colors') as string;
+  if (formData.has('hookSizes')) updateData.hooks = formData.get('hookSizes') as string;
+  if (formData.has('yarnWeights')) updateData.weights = formData.get('yarnWeights') as string;
+  if (formData.has('categories')) updateData.categories = formData.get('categories') as string;
+  if (formData.has('projectNotes')) updateData.notes = formData.get('projectNotes') as string;
+  if (formData.has('annotatedPattern')) updateData.content = formData.get('annotatedPattern') as string;
+
+  if (Object.keys(updateData).length > 0) {
+    await db.update(projects).set(updateData).where(eq(projects.id, projectId));
+  }
 
   revalidatePath(`/crafting/projects/${projectId}`);
 }
