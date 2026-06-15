@@ -26,7 +26,7 @@ function GalleryGrid<T extends BaseGalleryItem>({ items, basePath, deleteAction,
           }}
         >
           <Card.Section style={{ position: 'relative' }}>
-            <Image src={item.coverImage || 'https://placehold.co/600x400?text=No+Cover'} height={160} alt={item.title} fallbackSrc="https://placehold.co/600x400?text=No+Image" />
+            <Image src={item.coverImage || 'https://placehold.co/600x400?text=No+Cover'} h={{ base: 140, sm: 160 }} alt={item.title} fallbackSrc="https://placehold.co/600x400?text=No+Image" />
             {deleteAction && (
               <ActionIcon variant="filled" color="rust.6" size="md" radius="xl" style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }} onClick={(e) => { e.preventDefault(); setItemToDelete(item); }}>
                 <IconTrash size={16} stroke={1.5} />

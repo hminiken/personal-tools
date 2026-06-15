@@ -4,9 +4,9 @@
 import { useRef, useState } from 'react';
 import {
     Title, Text, Group, Paper, Switch, Tabs, Divider, Box, Button,
-    TextInput, Stack, Typography, Anchor, Modal, useComputedColorScheme, ActionIcon, Card, Image, Badge
+    TextInput, Stack, Typography, Anchor, Modal, useComputedColorScheme, ActionIcon, Card, Image, Badge, Collapse
 } from '@mantine/core';
-import { IconArrowLeft, IconPlus, IconUnlink } from '@tabler/icons-react';
+import { IconArrowLeft, IconPlus, IconUnlink, IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
 
@@ -22,6 +22,8 @@ import { Project, Pattern, PatternImage, yarnStash } from '../types';
 import { CraftingMetadataForm } from '@/components/CraftingMetadataForm';
 import { useRouter } from 'next/navigation';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
+import { ScrollToTopButton } from '@components/ScrollToTopButton';
+import { FloatingEditActions } from '@components/FloatingEditActions';
 import { StashBrowserModal } from './StashBrowserModal';
 import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
 import { useCraftingEditor } from '@hooks/useCraftingEditor';
@@ -102,6 +104,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
     };
 
     const [stashModalOpened, { open: openStashModal, close: closeStashModal }] = useDisclosure(false);
+    const [contentOpened, { toggle: toggleContent, open: openContent }] = useDisclosure(true);
 
     const handleUnlinkYarn = async (yarnId: number) => {
         if (confirm("Remove this yarn from the project?")) {
@@ -191,7 +194,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
             <Divider my="sm" />
 
             {/* TABS FORM */}
-            <form action={async (formData) => {
+            <form id="project-content-form" action={async (formData) => {
                 formData.set('projectNotes', notesEditor?.getHTML() || '');
                 formData.set('annotatedPattern', patternEditor?.getHTML() || '');
 
@@ -209,16 +212,41 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                 <input type="hidden" name="projectId" value={project.id} />
 
                 <Group justify="space-between" mb="sm">
-                    <Title order={4}>Project Content</Title>
+                    <Group gap={6} onClick={toggleContent} style={{ cursor: 'pointer' }}>
+                        <ActionIcon variant="subtle" color="gray" aria-label={contentOpened ? 'Collapse content' : 'Expand content'}>
+                            {contentOpened ? <IconChevronDown size={20} /> : <IconChevronRight size={20} />}
+                        </ActionIcon>
+                        <Title order={4}>Project Content</Title>
+                    </Group>
                     <Group>
-                        <Button variant="light" onClick={() => setIsEditingTabs(!isEditingTabs)}>
+                        <Button variant="light" onClick={() => { if (!isEditingTabs) openContent(); setIsEditingTabs(!isEditingTabs); }}>
                             {isEditingTabs ? 'Cancel Editing' : 'Edit Text'}
                         </Button>
                         {isEditingTabs && <Button type="submit" color="olive.5">Save Text</Button>}
                     </Group>
                 </Group>
 
-                <Tabs defaultValue="pattern" variant="outline" keepMounted styles={{ list: { flexWrap: 'nowrap', overflowX: 'auto' } }}>
+                <Collapse expanded={contentOpened} keepMounted>
+                <Tabs
+                    defaultValue="pattern"
+                    variant="outline"
+                    keepMounted
+                    styles={{
+                        list: {
+                            flexWrap: 'nowrap',
+                            overflowX: 'auto',
+                            // Keep the tab bar in reach while scrolling a long pattern.
+                            // Disabled while editing so it doesn't collide with the
+                            // editor's own sticky toolbar (which sits at the same offset).
+                            ...(!isEditingTabs && {
+                                position: 'sticky',
+                                top: 60,
+                                zIndex: 3,
+                                backgroundColor: 'var(--mantine-color-body)',
+                            }),
+                        },
+                    }}
+                >
                     <Tabs.List>
                         <Tabs.Tab value="pattern">Pattern</Tabs.Tab>
                         <Tabs.Tab value="projectNotes" color="blue">My Project Notes</Tabs.Tab>
@@ -301,6 +329,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                         )}
                     </Tabs.Panel>
                 </Tabs>
+                </Collapse>
             </form>
 
             <Divider my="sm" />
@@ -441,6 +470,12 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                 itemName={project.title}
                 isDeleting={isDeleting}
             />
+
+            {isEditingTabs ? (
+                <FloatingEditActions formId="project-content-form" onCancel={() => setIsEditingTabs(false)} />
+            ) : (
+                <ScrollToTopButton />
+            )}
         </Paper>
     );
 }

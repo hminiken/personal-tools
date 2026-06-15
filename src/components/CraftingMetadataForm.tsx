@@ -113,7 +113,7 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
                 </Stack>
                 ) : (
                   <Group justify="space-between" align="flex-start" w="100%">
-                    <Box>
+                    <Box style={{ flexGrow: 1, minWidth: 0 }}>
                         <Group>
                             <Title order={2}>{props.title}</Title>
                             {props.sourceUrl && (
@@ -125,9 +125,9 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
                         {props.subtext}
                     </Box>
 
-                    <Group gap="sm">
+                    <Group gap="sm" wrap="wrap" w={{ base: '100%', sm: 'auto' }} mt={{ base: 'sm', sm: 0 }}>
                         <Select
-                            w={140}
+                            w={{ base: '100%', xs: 140 }}
                             placeholder="Status"
                             data={props.statusOptions}
                             value={props.status}

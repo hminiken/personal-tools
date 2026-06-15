@@ -30,6 +30,7 @@
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "sharp": "^0.34.5",
     "tiptap-extension-resize-image": "^1.4.0"
   },
   "devDependencies": {

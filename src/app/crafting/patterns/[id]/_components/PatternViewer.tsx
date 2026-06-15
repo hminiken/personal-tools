@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Title, Group, Paper, Switch, Tabs, Divider, Box, Button, TextInput, Stack, Typography, useComputedColorScheme, Modal } from '@mantine/core';
+import { Title, Group, Paper, Switch, Tabs, Divider, Box, Button, TextInput, Stack, Typography, useComputedColorScheme, Modal, Collapse, ActionIcon } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
-import { IconArrowLeft } from '@tabler/icons-react';
+import { IconArrowLeft, IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 
 // Tiptap Imports
 import { RichTextEditor } from '@mantine/tiptap';
@@ -19,6 +19,8 @@ import { Pattern, PatternImage } from '../../types';
 import { CraftingMetadataForm } from '@/components/CraftingMetadataForm';
 import { useRouter } from 'next/navigation';
 import { ConfirmDeleteModal } from '@components/ConfirmDeleteModal';
+import { ScrollToTopButton } from '@components/ScrollToTopButton';
+import { FloatingEditActions } from '@components/FloatingEditActions';
 import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
 import { useCraftingEditor } from '@hooks/useCraftingEditor';
 import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
@@ -30,6 +32,7 @@ export default function PatternViewer({ pattern, images }: { pattern: Pattern, i
   const computedColorScheme = useComputedColorScheme('light');
   
   const [projectModalOpened, { open: openProject, close: closeProject }] = useDisclosure(false);
+  const [contentOpened, { toggle: toggleContent, open: openContent }] = useDisclosure(true);
 
   // States
   const [hookTags, setHookTags] = useState<string[]>(pattern.hooks ? pattern.hooks.split(',') : []);
@@ -103,7 +106,7 @@ const notesEditor = useCraftingEditor(pattern.notes, isEditingTabs);
       <Divider my="sm" />
 
       {/* TABS FORM */}
-      <form action={async (formData) => {
+      <form id="pattern-content-form" action={async (formData) => {
         formData.set('patternText', patternEditor?.getHTML() || '');
         formData.set('materials', materialsEditor?.getHTML() || '');
         formData.set('abbreviations', abbreviationsEditor?.getHTML() || '');
@@ -123,16 +126,41 @@ const notesEditor = useCraftingEditor(pattern.notes, isEditingTabs);
         <input type="hidden" name="patternId" value={pattern.id} />
 
         <Group justify="space-between" mb="sm">
-          <Title order={4}>Pattern Content</Title>
+          <Group gap={6} onClick={toggleContent} style={{ cursor: 'pointer' }}>
+            <ActionIcon variant="subtle" color="gray" aria-label={contentOpened ? 'Collapse content' : 'Expand content'}>
+              {contentOpened ? <IconChevronDown size={20} /> : <IconChevronRight size={20} />}
+            </ActionIcon>
+            <Title order={4}>Pattern Content</Title>
+          </Group>
           <Group>
-            <Button variant="light" onClick={() => setIsEditingTabs(!isEditingTabs)}>
+            <Button variant="light" onClick={() => { if (!isEditingTabs) openContent(); setIsEditingTabs(!isEditingTabs); }}>
               {isEditingTabs ? 'Cancel Editing' : 'Edit Text'}
             </Button>
             {isEditingTabs && <Button type="submit" color="olive.5">Save Text</Button>}
           </Group>
         </Group>
 
-        <Tabs defaultValue="pattern" variant="outline" keepMounted styles={{ list: { flexWrap: 'nowrap', overflowX: 'auto' } }}>
+        <Collapse expanded={contentOpened} keepMounted>
+        <Tabs
+          defaultValue="pattern"
+          variant="outline"
+          keepMounted
+          styles={{
+            list: {
+              flexWrap: 'nowrap',
+              overflowX: 'auto',
+              // Keep the tab bar in reach while scrolling a long pattern.
+              // Disabled while editing so it doesn't collide with the
+              // editor's own sticky toolbar (which sits at the same offset).
+              ...(!isEditingTabs && {
+                position: 'sticky',
+                top: 60,
+                zIndex: 3,
+                backgroundColor: 'var(--mantine-color-body)',
+              }),
+            },
+          }}
+        >
           <Tabs.List>
             <Tabs.Tab value="pattern">Pattern</Tabs.Tab>
             <Tabs.Tab value="materials">Materials</Tabs.Tab>
@@ -177,6 +205,7 @@ const notesEditor = useCraftingEditor(pattern.notes, isEditingTabs);
           <Tabs.Panel value="sizing" p="md"><TabContent editor={sizingEditor} isEditing={isEditingTabs} originalContent={pattern.sizing} fallbackText="No sizing info added." /></Tabs.Panel>
           <Tabs.Panel value="notes" p="md"><TabContent editor={notesEditor} isEditing={isEditingTabs} originalContent={pattern.notes} fallbackText="No notes added." /></Tabs.Panel>
         </Tabs>
+        </Collapse>
       </form>
 
       <Divider my="sm" />
@@ -217,6 +246,12 @@ const notesEditor = useCraftingEditor(pattern.notes, isEditingTabs);
           itemName={pattern.title}
           isDeleting={isDeleting}
       />
+
+      {isEditingTabs ? (
+        <FloatingEditActions formId="pattern-content-form" onCancel={() => setIsEditingTabs(false)} />
+      ) : (
+        <ScrollToTopButton />
+      )}
 
     </Paper>
   );

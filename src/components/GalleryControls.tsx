@@ -10,14 +10,14 @@ export function GalleryControls({
   universalInputStyles
 }: any) {
   return (
-    <Group 
-      wrap="nowrap" 
-      w={{ base: '100%', md: 'auto' }} 
-      style={{ flexGrow: 1 }} 
-      bg="light-dark(var(--mantine-color-neutrals-0), var(--mantine-color-dark-7))" 
+    <Group
+      wrap="wrap"
+      w={{ base: '100%', md: 'auto' }}
+      style={{ flexGrow: 1 }}
+      bg="light-dark(var(--mantine-color-neutrals-0), var(--mantine-color-dark-7))"
       bdrs="md" p="sm" mb="sm"
     >
-      <Group>
+      <Group wrap="nowrap" w={{ base: '100%', sm: 'auto' }} style={{ flexGrow: 1 }}>
         <TextInput
           styles={universalInputStyles}
           placeholder={searchPlaceholder}
@@ -25,6 +25,7 @@ export function GalleryControls({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.currentTarget.value)}
           w={{ base: '100%', sm: 300 }}
+          style={{ flexGrow: 1 }}
           rightSection={searchQuery.length > 0 ? <CloseButton size="sm" onClick={() => setSearchQuery('')} /> : null}
         />
         <ActionIcon variant="subtle" color="neutrals.8" size="lg" onClick={() => setShowSearchHelp((prev: boolean) => !prev)}>
@@ -32,8 +33,8 @@ export function GalleryControls({
         </ActionIcon>
       </Group>
 
-      <Group justify="space-between" w={{ base: '100%', md: 'auto' }}>
-        <Switch 
+      <Group justify="space-between" wrap="wrap" w={{ base: '100%', md: 'auto' }}>
+        <Switch
           color="neutrals.7" label="Group by Category" checked={isGrouped}
           onChange={(e) => setIsGrouped(e.currentTarget.checked)}
           styles={{ track: { backgroundColor: 'var(--mantine-color-neutrals-2)' } }}
@@ -50,7 +51,7 @@ export function GalleryControls({
             { value: 'created-desc', label: 'Newest First' },
             { value: 'updated-desc', label: 'Recently Updated' },
           ]}
-          w={200}
+          w={{ base: '100%', xs: 200 }}
         />
       </Group>
     </Group>

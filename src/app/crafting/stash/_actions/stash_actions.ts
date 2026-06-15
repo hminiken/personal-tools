@@ -6,6 +6,7 @@ import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
+import { compressImage } from '@/utils/compressImage';
 
 // 1. Fetch all yarn
 export async function getYarnStash() {
@@ -35,11 +36,14 @@ export async function createYarn(formData: FormData) {
 
   if (file && file.size > 0) {
     const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    // Compress before saving: cap dimensions + re-encode to ~1MB WebP.
+    const buffer = await compressImage(Buffer.from(bytes));
 
-    // Create a unique filename so you don't overwrite photos with the same name
-    const uniqueFilename = `${Date.now()}-${file.name.replace(/\s+/g, '_')}`;
-    
+    // Create a unique filename so you don't overwrite photos with the same name.
+    // Strip the original extension since we always write WebP now.
+    const baseName = file.name.replace(/\s+/g, '_').replace(/\.[^.]+$/, '');
+    const uniqueFilename = `${Date.now()}-${baseName}.webp`;
+
     // Define where to save it (public/uploads so the browser can see it)
     const uploadDir = join(process.cwd(), 'public/uploads');
     

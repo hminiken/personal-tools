@@ -139,7 +139,7 @@ export default function YarnViewer({
                 <Group justify="space-between" align="flex-start">
                     <Box style={{ flex: 1 }}>
                         {isEditingDetails ? (
-                            <Stack gap="sm" maw={500}>
+                            <Stack gap="sm" maw={{ base: '100%', sm: 500 }}>
                                 <TextInput label="Yarn Name" value={title} onChange={(e) => setTitle(e.currentTarget.value)} required />
                                 <TextInput label="Brand" value={brand} onChange={(e) => setBrand(e.currentTarget.value)} />
                                 <Select
@@ -216,7 +216,7 @@ export default function YarnViewer({
                 {linkedProjects.length === 0 ? (
                     <Text c="dimmed">This yarn isn't linked to any projects yet.</Text>
                 ) : (
-                    <SimpleGrid cols={{ base: 2, sm: 2, md: 3 }}>
+                    <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
                         {linkedProjects.map((project) => (
 
                             <Card

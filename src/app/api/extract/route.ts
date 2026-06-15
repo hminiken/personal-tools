@@ -21,10 +21,7 @@ export async function POST(req: Request) {
         
         // 1. Clean out layout junk
         $('script, style, noscript, nav, header, footer, aside, iframe, svg, form').remove();
-        
-        // ✨ 2. THE LAZY-LOAD FIX ✨
-        // Blogs hide the real image in data attributes. We loop through all images
-        // and force the real URL back into the standard "src" attribute.
+      
         $('img').each((_, img) => {
           const $img = $(img);
           const lazySrc = $img.attr('data-lazy-src') || $img.attr('data-src') || $img.attr('data-original');
