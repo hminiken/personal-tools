@@ -13,6 +13,26 @@ export default function YarnForm({ onSuccess }: { onSuccess: () => void }) {
   const [fibers, setFibers] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
 
+  // Let the user paste a screenshot/photo straight into the form instead of
+  // having to save the file and browse for it. Mirrors the paste handling in
+  // the edit-view UploadModal.
+  const handlePaste = (e: React.ClipboardEvent<HTMLFormElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const pastedFile = item.getAsFile();
+        if (pastedFile) {
+          e.preventDefault();
+          const ext = pastedFile.type.split('/')[1] || 'png';
+          const cleanFile = new File([pastedFile], `pasted_photo_${Date.now()}.${ext}`, { type: pastedFile.type });
+          setFile(cleanFile);
+        }
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -31,14 +51,16 @@ export default function YarnForm({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} onPaste={handlePaste}>
       <Stack gap="md">
         <FileInput
           label="Yarn Photo"
-          placeholder="Upload a picture of the skein"
+          placeholder="Upload or paste a picture of the skein (Ctrl+V)"
           accept="image/png,image/jpeg,image/webp"
           leftSection={<IconUpload size={16} />}
+          value={file}
           onChange={setFile}
+          clearable
         />
         
         <TextInput name="title" label="Title/Name" placeholder="e.g., Leftover Navy Blue" required />

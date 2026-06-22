@@ -33,7 +33,12 @@ export function middleware(req: NextRequest) {
 }
 
 // This tells Next.js exactly which routes to protect.
-// We protect EVERYTHING except the Next.js internal build files.
+// We protect EVERYTHING except the Next.js internal build files and the
+// /uploads image route. User-uploaded photos are served as <img> subresources;
+// browsers don't reliably resend basic-auth credentials for those, so leaving
+// /uploads protected made every uploaded image 401 and fall back to the
+// "Not Found" placeholder. These are just craft photos, so serving them
+// without the basic-auth gate is fine.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|uploads).*)'],
 };

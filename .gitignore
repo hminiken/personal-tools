@@ -43,3 +43,5 @@ next-env.d.ts
 /public
 sqlite.db
 sqlite.db.bak
+/data
+./data
