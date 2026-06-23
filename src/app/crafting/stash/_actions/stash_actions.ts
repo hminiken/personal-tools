@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/db'; // Adjust path if your db.ts is elsewhere
-import { projectYarns, yarns } from '@/db/schema';
+import { images, projectYarns, yarns } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { writeFile, mkdir } from 'fs/promises';
@@ -59,7 +59,7 @@ export async function createYarn(formData: FormData) {
   }
 
   // Insert into SQLite
-  await db.insert(yarns).values({
+  const [newYarn] = await db.insert(yarns).values({
     title,
     brand,
     weights: weight,
@@ -67,7 +67,16 @@ export async function createYarn(formData: FormData) {
     colors: colorTags,
     notes,
     coverImage,
-  });
+  }).returning({ id: yarns.id });
+
+  // Also add the uploaded photo to the gallery (images table) so it shows up
+  // in the item's photo gallery — not just as the card cover.
+  if (coverImage && newYarn) {
+    await db.insert(images).values({
+      path: coverImage,
+      yarnId: newYarn.id,
+    });
+  }
 
   // Tell Next.js to refresh the page so the new yarn instantly appears
   revalidatePath('/crafting/stash');

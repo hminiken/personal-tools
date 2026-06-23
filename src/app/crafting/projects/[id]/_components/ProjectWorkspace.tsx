@@ -208,6 +208,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                 formData.set('categories', categoryTags.join(','));
 
                 await updateProject(formData);
+                router.refresh(); // Pull fresh server props so the editors re-sync
                 setIsEditingTabs(false);
             }}>
                 <input type="hidden" name="projectId" value={project.id} />

@@ -2,26 +2,40 @@
 'use client';
 
 import { useState } from 'react';
-import { Modal, Textarea, TextInput, Button, Group, Box, Loader, Text } from '@mantine/core';
+import { Modal, Textarea, TextInput, Button, Group, Box, Loader, Text, FileInput } from '@mantine/core';
+import { IconFileTypePdf } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 export function ImportPatternModal({ opened, close }: { opened: boolean; close: () => void }) {
   const router = useRouter();
   const [sourceUrl, setSourceUrl] = useState('');
   const [rawText, setRawText] = useState('');
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleImport = async () => {
-    if (!sourceUrl && !rawText) return;
+    if (!sourceUrl && !rawText && !pdfFile) return;
     setIsProcessing(true);
 
     try {
-      // 1. Send the raw input to our AI extraction route
-      const response = await fetch('/api/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceUrl, rawText })
-      });
+      // 1. Send the raw input to our AI extraction route.
+      //    PDFs go as multipart/form-data; URL/text go as JSON.
+      let response: Response;
+      if (pdfFile) {
+        const formData = new FormData();
+        formData.append('pdf', pdfFile);
+        if (sourceUrl) formData.append('sourceUrl', sourceUrl);
+        response = await fetch('/api/extract', {
+          method: 'POST',
+          body: formData,
+        });
+      } else {
+        response = await fetch('/api/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sourceUrl, rawText }),
+        });
+      }
 
       if (!response.ok) throw new Error('Failed to extract pattern');
 
@@ -68,12 +82,26 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
           value={rawText}
           onChange={(e) => setRawText(e.currentTarget.value)}
           minRows={6}
+          mb="md"
+          disabled={!!pdfFile}
+        />
+
+        <Text ta="center" c="dimmed" mb="md">OR</Text>
+
+        <FileInput
+          label="Upload PDF"
+          placeholder="Choose a pattern PDF..."
+          accept="application/pdf"
+          leftSection={<IconFileTypePdf size={18} />}
+          value={pdfFile}
+          onChange={setPdfFile}
+          clearable
           mb="xl"
         />
 
         <Group justify="flex-end">
           <Button variant="default" onClick={close} disabled={isProcessing}>Cancel</Button>
-          <Button color="olive" onClick={handleImport} disabled={(!sourceUrl && !rawText) || isProcessing}>
+          <Button color="olive" onClick={handleImport} disabled={(!sourceUrl && !rawText && !pdfFile) || isProcessing}>
             Parse Pattern
           </Button>
         </Group>

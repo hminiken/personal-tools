@@ -92,6 +92,7 @@ export default function YarnViewer({
         formData.append('notes', notesEditor?.getHTML() || '');
 
         await updateYarn(formData);
+        router.refresh(); // Pull fresh server props so the editor re-syncs
         setIsSaving(false);
         setIsEditingDetails(false);
     };
@@ -110,6 +111,7 @@ export default function YarnViewer({
         formData.append('notes', notesEditor?.getHTML() || '');
 
         await updateYarn(formData);
+        router.refresh(); // Pull fresh server props so the editor re-syncs
         setIsSaving(false);
         setIsEditingNotes(false);
     };

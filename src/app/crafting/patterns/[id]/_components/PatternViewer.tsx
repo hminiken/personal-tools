@@ -121,6 +121,7 @@ const notesEditor = useCraftingEditor(pattern.notes, isEditingTabs);
         formData.set('categories', categoryTags.join(','));
         
         await updatePattern(formData);
+        router.refresh(); // Pull fresh server props so the editors re-sync
         setIsEditingTabs(false);
       }}>
         <input type="hidden" name="patternId" value={pattern.id} />
