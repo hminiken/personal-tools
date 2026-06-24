@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
-import { 
-    Group, Stack, TextInput, TagsInput, Box, Title, 
-    Anchor, Select, Button, Badge, 
+import { useState, useEffect, useMemo } from 'react';
+import {
+    Group, Stack, TextInput, TagsInput, MultiSelect, Box, Title,
+    Anchor, Select, Button, Badge,
     SimpleGrid
 } from '@mantine/core';
 import { IconExternalLink, IconNeedleThread } from '@tabler/icons-react';
 import { getTagSuggestions } from '@app/crafting/actions/MetadataActions';
+import { weightOptionsWith } from '@/utils/yarnWeights';
 
 interface CraftingMetadataProps {
     idName: string;
@@ -49,6 +50,14 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
         });
     }, []);
 
+    // Weights now come from the shared canonical list (a fixed dropdown), with
+    // any legacy free-text values already on this record merged in so they stay
+    // visible/selected instead of vanishing from the chips.
+    const weightData = useMemo(
+        () => weightOptionsWith(tags.weightTags),
+        [tags.weightTags]
+    );
+
     return (
         <form action={async (formData) => {
             formData.set('hookSizes', tags.hookTags.join(','));
@@ -79,10 +88,10 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
                             value={tags.hookTags} onChange={tags.setHookTags} 
                             data={suggestions.hooks} clearable 
                         />
-                        <TagsInput 
-                            label="Yarn Weights" placeholder="Worsted" 
-                            value={tags.weightTags} onChange={tags.setWeightTags} 
-                            data={suggestions.weights} clearable 
+                        <MultiSelect
+                            label="Yarn Weights" placeholder="Select weight(s)"
+                            value={tags.weightTags} onChange={tags.setWeightTags}
+                            data={weightData} clearable searchable
                         />
                     </SimpleGrid>
 

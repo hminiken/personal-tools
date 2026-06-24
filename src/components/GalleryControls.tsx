@@ -1,36 +1,48 @@
 // src/components/GalleryControls.tsx
-import { Group, TextInput, ActionIcon, Switch, Select, CloseButton } from '@mantine/core';
-import { IconSearch, IconSortAscending, IconInfoCircle } from '@tabler/icons-react';
+import { Group, Switch, Select } from '@mantine/core';
+import { IconSortAscending } from '@tabler/icons-react';
+import { FilterBuilder, Filter, FieldOption } from './FilterBuilder';
+
+interface GalleryControlsProps {
+  fields: FieldOption[];
+  getSuggestions: (field: string) => string[];
+  filters: Filter[];
+  onAddFilter: (filter: Filter) => void;
+  onRemoveFilter: (index: number) => void;
+  onClearFilters: () => void;
+  searchPlaceholder?: string;
+  isGrouped: boolean;
+  setIsGrouped: (val: boolean) => void;
+  sortOption: string | null;
+  setSortOption: (val: string | null) => void;
+  universalInputStyles?: object;
+}
 
 export function GalleryControls({
-  searchQuery, setSearchQuery, searchPlaceholder,
-  isGrouped, setIsGrouped,
-  sortOption, setSortOption,
-  setShowSearchHelp,
-  universalInputStyles
-}: any) {
+  fields, getSuggestions, filters, onAddFilter, onRemoveFilter, onClearFilters,
+  searchPlaceholder, isGrouped, setIsGrouped, sortOption, setSortOption,
+  universalInputStyles,
+}: GalleryControlsProps) {
   return (
     <Group
       wrap="wrap"
       w={{ base: '100%', md: 'auto' }}
       style={{ flexGrow: 1 }}
+      align="flex-start"
       bg="light-dark(var(--mantine-color-neutrals-0), var(--mantine-color-dark-7))"
       bdrs="md" p="sm" mb="sm"
     >
-      <Group wrap="nowrap" w={{ base: '100%', sm: 'auto' }} style={{ flexGrow: 1 }}>
-        <TextInput
-          styles={universalInputStyles}
+      <Group wrap="nowrap" w={{ base: '100%', md: 'auto' }} style={{ flexGrow: 1 }}>
+        <FilterBuilder
+          fields={fields}
+          getSuggestions={getSuggestions}
+          filters={filters}
+          onAdd={onAddFilter}
+          onRemove={onRemoveFilter}
+          onClear={onClearFilters}
           placeholder={searchPlaceholder}
-          leftSection={<IconSearch size={16} color="var(--mantine-color-neutrals-9)" />}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.currentTarget.value)}
-          w={{ base: '100%', sm: 300 }}
-          style={{ flexGrow: 1 }}
-          rightSection={searchQuery.length > 0 ? <CloseButton size="sm" onClick={() => setSearchQuery('')} /> : null}
+          universalInputStyles={universalInputStyles}
         />
-        <ActionIcon variant="subtle" color="neutrals.8" size="lg" onClick={() => setShowSearchHelp((prev: boolean) => !prev)}>
-          <IconInfoCircle size={20} />
-        </ActionIcon>
       </Group>
 
       <Group justify="space-between" wrap="wrap" w={{ base: '100%', md: 'auto' }}>

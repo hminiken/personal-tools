@@ -2,9 +2,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Modal, Textarea, TextInput, Button, Group, Box, Loader, Text, FileInput } from '@mantine/core';
-import { IconFileTypePdf } from '@tabler/icons-react';
+import { Modal, Textarea, TextInput, Button, Group, Box, Loader, Text, FileInput, Alert } from '@mantine/core';
+import { IconFileTypePdf, IconAlertTriangle } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
+
+interface ImportError {
+  message: string;
+  overloaded: boolean;
+  nextTier: number | null;
+  nextModelLabel: string | null;
+}
 
 export function ImportPatternModal({ opened, close }: { opened: boolean; close: () => void }) {
   const router = useRouter();
@@ -12,10 +19,14 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
   const [rawText, setRawText] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<ImportError | null>(null);
 
-  const handleImport = async () => {
+  // `tier` selects which Gemini model to use (0 = standard, higher = lighter).
+  // A failed run can offer a one-click retry at the next tier down.
+  const handleImport = async (tier = 0) => {
     if (!sourceUrl && !rawText && !pdfFile) return;
     setIsProcessing(true);
+    setError(null);
 
     try {
       // 1. Send the raw input to our AI extraction route.
@@ -24,6 +35,7 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
       if (pdfFile) {
         const formData = new FormData();
         formData.append('pdf', pdfFile);
+        formData.append('modelTier', String(tier));
         if (sourceUrl) formData.append('sourceUrl', sourceUrl);
         response = await fetch('/api/extract', {
           method: 'POST',
@@ -33,24 +45,39 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
         response = await fetch('/api/extract', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sourceUrl, rawText }),
+          body: JSON.stringify({ sourceUrl, rawText, modelTier: tier }),
         });
       }
 
-      if (!response.ok) throw new Error('Failed to extract pattern');
+      const data = await response.json().catch(() => ({}));
 
-      const extractedData = await response.json();
+      if (!response.ok) {
+        // Show the real reason (e.g. Gemini overloaded) and, when available,
+        // offer to retry on a lighter model tier.
+        setError({
+          message: data.error || 'Failed to parse pattern. Please try again.',
+          overloaded: !!data.overloaded,
+          nextTier: data.canRetryLower ? data.nextTier : null,
+          nextModelLabel: data.nextModelLabel ?? null,
+        });
+        return;
+      }
 
       // 2. We don't save yet! We pass the data to the "Preview" page.
       // We can do this by stringifying it into sessionStorage for temporary passing.
-      sessionStorage.setItem('patternImportPreview', JSON.stringify(extractedData));
-      
-      close();
-      router.push('/crafting/patterns/preview'); 
+      sessionStorage.setItem('patternImportPreview', JSON.stringify(data));
 
-    } catch (error) {
-      console.error("Import failed:", error);
-      alert("Failed to parse pattern. Please try again.");
+      close();
+      router.push('/crafting/patterns/preview');
+
+    } catch (err) {
+      console.error("Import failed:", err);
+      setError({
+        message: 'Could not reach the server. Check your connection and try again.',
+        overloaded: false,
+        nextTier: null,
+        nextModelLabel: null,
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -99,9 +126,33 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
           mb="xl"
         />
 
+        {error && (
+          <Alert
+            color={error.overloaded ? 'yellow' : 'red'}
+            icon={<IconAlertTriangle size={18} />}
+            title={error.overloaded ? 'Gemini is busy right now' : 'Import failed'}
+            withCloseButton
+            onClose={() => setError(null)}
+            mb="md"
+          >
+            <Text size="sm">{error.message}</Text>
+            {error.nextTier !== null && (
+              <Button
+                mt="sm"
+                size="xs"
+                color="olive"
+                loading={isProcessing}
+                onClick={() => handleImport(error.nextTier!)}
+              >
+                Try a lighter model ({error.nextModelLabel})
+              </Button>
+            )}
+          </Alert>
+        )}
+
         <Group justify="flex-end">
           <Button variant="default" onClick={close} disabled={isProcessing}>Cancel</Button>
-          <Button color="olive" onClick={handleImport} disabled={(!sourceUrl && !rawText && !pdfFile) || isProcessing}>
+          <Button color="olive" onClick={() => handleImport()} disabled={(!sourceUrl && !rawText && !pdfFile) || isProcessing}>
             Parse Pattern
           </Button>
         </Group>

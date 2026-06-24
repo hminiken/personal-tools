@@ -1,18 +1,13 @@
-/* eslint-disable react/no-unescaped-entities */
 'use client';
 
-import { useState, useMemo } from 'react';
-import {
-  SimpleGrid, Card, Text, Group, TextInput, Title, Button, Image, Modal, ActionIcon, Select, Switch, Accordion, Box, List, CloseButton, Collapse, Paper
-} from '@mantine/core';
-import { IconSearch, IconPlus, IconTrash, IconSortAscending, IconInfoCircle } from '@tabler/icons-react';
+import { useState, useMemo, useCallback } from 'react';
+import { Text, Accordion, Box, Modal } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import Link from 'next/link';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 import GalleryGrid from './GalleryGrid';
-import SearchHelpBox from './SearchHelpBox';
 import { GalleryControls } from './GalleryControls';
 import { FloatingAddButton } from './FloatingAddButton';
+import { Filter, FieldOption } from './FilterBuilder';
 
 // ==========================================
 // 1. TYPES & INTERFACES
@@ -64,60 +59,67 @@ const universalInputStyles = {
   },
 };
 
-// Extracted the complex Regex logic out of the component to keep the file clean
-function applyAdvancedSearch<T extends BaseGalleryItem>(items: T[], searchQuery: string): T[] {
-  if (!searchQuery.trim()) return items;
-  const tokens = searchQuery.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
-  
-  return items.filter((item) => {
-    return tokens.every((token) => {
-      const cleanToken = token.replace(/(^"|"$)/g, '');
-      const match = cleanToken.match(/^(\w+)(>=|<=|>|<|=|:)(.+)$/);
+// Friendly labels for the fields users can filter by. Only the keys that
+// actually exist on the items show up in the "Search by..." dropdown, so this
+// one map serves patterns, projects, and yarn without per-page config.
+const FIELD_LABELS: Record<string, string> = {
+  title: 'Title',
+  categories: 'Category',
+  status: 'Status',
+  hooks: 'Hook',
+  weights: 'Weight',
+  brand: 'Brand',
+  fibers: 'Fiber',
+  colors: 'Color',
+  yarn: 'Yarn',
+};
 
-      if (match) {
-        const [, field, operator, searchVal] = match;
-        const itemVal = item[field];
-        if (itemVal == null) return false;
+// The keys "Anything" searches across (the union of all known text fields).
+const ALL_TEXT_FIELDS = Object.keys(FIELD_LABELS);
 
-        const isDate = (val: any) => isNaN(Number(val)) && !isNaN(Date.parse(val));
-        const numSearchVal = isDate(searchVal) ? new Date(searchVal).getTime() : Number(searchVal);
-        const numItemVal = isDate(itemVal) ? new Date(itemVal as string).getTime() : Number(itemVal);
+// AND together every active filter. Each filter is a simple case-insensitive
+// "contains" against one field (or across all text fields for "Anything").
+function applyFilters<T extends BaseGalleryItem>(items: T[], filters: Filter[]): T[] {
+  const active = filters.filter((f) => f.value.trim());
+  if (active.length === 0) return items;
 
-        switch (operator) {
-          case ':': return String(itemVal).toLowerCase().includes(String(searchVal).toLowerCase());
-          case '=': return String(itemVal).toLowerCase() === String(searchVal).toLowerCase();
-          case '>': return !isNaN(numItemVal) && numItemVal > numSearchVal;
-          case '<': return !isNaN(numItemVal) && numItemVal < numSearchVal;
-          case '>=': return !isNaN(numItemVal) && numItemVal >= numSearchVal;
-          case '<=': return !isNaN(numItemVal) && numItemVal <= numSearchVal;
-          default: return false;
-        }
+  return items.filter((item) =>
+    active.every((f) => {
+      const needle = f.value.trim().toLowerCase();
+      if (f.field === '__all__') {
+        return ALL_TEXT_FIELDS.some((k) =>
+          String(item[k] ?? '').toLowerCase().includes(needle)
+        );
       }
-      return String(item.title || '').toLowerCase().includes(cleanToken.toLowerCase());
-    });
-  });
+      return String(item[f.field] ?? '').toLowerCase().includes(needle);
+    })
+  );
 }
 
 // ==========================================
 // 3. MAIN COMPONENT
 // ==========================================
 export default function ItemGallery<T extends BaseGalleryItem>({
-  title, items, basePath, searchPlaceholder = "Search...", newItemText = "New",
+  items, basePath, searchPlaceholder = "Search...", newItemText = "New",
   createModalTitle = "Create New", categoryField = 'categories', deleteAction,
   renderBadges, renderCreateForm
 }: ItemGalleryProps<T>) {
 
   // State Management
-  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<Filter[]>([]);
   const [createModalOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
   const [itemToDelete, setItemToDelete] = useState<T | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [sortOption, setSortOption] = useState<string | null>('title-asc');
   const [isGrouped, setIsGrouped] = useState(false);
-  const [showSearchHelp, setShowSearchHelp] = useState(false);
+
+  // Filter handlers
+  const addFilter = useCallback((f: Filter) => setFilters((prev) => [...prev, f]), []);
+  const removeFilter = useCallback((index: number) => setFilters((prev) => prev.filter((_, i) => i !== index)), []);
+  const clearFilters = useCallback(() => setFilters([]), []);
 
   // Derived Data (Memoized)
-  const filteredItems = useMemo(() => applyAdvancedSearch(items, searchQuery), [items, searchQuery]);
+  const filteredItems = useMemo(() => applyFilters(items, filters), [items, filters]);
 
   const sortedItems = useMemo(() => {
     return [...filteredItems].sort((a, b) => {
@@ -161,15 +163,33 @@ export default function ItemGallery<T extends BaseGalleryItem>({
     }, {} as Record<string, T[]>);
   }, [sortedItems, isGrouped, categoryField]);
 
-  const availableFields = useMemo(() => {
-    if (!items || items.length === 0) return [];
-    return Object.entries(items[0])
-      .map(([key, value]) => {
-        const rawType = typeof value as 'string' | 'number' | 'boolean' | 'object' | 'undefined' | 'function' | 'symbol' | 'bigint';
-        const type = rawType === 'string' && !isNaN(Date.parse(value as string)) ? 'date' : rawType;
-        return { key, type };
-      })
-      .filter(f => ['string', 'number', 'boolean', 'date'].includes(f.type));
+  // The fields offered in the "Search by..." dropdown: "Anything" first, then
+  // any known text field that actually exists on these items.
+  const fieldOptions = useMemo<FieldOption[]>(() => {
+    const sample = items[0] || {};
+    const opts: FieldOption[] = [{ value: '__all__', label: 'Anything' }];
+    for (const [key, label] of Object.entries(FIELD_LABELS)) {
+      if (key in sample) opts.push({ value: key, label });
+    }
+    return opts;
+  }, [items]);
+
+  // Distinct values present in the data for a field, powering the value
+  // autocomplete. Comma-joined fields (categories, hooks, etc.) are split so
+  // each individual tag is suggested on its own.
+  const getSuggestions = useCallback((field: string) => {
+    if (!field || field === '__all__' || field === 'title') return [];
+    const set = new Set<string>();
+    for (const item of items) {
+      const raw = item[field];
+      if (typeof raw === 'string') {
+        raw.split(',').forEach((part) => {
+          const t = part.trim();
+          if (t) set.add(t);
+        });
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [items]);
 
   // Actions
@@ -189,38 +209,32 @@ export default function ItemGallery<T extends BaseGalleryItem>({
 
   return (
     <div>
-      {/* HEADER */}
-      <Group  mb="md" mt="0">
-        {/* <Title order={2}>{title}</Title> */}
-        {/* {renderCreateForm && (
-          <Button leftSection={<IconPlus size={16} />} onClick={openCreate} bg="olive.5">
-            {newItemText}
-          </Button>
-        )} */}
-      </Group>
       {renderCreateForm && (
         <FloatingAddButton onClick={openCreate} text={newItemText} />
       )}
 
       {/* CONTROLS BAR */}
-        <GalleryControls 
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
+        <GalleryControls
+        fields={fieldOptions}
+        getSuggestions={getSuggestions}
+        filters={filters}
+        onAddFilter={addFilter}
+        onRemoveFilter={removeFilter}
+        onClearFilters={clearFilters}
         searchPlaceholder={searchPlaceholder}
         isGrouped={isGrouped}
         setIsGrouped={setIsGrouped}
         sortOption={sortOption}
         setSortOption={setSortOption}
-        setShowSearchHelp={setShowSearchHelp}
         universalInputStyles={universalInputStyles}
       />
-
-      <SearchHelpBox opened={showSearchHelp} onClose={() => setShowSearchHelp(false)} availableFields={availableFields} />
 
       {/* GALLERY GRID */}
       <Box mt="xl">
         {sortedItems.length === 0 ? (
-          <Text c="dimmed" ta="center" mt="xl">No items found matching "{searchQuery}".</Text>
+          <Text c="dimmed" ta="center" mt="xl">
+            {filters.length > 0 ? 'No items match your filters.' : 'No items yet.'}
+          </Text>
         ) : isGrouped ? (
           <Accordion multiple variant="separated">
             {Object.entries(groupedItems).map(([groupName, groupItems]) => (

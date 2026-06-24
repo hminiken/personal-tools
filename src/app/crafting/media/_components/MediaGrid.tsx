@@ -8,6 +8,7 @@ import { ConfirmDeleteModal } from '@components/ConfirmDeleteModal';
 import { deleteMediaPermanently, unlinkMedia } from '@app/crafting/actions/MediaActions';
 import Link from 'next/link';
 import { GalleryControls } from '@components/GalleryControls';
+import { Filter } from '@components/FilterBuilder';
 import MediaCard from './MediaCard';
 
 export function MediaGrid({ media }: { media: any[] }) {
@@ -28,19 +29,29 @@ export function MediaGrid({ media }: { media: any[] }) {
         }
     };
 
-    const [searchQuery, setSearchQuery] = useState('');
+    const [filters, setFilters] = useState<Filter[]>([]);
     const [isGrouped, setIsGrouped] = useState(false);
     const [sortOption, setSortOption] = useState<string | null>('created-desc');
-    const [showSearchHelp, setShowSearchHelp] = useState(false);
 
-    // 2. Add the filter/sort logic (using your existing logic from ItemGallery)
+    const addFilter = (f: Filter) => setFilters((prev) => [...prev, f]);
+    const removeFilter = (index: number) => setFilters((prev) => prev.filter((_, i) => i !== index));
+    const clearFilters = () => setFilters([]);
+
+    // Media items only have a "source" (the pattern/project/yarn they're attached
+    // to), so the single "Anything" filter searches across all those titles.
+    // Filters stack with AND, matching the behavior of the other grids.
+    const sourceTitle = (item: { pattern?: { title?: string | null }; project?: { title?: string | null }; yarn?: { title?: string | null } }) =>
+        `${item.pattern?.title ?? ''} ${item.project?.title ?? ''} ${item.yarn?.title ?? ''}`.toLowerCase();
+
+    const mediaFields = [{ value: '__all__', label: 'Source' }];
+
     const filteredMedia = useMemo(() => {
-        return media.filter(item => 
-            item.pattern?.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.project?.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.yarn?.title.toLowerCase().includes(searchQuery.toLowerCase())
+        const active = filters.filter((f) => f.value.trim());
+        if (active.length === 0) return media;
+        return media.filter((item) =>
+            active.every((f) => sourceTitle(item).includes(f.value.trim().toLowerCase()))
         );
-    }, [media, searchQuery]);
+    }, [media, filters]);
 
     const groupedMedia = useMemo(() => {
     if (!isGrouped) return { 'All Media': filteredMedia };
@@ -65,17 +76,19 @@ export function MediaGrid({ media }: { media: any[] }) {
 
     return (
         <Box mt={'xs'}>
-            <GalleryControls 
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
+            <GalleryControls
+                fields={mediaFields}
+                getSuggestions={() => []}
+                filters={filters}
+                onAddFilter={addFilter}
+                onRemoveFilter={removeFilter}
+                onClearFilters={clearFilters}
                 searchPlaceholder="Search media by project or pattern..."
                 isGrouped={isGrouped}
                 setIsGrouped={setIsGrouped}
                 sortOption={sortOption}
                 setSortOption={setSortOption}
-                setShowSearchHelp={setShowSearchHelp}
-                // You can define a simple style or import your universal ones
-                universalInputStyles={{}} 
+                universalInputStyles={{}}
             />
 {isGrouped ? (
             // ✨ IF GROUPED: Loop through the groups

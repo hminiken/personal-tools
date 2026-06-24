@@ -19,6 +19,7 @@ import { updateYarn, deleteYarn, unlinkProjectFromYarn } from '../_actions/stash
 import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
 import { useCraftingEditor } from '@hooks/useCraftingEditor';
 import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
+import { YARN_WEIGHTS } from '@/utils/yarnWeights';
 
 // Interfaces
 interface Yarn {
@@ -146,7 +147,7 @@ export default function YarnViewer({
                                 <TextInput label="Brand" value={brand} onChange={(e) => setBrand(e.currentTarget.value)} />
                                 <Select
                                     label="Weight"
-                                    data={['Lace (0)', 'Super Fine (1)', 'Fine (2)', 'Light (3)', 'Medium/Worsted (4)', 'Bulky (5)', 'Super Bulky (6)', 'Jumbo (7)']}
+                                    data={YARN_WEIGHTS}
                                     value={weight}
                                     onChange={(val) => setWeight(val || '')}
                                     clearable

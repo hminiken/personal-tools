@@ -5,6 +5,14 @@ import * as cheerio from 'cheerio';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
+// Ordered from most capable to lightest. When a tier is overloaded (503) the
+// client can retry with the next one down, which is usually under less demand.
+const MODEL_TIERS = [
+  { id: 'gemini-flash-latest', label: 'Flash (standard)' },
+  { id: 'gemini-flash-lite-latest', label: 'Flash-Lite (lighter)' },
+  { id: 'gemini-2.5-flash', label: '2.5 Flash ' },
+];
+
 export async function POST(req: Request) {
   try {
     const contentType = req.headers.get('content-type') || '';
@@ -12,11 +20,13 @@ export async function POST(req: Request) {
     let sourceUrl: string | null = null;
     let rawText: string | null = null;
     let pdfPart: { inlineData: { data: string; mimeType: string } } | null = null;
+    let modelTier = 0;
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
       sourceUrl = (formData.get('sourceUrl') as string) || null;
       rawText = (formData.get('rawText') as string) || null;
+      modelTier = Number(formData.get('modelTier')) || 0;
 
       const file = formData.get('pdf');
       if (file && file instanceof File) {
@@ -32,7 +42,11 @@ export async function POST(req: Request) {
       const body = await req.json();
       sourceUrl = body.sourceUrl || null;
       rawText = body.rawText || null;
+      modelTier = Number(body.modelTier) || 0;
     }
+
+    // Clamp to a valid tier index.
+    modelTier = Math.min(Math.max(0, modelTier), MODEL_TIERS.length - 1);
 
     let textToParse = rawText;
 
@@ -113,23 +127,58 @@ export async function POST(req: Request) {
       ${pdfPart ? '' : `\n      Pattern HTML Data:\n      ${textToParse}\n`}
     `;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
-    const result = await model.generateContent(
-      pdfPart ? [prompt, pdfPart] : prompt
-    );
-    let responseText = result.response.text();
+    const selected = MODEL_TIERS[modelTier];
+    let responseText: string;
+
+    try {
+      const model = genAI.getGenerativeModel({ model: selected.id });
+      const result = await model.generateContent(
+        pdfPart ? [prompt, pdfPart] : prompt
+      );
+      responseText = result.response.text();
+    } catch (err) {
+      // Surface the real Gemini error to the user, and tell the client whether
+      // a lighter model tier is available to retry with.
+      const message = err instanceof Error ? err.message : String(err);
+      const isOverloaded = /\b503\b|overloaded|high demand|service unavailable|unavailable/i.test(message);
+      const hasLowerTier = modelTier < MODEL_TIERS.length - 1;
+
+      console.error('Gemini generate error:', message);
+
+      return NextResponse.json(
+        {
+          error: message,
+          model: selected.label,
+          overloaded: isOverloaded,
+          canRetryLower: hasLowerTier,
+          nextTier: hasLowerTier ? modelTier + 1 : null,
+          nextModelLabel: hasLowerTier ? MODEL_TIERS[modelTier + 1].label : null,
+        },
+        { status: isOverloaded ? 503 : 502 }
+      );
+    }
 
     responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsedData = JSON.parse(responseText);
+
+    let parsedData;
+    try {
+      parsedData = JSON.parse(responseText);
+    } catch {
+      return NextResponse.json(
+        { error: `${selected.label} returned a response we couldn't read. Please try again.` },
+        { status: 502 }
+      );
+    }
 
     // ✨ INJECT THE SOURCE URL FOR YOUR DATABASE
     return NextResponse.json({
       ...parsedData,
-      sourceUrl: sourceUrl || null 
+      sourceUrl: sourceUrl || null
     });
 
   } catch (error) {
-    console.error('Gemini Error:', error);
-    return NextResponse.json({ error: 'Failed to parse pattern' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to parse pattern';
+    console.error('Extract route error:', message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

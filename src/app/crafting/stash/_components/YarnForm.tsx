@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { TextInput, Textarea, Select, TagsInput, FileInput, Button, Stack, Group } from '@mantine/core';
 import { IconUpload, IconPalette, IconTag } from '@tabler/icons-react';
 import { createYarn } from '../_actions/stash_actions';
+import { YARN_WEIGHTS } from '@/utils/yarnWeights';
 
 export default function YarnForm({ onSuccess }: { onSuccess: () => void }) {
   const [loading, setLoading] = useState(false);
@@ -70,10 +71,7 @@ export default function YarnForm({ onSuccess }: { onSuccess: () => void }) {
           name="weight"
           label="Yarn Weight"
           placeholder="Select weight"
-          data={[
-            'Lace (0)', 'Super Fine (1)', 'Fine (2)', 'Light (3)', 
-            'Medium/Worsted (4)', 'Bulky (5)', 'Super Bulky (6)', 'Jumbo (7)'
-          ]}
+          data={YARN_WEIGHTS}
         />
 
         <TagsInput
