@@ -48,6 +48,7 @@ export async function updateProject(formData: FormData) {
   if (formData.has('sourceUrl')) updateData.sourceUrl = formData.get('sourceUrl') as string;
   if (formData.has('yarnUsed')) updateData.yarn = formData.get('yarnUsed') as string;
   if (formData.has('colors')) updateData.colors = formData.get('colors') as string;
+  if (formData.has('craftType')) updateData.craftType = formData.get('craftType') as string;
   if (formData.has('hookSizes')) updateData.hooks = formData.get('hookSizes') as string;
   if (formData.has('yarnWeights')) updateData.weights = formData.get('yarnWeights') as string;
   if (formData.has('categories')) updateData.categories = formData.get('categories') as string;

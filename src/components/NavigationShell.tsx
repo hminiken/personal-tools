@@ -6,8 +6,8 @@ import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  IconNeedleThread, 
-  IconBook, 
+  IconNeedleThread,
+  IconBook,
   IconHome,
   IconCurrencyDollar,
   IconChevronLeft,
@@ -38,7 +38,8 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     if (pathname.includes('/crafting/projects')) return 'Active Projects';
     if (pathname.includes('/crafting/stash')) return 'Yarn Stash'; // Just in case you add this later!
     if (pathname.includes('/crafting/media')) return 'Manage Media'; // Just in case you add this later!
-    
+    if (pathname.includes('/crafting/references')) return 'References';
+
     return 'Command Center'; // A safe fallback
   };
 const isMobile = useMediaQuery('(max-width: 48em)'); // matches 'sm' breakpoint
@@ -147,11 +148,17 @@ useEffect(() => {
               label="Yarn Stash" 
               active={pathname.includes('/stash')}
             />
-             <NavLink 
-              component={Link} 
-              href="/crafting/media" 
-              label="Media" 
+             <NavLink
+              component={Link}
+              href="/crafting/media"
+              label="Media"
               active={pathname.includes('/media')}
+            />
+             <NavLink
+              component={Link}
+              href="/crafting/references"
+              label="References"
+              active={pathname.includes('/references')}
             />
           </NavLink>
 

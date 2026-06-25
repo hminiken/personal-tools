@@ -122,7 +122,8 @@ export async function POST(req: Request) {
       - "notes": HTML string.
       - "content": HTML string containing full step-by-step instructions and strictly filtered inline <img> tags.
       - "categories": Comma separated string.
-      - "hooks": Comma separated string.
+      - "craftType": Either "crochet" or "knitting". Infer it from the pattern's tools and stitches: crochet uses a hook and stitches like sc/dc/hdc/tr (chains, single/double crochet); knitting uses two needles and stitches like knit/purl (k/p, cast on, bind off, stockinette). If genuinely ambiguous, default to "crochet".
+      - "hooks": Comma separated string of the tool sizes (crochet hook OR knitting needle sizes, matching craftType). Prefer the metric size in millimeters when available, e.g. "5mm" or "5mm (H/8)".
       - "weights": Comma separated string.
       ${pdfPart ? '' : `\n      Pattern HTML Data:\n      ${textToParse}\n`}
     `;

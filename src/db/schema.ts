@@ -22,9 +22,13 @@ export const patterns = sqliteTable('patterns', {
   // Classifications
   categories: text('categories'),
   status: text('status'),
-  hooks: text('hooks'), 
+  // 'crochet' (default) or 'knitting' — drives whether the UI shows crochet
+  // hook sizes or knitting needle sizes. The tool size itself is stored in
+  // `hooks` for both crafts (labels embed mm + US, so they're self-describing).
+  craftType: text('craft_type').default('crochet'),
+  hooks: text('hooks'),
   weights: text('weights'),
-  yardage: integer('yardage'), 
+  yardage: integer('yardage'),
   
   // Timestamps
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
@@ -45,7 +49,8 @@ export const projects = sqliteTable('projects', {
   colors: text('colors'),
   categories: text('categories'),
   status: text('status'),
-  hooks: text('hooks'), 
+  craftType: text('craft_type').default('crochet'), // see patterns.craftType
+  hooks: text('hooks'),
   weights: text('weights'),
   
   // Workspace

@@ -24,6 +24,7 @@ import { FloatingEditActions } from '@components/FloatingEditActions';
 import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
 import { useCraftingEditor } from '@hooks/useCraftingEditor';
 import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
+import type { CraftType } from '@/utils/knittingNeedles';
 
 export default function PatternViewer({ pattern, images }: { pattern: Pattern, images: PatternImage[] }) {
   const [isEditingDetails, setIsEditingDetails] = useState(false);
@@ -39,6 +40,7 @@ export default function PatternViewer({ pattern, images }: { pattern: Pattern, i
   const [weightTags, setWeightTags] = useState<string[]>(pattern.weights ? pattern.weights.split(',') : []);
   const [categoryTags, setCategoryTags] = useState<string[]>(pattern.categories ? pattern.categories.split(',') : []);
   const [status, setStatus] = useState<string>(pattern.status || '');
+  const [craftType, setCraftType] = useState<CraftType>((pattern.craftType as CraftType) || 'crochet');
 
 
   const patternEditor = useCraftingEditor(pattern.content, isEditingTabs);
@@ -95,6 +97,8 @@ const notesEditor = useCraftingEditor(pattern.notes, isEditingTabs);
           { value: 'Did Not Like', label: 'Did Not Like' },
         ]}
         onUpdateStatus={handleUpdateStatus}
+        craftType={craftType}
+        setCraftType={setCraftType}
         tags={{ hookTags, setHookTags, weightTags, setWeightTags, categoryTags, setCategoryTags }}
         isEditing={isEditingDetails}
         setIsEditing={setIsEditingDetails}

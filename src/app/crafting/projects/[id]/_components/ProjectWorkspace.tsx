@@ -28,6 +28,7 @@ import { StashBrowserModal } from './StashBrowserModal';
 import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
 import { useCraftingEditor } from '@hooks/useCraftingEditor';
 import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
+import type { CraftType } from '@/utils/knittingNeedles';
 import { sanitizePatternHtml } from '@/utils/sanitizeHtml';
 function ReadOnlyHTML({ html, fallback }: { html: string | null, fallback: string }) {
     return (
@@ -70,6 +71,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
     const [weightTags, setWeightTags] = useState<string[]>(project.weights ? project.weights.split(',') : []);
     const [categoryTags, setCategoryTags] = useState<string[]>(project.categories ? project.categories.split(',') : []);
     const [status, setStatus] = useState<string>(project.status || '');
+    const [craftType, setCraftType] = useState<CraftType>((project.craftType as CraftType) || 'crochet');
 
     const notesEditor = useCraftingEditor(project.notes, isEditingTabs);
     const patternEditor = useCraftingEditor(project.content || pattern.content, isEditingTabs);
@@ -170,6 +172,8 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                     { value: 'Frogged', label: 'Frogged' },
                 ]}
                 onUpdateStatus={handleUpdateStatus}
+                craftType={craftType}
+                setCraftType={setCraftType}
                 tags={{ hookTags, setHookTags, weightTags, setWeightTags, categoryTags, setCategoryTags }}
                 isEditing={isEditingDetails}
                 setIsEditing={setIsEditingDetails}

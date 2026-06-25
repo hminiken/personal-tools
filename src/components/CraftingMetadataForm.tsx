@@ -7,6 +7,13 @@ import {
 import { IconExternalLink, IconNeedleThread } from '@tabler/icons-react';
 import { getTagSuggestions } from '@app/crafting/actions/MetadataActions';
 import { weightOptionsWith } from '@/utils/yarnWeights';
+import { hookOptionsWith } from '@/utils/hookSizes';
+import { needleOptionsWith, type CraftType } from '@/utils/knittingNeedles';
+
+const CRAFT_OPTIONS = [
+    { value: 'crochet', label: 'Crochet' },
+    { value: 'knitting', label: 'Knitting' },
+];
 
 interface CraftingMetadataProps {
     idName: string;
@@ -16,7 +23,10 @@ interface CraftingMetadataProps {
     status: string;
     statusOptions: { value: string, label: string }[];
     onUpdateStatus: (val: string) => void;
-    
+
+    craftType: CraftType;
+    setCraftType: (val: CraftType) => void;
+
     tags: {
         hookTags: string[]; setHookTags: (val: string[]) => void;
         weightTags: string[]; setWeightTags: (val: string[]) => void;
@@ -58,8 +68,24 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
         [tags.weightTags]
     );
 
+    // Hooks likewise come from the shared canonical chart (mm + US size), with
+    // any legacy free-text values on this record merged in so they stay visible.
+    const isKnitting = props.craftType === 'knitting';
+
+    // The tool dropdown swaps vocabulary based on craft: crochet hook sizes vs
+    // knitting needle sizes. Both store into the same `hookTags`/`hooks` field.
+    const hookData = useMemo(
+        () => hookOptionsWith(tags.hookTags),
+        [tags.hookTags]
+    );
+    const needleData = useMemo(
+        () => needleOptionsWith(tags.hookTags),
+        [tags.hookTags]
+    );
+
     return (
         <form action={async (formData) => {
+            formData.set('craftType', props.craftType);
             formData.set('hookSizes', tags.hookTags.join(','));
             formData.set('yarnWeights', tags.weightTags.join(','));
             formData.set('categories', tags.categoryTags.join(','));
@@ -81,13 +107,30 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
                         </SimpleGrid>
                     )}
 
-                    {/* 1. Use SimpleGrid for Hooks & Weights so they stay perfectly even */}
+                    {/* Craft type drives which tool vocabulary is shown below */}
+                    <Select
+                        label="Craft" name="craftType"
+                        data={CRAFT_OPTIONS}
+                        value={props.craftType}
+                        onChange={(val) => props.setCraftType((val as CraftType) || 'crochet')}
+                        allowDeselect={false}
+                    />
+
+                    {/* 1. Use SimpleGrid for tool size & weights so they stay perfectly even */}
                     <SimpleGrid cols={{ base: 1, sm: 2 }}>
-                        <TagsInput 
-                            label="Hook Sizes" placeholder="5mm" 
-                            value={tags.hookTags} onChange={tags.setHookTags} 
-                            data={suggestions.hooks} clearable 
-                        />
+                        {isKnitting ? (
+                            <MultiSelect
+                                label="Needle Sizes" placeholder="Select needle(s)"
+                                value={tags.hookTags} onChange={tags.setHookTags}
+                                data={needleData} clearable searchable
+                            />
+                        ) : (
+                            <MultiSelect
+                                label="Hook Sizes" placeholder="Select hook(s)"
+                                value={tags.hookTags} onChange={tags.setHookTags}
+                                data={hookData} clearable searchable
+                            />
+                        )}
                         <MultiSelect
                             label="Yarn Weights" placeholder="Select weight(s)"
                             value={tags.weightTags} onChange={tags.setWeightTags}
@@ -159,7 +202,7 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
                     {props.colors && <Badge size='xs' color="olive.7" variant="outline">Colors: {props.colors}</Badge>}
                     
                     {tags.categoryTags.map(tag => <Badge size='xs' key={`cat-${tag}`} color="rust.6" variant="outline">Categories: {tag}</Badge>)}
-                    {tags.hookTags.map(tag => <Badge size='xs' key={`hook-${tag}`} color="rust.5" variant="outline">Hook: {tag}</Badge>)}
+                    {tags.hookTags.map(tag => <Badge size='xs' key={`hook-${tag}`} color="rust.5" variant="outline">{isKnitting ? 'Needle' : 'Hook'}: {tag}</Badge>)}
                     {tags.weightTags.map(tag => <Badge size='xs' key={`weight-${tag}`} color="mustard.6" variant="outline">Weight: {tag}</Badge>)}
                 </Group>
             )}

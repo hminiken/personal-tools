@@ -59,6 +59,7 @@ export async function spawnProject(formData: FormData) {
     colors,
     hooks,        // ✨ NEW SCHEMA NAME
     weights,      // ✨ NEW SCHEMA NAME
+    craftType: masterPattern?.craftType || 'crochet', // inherit crochet/knitting
     sourceUrl,
     content: masterPattern?.content || '', // ✨ NEW SCHEMA NAME (The magic clone!)
   }).returning();
@@ -98,6 +99,7 @@ export async function updatePattern(formData: FormData) {
   if (formData.has('title')) updateData.title = formData.get('title') as string;
   if (formData.has('sourceUrl')) updateData.sourceUrl = formData.get('sourceUrl') as string;
   if (formData.has('categories')) updateData.categories = formData.get('categories') as string;
+  if (formData.has('craftType')) updateData.craftType = formData.get('craftType') as string;
   if (formData.has('hookSizes')) updateData.hooks = formData.get('hookSizes') as string;
   if (formData.has('yarnWeights')) updateData.weights = formData.get('yarnWeights') as string;
 
@@ -157,6 +159,7 @@ export async function createPatternFromImport(data: any) {
     notes: sanitizePatternHtml(data.notes),
     content: sanitizePatternHtml(data.content),
     categories: data.categories,
+    craftType: data.craftType === 'knitting' ? 'knitting' : 'crochet',
     hooks: data.hooks,
     weights: data.weights,
     status: 'planned', // Give it a default status
