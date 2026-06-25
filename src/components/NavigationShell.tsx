@@ -39,6 +39,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     if (pathname.includes('/crafting/stash')) return 'Yarn Stash'; // Just in case you add this later!
     if (pathname.includes('/crafting/media')) return 'Manage Media'; // Just in case you add this later!
     if (pathname.includes('/crafting/references')) return 'References';
+    if (pathname.startsWith('/writing')) return 'Writing Desk';
 
     return 'Command Center'; // A safe fallback
   };
