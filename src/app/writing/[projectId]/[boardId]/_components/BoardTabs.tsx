@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Group, ActionIcon, Menu, ScrollArea, Tooltip } from '@mantine/core';
-import { IconPlus, IconDots, IconPencil, IconTrash } from '@tabler/icons-react';
+import { IconPlus, IconDots, IconPencil, IconTrash, IconPhoto, IconPhotoOff } from '@tabler/icons-react';
 import Link from 'next/link';
 import {
   DndContext, PointerSensor, useSensor, useSensors, closestCenter,
@@ -65,6 +65,9 @@ export default function BoardTabs({
   onAddBoard,
   onRenameBoard,
   onDeleteBoard,
+  hasBg,
+  onSetBackground,
+  onRemoveBackground,
 }: {
   projectId: number;
   boards: Board[];
@@ -72,6 +75,9 @@ export default function BoardTabs({
   onAddBoard: () => void;
   onRenameBoard: () => void;
   onDeleteBoard: () => void;
+  hasBg: boolean;
+  onSetBackground: () => void;
+  onRemoveBackground: () => void;
 }) {
   const [order, setOrder] = useState<Board[]>(boards);
   useEffect(() => { setOrder(boards); }, [boards]);
@@ -131,6 +137,15 @@ export default function BoardTabs({
         <Menu.Dropdown>
           <Menu.Item leftSection={<IconPencil size={14} />} onClick={onRenameBoard}>Rename board</Menu.Item>
           <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={onDeleteBoard}>Delete board</Menu.Item>
+          <Menu.Divider />
+          <Menu.Item leftSection={<IconPhoto size={14} />} onClick={onSetBackground}>
+            {hasBg ? 'Change background' : 'Set background'}
+          </Menu.Item>
+          {hasBg && (
+            <Menu.Item leftSection={<IconPhotoOff size={14} />} onClick={onRemoveBackground}>
+              Remove background
+            </Menu.Item>
+          )}
         </Menu.Dropdown>
       </Menu>
     </Group>

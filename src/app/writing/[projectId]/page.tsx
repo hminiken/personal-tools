@@ -35,5 +35,6 @@ export default async function WritingProjectPage({ params }: PageProps) {
     redirect(`/writing/${projectId}/${projectBoards[0].id}`);
   }
 
-  return <EmptyProject projectId={projectId} projectTitle={project.title} />;
+  const backUrl = project.folderId ? `/writing/folder/${project.folderId}` : '/writing';
+  return <EmptyProject projectId={projectId} projectTitle={project.title} backUrl={backUrl} />;
 }

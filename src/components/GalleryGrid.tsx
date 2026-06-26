@@ -5,9 +5,12 @@ import { BaseGalleryItem } from "./ItemGallery";
 
 
 
-export default 
+export default
 
-function GalleryGrid<T extends BaseGalleryItem>({ items, basePath, deleteAction, setItemToDelete, renderBadges }: any) {
+// `renderItemMenu` is optional and used by the writing gallery to add a
+// "Move to folder…" kebab menu on each card. It's left undefined elsewhere
+// (e.g. crafting), so those grids are unchanged.
+function GalleryGrid<T extends BaseGalleryItem>({ items, basePath, deleteAction, setItemToDelete, renderBadges, renderItemMenu }: any) {
   return (
     <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="lg">
       {items.map((item: any, index: number) => (
@@ -27,6 +30,11 @@ function GalleryGrid<T extends BaseGalleryItem>({ items, basePath, deleteAction,
         >
           <Card.Section style={{ position: 'relative' }}>
             <Image src={item.coverImage || 'https://placehold.co/600x400?text=No+Cover'} h={{ base: 140, sm: 160 }} alt={item.title} fallbackSrc="https://placehold.co/600x400?text=No+Image" />
+            {renderItemMenu && (
+              <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 10 }} onClick={(e) => e.preventDefault()}>
+                {renderItemMenu(item)}
+              </div>
+            )}
             {deleteAction && (
               <ActionIcon variant="filled" color="rust.6" size="md" radius="xl" style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }} onClick={(e) => { e.preventDefault(); setItemToDelete(item); }}>
                 <IconTrash size={16} stroke={1.5} />

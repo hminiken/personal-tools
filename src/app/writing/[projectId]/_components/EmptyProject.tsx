@@ -10,9 +10,11 @@ import { createBoard } from '../../_actions/writing_actions';
 export default function EmptyProject({
   projectId,
   projectTitle,
+  backUrl,
 }: {
   projectId: number;
   projectTitle: string;
+  backUrl: string;
 }) {
   const [title, setTitle] = useState('');
   const [isPending, startTransition] = useTransition();
@@ -31,13 +33,13 @@ export default function EmptyProject({
       <Stack align="center" gap="md">
         <Button
           component={Link}
-          href="/writing"
+          href={backUrl}
           variant="subtle"
           color="gray"
           leftSection={<IconArrowLeft size={16} />}
           style={{ alignSelf: 'flex-start' }}
         >
-          All projects
+          Back to Projects
         </Button>
         <IconLayoutBoard size={48} stroke={1.5} color="var(--mantine-color-olive-6)" />
         <Title order={3} ta="center">{projectTitle}</Title>

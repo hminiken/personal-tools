@@ -33,6 +33,9 @@ interface ItemGalleryProps<T extends BaseGalleryItem> {
   deleteAction?: (id: number) => Promise<void>;
   renderBadges?: (item: T) => React.ReactNode;
   renderCreateForm?: (closeModal: () => void) => React.ReactNode;
+  // Optional per-card menu (e.g. the writing gallery's "Move to folder…").
+  // Undefined elsewhere, so other galleries render no extra control.
+  renderItemMenu?: (item: T) => React.ReactNode;
 }
 
 // ==========================================
@@ -102,7 +105,7 @@ function applyFilters<T extends BaseGalleryItem>(items: T[], filters: Filter[]):
 export default function ItemGallery<T extends BaseGalleryItem>({
   items, basePath, searchPlaceholder = "Search...", newItemText = "New",
   createModalTitle = "Create New", categoryField = 'categories', deleteAction,
-  renderBadges, renderCreateForm
+  renderBadges, renderCreateForm, renderItemMenu
 }: ItemGalleryProps<T>) {
 
   // State Management
@@ -241,13 +244,13 @@ export default function ItemGallery<T extends BaseGalleryItem>({
               <Accordion.Item key={groupName} value={groupName}>
                 <Accordion.Control><Text fw={600}>{groupName} ({groupItems.length})</Text></Accordion.Control>
                 <Accordion.Panel>
-                  <GalleryGrid items={groupItems} basePath={basePath} deleteAction={deleteAction} setItemToDelete={setItemToDelete} renderBadges={renderBadges} />
+                  <GalleryGrid items={groupItems} basePath={basePath} deleteAction={deleteAction} setItemToDelete={setItemToDelete} renderBadges={renderBadges} renderItemMenu={renderItemMenu} />
                 </Accordion.Panel>
               </Accordion.Item>
             ))}
           </Accordion>
         ) : (
-          <GalleryGrid items={sortedItems} basePath={basePath} deleteAction={deleteAction} setItemToDelete={setItemToDelete} renderBadges={renderBadges} />
+          <GalleryGrid items={sortedItems} basePath={basePath} deleteAction={deleteAction} setItemToDelete={setItemToDelete} renderBadges={renderBadges} renderItemMenu={renderItemMenu} />
         )}
       </Box>
 

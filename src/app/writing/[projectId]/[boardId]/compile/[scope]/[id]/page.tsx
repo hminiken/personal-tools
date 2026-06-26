@@ -4,7 +4,7 @@
 // continuous, editable document (segmented: one TipTap editor per card).
 import { writingDb } from '@/db/writing';
 import { boards, groups, lists, cards } from '@/db/writing/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, and } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import CompiledView from './_components/CompiledView';
 import type { CompiledData, CompiledList } from './types';
@@ -21,7 +21,7 @@ async function loadList(listId: number): Promise<CompiledList | null> {
   const listCards = await writingDb
     .select()
     .from(cards)
-    .where(eq(cards.listId, listId))
+    .where(and(eq(cards.listId, listId), eq(cards.includeInCompile, true)))
     .orderBy(cards.position)
     .all();
   return { id: list.id, title: list.title, cards: listCards };
@@ -38,7 +38,7 @@ async function loadGroup(groupId: number) {
     .all();
   const listIds = groupLists.map((l) => l.id);
   const allCards = listIds.length
-    ? await writingDb.select().from(cards).where(inArray(cards.listId, listIds)).orderBy(cards.position).all()
+    ? await writingDb.select().from(cards).where(and(inArray(cards.listId, listIds), eq(cards.includeInCompile, true))).orderBy(cards.position).all()
     : [];
   return {
     id: group.id,
@@ -81,7 +81,7 @@ export default async function CompilePage({ params }: PageProps) {
       : [];
     const listIds = boardLists.map((l) => l.id);
     const boardCards = listIds.length
-      ? await writingDb.select().from(cards).where(inArray(cards.listId, listIds)).orderBy(cards.position).all()
+      ? await writingDb.select().from(cards).where(and(inArray(cards.listId, listIds), eq(cards.includeInCompile, true))).orderBy(cards.position).all()
       : [];
     data = {
       scope: 'board',
@@ -100,5 +100,24 @@ export default async function CompilePage({ params }: PageProps) {
 
   if (!data) notFound();
 
-  return <CompiledView data={data} backHref={`/writing/${projectId}/${boardId}`} />;
+  // Document-wide spacing is stored on the parent board.
+  const boardRow = await writingDb
+    .select({ lineHeight: boards.lineHeight, spaceBefore: boards.spaceBefore, spaceAfter: boards.spaceAfter })
+    .from(boards)
+    .where(eq(boards.id, boardId))
+    .get();
+  const initialSpacing = {
+    lineHeight: boardRow?.lineHeight ?? null,
+    spaceBefore: boardRow?.spaceBefore ?? null,
+    spaceAfter: boardRow?.spaceAfter ?? null,
+  };
+
+  return (
+    <CompiledView
+      data={data}
+      backHref={`/writing/${projectId}/${boardId}`}
+      boardId={boardId}
+      initialSpacing={initialSpacing}
+    />
+  );
 }

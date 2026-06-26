@@ -19,11 +19,13 @@ import {
 import { useWakeLock } from '@hooks/useWakeLock';
 import { useEffect } from 'react';
 import { useMediaQuery } from '@mantine/hooks';
+import { usePageTitleSuffix } from '@/components/PageTitleContext';
 
 export default function NavigationShell({ children }: { children: React.ReactNode }) {
   // Start the sidebar closed by default
   const [opened, { toggle, close }] = useDisclosure(false);
   const pathname = usePathname();
+  const { suffix } = usePageTitleSuffix();
 
   const { setColorScheme } = useMantineColorScheme();
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
@@ -39,7 +41,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     if (pathname.includes('/crafting/stash')) return 'Yarn Stash'; // Just in case you add this later!
     if (pathname.includes('/crafting/media')) return 'Manage Media'; // Just in case you add this later!
     if (pathname.includes('/crafting/references')) return 'References';
-    if (pathname.startsWith('/writing')) return 'Writing Desk';
+    if (pathname.startsWith('/writing')) return suffix ? `Writing Desk - ${suffix}` : 'Writing Desk';
 
     return 'Command Center'; // A safe fallback
   };

@@ -1,26 +1,28 @@
 // src/app/writing/page.tsx
-import { writingDb } from '@/db/writing';
-import { writingProjects } from '@/db/writing/schema';
-import { desc } from 'drizzle-orm';
-import WritingProjectGallery from './_components/WritingProjectGallery';
+import WritingGalleryView from './_components/WritingGalleryView';
+import { loadGalleryLevel } from './_lib/loadGalleryLevel';
+import { SetPageTitleSuffix } from '@/components/PageTitleContext';
 
 export const dynamic = 'force-dynamic';
 
 export default async function WritingPage() {
-  const projects = await writingDb
-    .select()
-    .from(writingProjects)
-    .orderBy(desc(writingProjects.createdAt));
+  const { folders, projects, allFolders, allProjects, breadcrumbs, childCounts } = await loadGalleryLevel(null);
 
   // ItemGallery expects a `coverImagePath` field for the card thumbnail.
-  const normalized = projects.map((p) => ({
-    ...p,
-    coverImagePath: p.coverImage ?? '',
-  }));
+  const normalized = projects.map((p) => ({ ...p, coverImagePath: p.coverImage ?? '' }));
 
   return (
     <main>
-      <WritingProjectGallery initialProjects={normalized} />
+      <SetPageTitleSuffix value={null} />
+      <WritingGalleryView
+        folders={folders}
+        projects={normalized}
+        allFolders={allFolders}
+        allProjects={allProjects}
+        breadcrumbs={breadcrumbs}
+        childCounts={childCounts}
+        currentFolderId={null}
+      />
     </main>
   );
 }

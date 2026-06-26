@@ -1,62 +1,11 @@
 'use client';
 
 import { RichTextEditor, useRichTextEditorContext } from '@mantine/tiptap';
-import { Menu } from '@mantine/core';
-import { IconPhoto, IconLineHeight } from '@tabler/icons-react';
+import { IconPhoto } from '@tabler/icons-react';
 
-const LINE_HEIGHTS: [string, string][] = [
-  ['1', 'Single'],
-  ['1.15', '1.15'],
-  ['1.5', '1.5'],
-  ['2', 'Double'],
-];
-
-// [value-or-null, label] — null means "no extra space" (back to default).
-const SPACES: [string | null, string][] = [
-  [null, 'None'],
-  ['0.5em', 'Small'],
-  ['1em', 'Medium'],
-  ['1.5em', 'Large'],
-];
-
-// One menu for line spacing + space before/after the current paragraph/heading.
-function SpacingControl() {
-  const { editor } = useRichTextEditorContext();
-  const setAttr = (key: string, value: string | null) =>
-    editor
-      ?.chain()
-      .focus()
-      .updateAttributes('paragraph', { [key]: value })
-      .updateAttributes('heading', { [key]: value })
-      .run();
-
-  return (
-    <Menu position="bottom-start" withinPortal width={210}>
-      <Menu.Target>
-        <RichTextEditor.Control aria-label="Spacing" title="Line & paragraph spacing">
-          <IconLineHeight stroke={1.5} size="1rem" />
-        </RichTextEditor.Control>
-      </Menu.Target>
-      <Menu.Dropdown>
-        <Menu.Label>Line spacing</Menu.Label>
-        {LINE_HEIGHTS.map(([value, label]) => (
-          <Menu.Item key={`lh-${value}`} onClick={() => setAttr('lineHeight', value)}>{label}</Menu.Item>
-        ))}
-        <Menu.Divider />
-        <Menu.Label>Space before paragraph</Menu.Label>
-        {SPACES.map(([value, label]) => (
-          <Menu.Item key={`sb-${label}`} onClick={() => setAttr('spaceBefore', value)}>{label}</Menu.Item>
-        ))}
-        <Menu.Divider />
-        <Menu.Label>Space after paragraph</Menu.Label>
-        {SPACES.map(([value, label]) => (
-          <Menu.Item key={`sa-${label}`} onClick={() => setAttr('spaceAfter', value)}>{label}</Menu.Item>
-        ))}
-      </Menu.Dropdown>
-    </Menu>
-  );
-}
-
+// Toolbar for the Writing Desk editors. Line/paragraph spacing is NOT here —
+// it's a document-wide setting (see components/DocumentSpacing). This toolbar
+// covers per-selection formatting only.
 export function WritingEditorToolbar() {
   const { editor } = useRichTextEditorContext();
 
@@ -91,7 +40,6 @@ export function WritingEditorToolbar() {
       </RichTextEditor.ControlsGroup>
 
       <RichTextEditor.ControlsGroup>
-        <SpacingControl />
         <RichTextEditor.Control
           onClick={() => {
             const url = window.prompt('Enter Image URL');

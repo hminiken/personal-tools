@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  Box, Paper, Group, Stack, Text, Title, Button,
+  Box, Paper, Group, Stack, Text, Title, Button, Anchor, Drawer, ActionIcon, Divider, Tooltip,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconArrowLeft, IconLayoutBoard, IconBook2 } from '@tabler/icons-react';
+import { IconArrowLeft, IconLayoutBoard, IconBook2, IconTags, IconSettings } from '@tabler/icons-react';
 import Link from 'next/link';
+import UnsplashPicker from '@components/UnsplashPicker';
 import { useRouter } from 'next/navigation';
 import {
   DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors,
@@ -17,13 +18,15 @@ import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-ki
 import GroupRow from './GroupRow';
 import BoardTabs from './BoardTabs';
 import CardEditorModal from './CardEditorModal';
+import ManageLabelsModal from './ManageLabelsModal';
 import InlineAdd from './InlineAdd';
-import type { Board, BoardGroup, Card } from '../types';
+import { DocumentSpacingMenu, type Spacing } from '@components/DocumentSpacing';
+import type { Board, BoardGroup, BoardCard, LabelCatalog } from '../types';
 import {
   createBoard, renameBoard, deleteBoard,
   createGroup, renameGroup, deleteGroup, moveGroup,
   createList, renameList, deleteList, moveList,
-  createCard, moveCard,
+  createCard, moveCard, setBoardSpacing, setBoardBackground, getCardById,
 } from '../../../_actions/writing_actions';
 
 // ---------- id helpers ----------
@@ -58,15 +61,19 @@ const findList = (gs: BoardGroup[], listId: number) => {
 export default function BoardView({
   projectId,
   projectTitle,
+  backUrl,
   boards,
   activeBoardId,
   initialGroups,
+  catalog,
 }: {
   projectId: number;
   projectTitle: string;
+  backUrl: string;
   boards: Board[];
   activeBoardId: number;
   initialGroups: BoardGroup[];
+  catalog: LabelCatalog;
 }) {
   const router = useRouter();
   const [groups, setGroups] = useState<BoardGroup[]>(initialGroups);
@@ -74,8 +81,33 @@ export default function BoardView({
   const activeTypeRef = useRef<IdType | null>(null);
 
   // Card editor
-  const [editingCard, setEditingCard] = useState<Card | null>(null);
+  const [editingCard, setEditingCard] = useState<BoardCard | null>(null);
   const [editorOpened, { open: openEditor, close: closeEditor }] = useDisclosure(false);
+
+  // Label manager
+  const [labelsOpened, { open: openLabels, close: closeLabels }] = useDisclosure(false);
+
+  // Board background (Unsplash) picker.
+  const [bgOpened, { open: openBg, close: closeBg }] = useDisclosure(false);
+
+  // Settings drawer (slides in from the right) holding the board-level controls.
+  const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
+
+  // Document-wide prose spacing (stored on the active board).
+  const activeBoard = boards.find((b) => b.id === activeBoardId);
+  const boardBg = activeBoard?.backgroundImage ?? null;
+  const boardCredit = activeBoard?.backgroundCredit
+    ? (JSON.parse(activeBoard.backgroundCredit) as { name: string; link: string })
+    : null;
+  const [spacing, setSpacing] = useState<Spacing>({
+    lineHeight: activeBoard?.lineHeight ?? null,
+    spaceBefore: activeBoard?.spaceBefore ?? null,
+    spaceAfter: activeBoard?.spaceAfter ?? null,
+  });
+  const handleSpacing = (next: Spacing) => {
+    setSpacing(next);
+    setBoardSpacing(activeBoardId, next);
+  };
 
   // Adopt fresh server data whenever the route re-renders (after an action).
   useEffect(() => { setGroups(initialGroups); }, [initialGroups]);
@@ -155,7 +187,7 @@ export default function BoardView({
 
       setGroups((prev) => {
         const next = structuredClone(prev) as BoardGroup[];
-        let moved: Card | undefined;
+        let moved: BoardCard | undefined;
         for (const g of next) for (const l of g.lists) {
           const i = l.cards.findIndex((c) => c.id === a.num);
           if (i !== -1) { moved = l.cards.splice(i, 1)[0]; }
@@ -282,7 +314,20 @@ export default function BoardView({
   const onRenameList = async (listId: number, title: string) => { await renameList(listId, title); refresh(); };
   const onDeleteList = async (listId: number) => { if (confirm('Delete this list and its cards?')) { await deleteList(listId); refresh(); } };
 
-  const onOpenCard = (card: Card) => { setEditingCard(card); openEditor(); };
+  const onOpenCard = (card: BoardCard) => { setEditingCard(card); openEditor(); };
+
+  // Open a card by ID — checks the current board first, falls back to a server fetch
+  // for linked cards that live on a different board.
+  const onOpenCardById = async (cardId: number) => {
+    for (const g of groups) {
+      for (const l of g.lists) {
+        const found = l.cards.find((c) => c.id === cardId);
+        if (found) { onOpenCard(found); return; }
+      }
+    }
+    const fetched = await getCardById(cardId);
+    if (fetched) { setEditingCard(fetched as BoardCard); openEditor(); }
+  };
 
   // ---------- board (tab) handlers ----------
   const onAddBoard = async () => {
@@ -296,6 +341,11 @@ export default function BoardView({
     const name = prompt('Rename board:', current?.title)?.trim();
     if (name) { await renameBoard(activeBoardId, name); refresh(); }
   };
+  const onRemoveBackground = async () => {
+    await setBoardBackground(activeBoardId, null, null);
+    router.refresh();
+  };
+
   const onDeleteBoard = async () => {
     if (!confirm('Delete this entire board?')) return;
     await deleteBoard(activeBoardId);
@@ -309,24 +359,25 @@ export default function BoardView({
   return (
     <Box>
       {/* Header */}
-      <Group justify="space-between" mb="sm" wrap="nowrap">
+      <Group justify="space-between" mb="sm" mt={'10px'} wrap="nowrap">
         <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
-          <Button component={Link} href="/writing" variant="subtle" color="gray" size="compact-sm" leftSection={<IconArrowLeft size={16} />}>
+          <Button component={Link} href={backUrl} variant="subtle" color="gray" size="compact-sm" leftSection={<IconArrowLeft size={16} />}>
             Projects
           </Button>
           <IconLayoutBoard size={20} stroke={1.5} />
           <Title order={4} lineClamp={1}>{projectTitle}</Title>
         </Group>
-        <Button
-          component={Link}
-          href={`/writing/${projectId}/${activeBoardId}/compile/board/${activeBoardId}`}
-          variant="light"
-          color="olive"
-          size="compact-sm"
-          leftSection={<IconBook2 size={16} />}
-        >
-          Compile board
-        </Button>
+        <Tooltip label="Board settings" withArrow>
+          <ActionIcon
+            variant="light"
+            color="gray"
+            size="lg"
+            onClick={openSettings}
+            aria-label="Board settings"
+          >
+            <IconSettings size={20} stroke={1.5} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
 
       {/* Board tabs (reorderable) */}
@@ -337,9 +388,32 @@ export default function BoardView({
         onAddBoard={onAddBoard}
         onRenameBoard={onRenameBoard}
         onDeleteBoard={onDeleteBoard}
+        hasBg={!!boardBg}
+        onSetBackground={openBg}
+        onRemoveBackground={onRemoveBackground}
       />
 
-      {/* Board body: vertical scroll of groups */}
+      {/* Board body: vertical scroll of groups, optionally over an Unsplash bg.
+          When a background is set we cancel the AppShell.Main left/right padding
+          (xs mobile / xl desktop) with matching negative margins so the image
+          bleeds to the screen edges, then restore that padding inside so the
+          groups stay aligned with the rest of the page. */}
+      <Box
+        mx={boardBg ? { base: '-xs', sm: '-xl' } : undefined}
+        mt={boardBg ? '-md' : undefined}
+        px={boardBg ? { base: 'xs', sm: 'xl' } : undefined}
+        py={boardBg ? 'lg' : undefined}
+        style={
+          boardBg
+            ? {
+                backgroundImage: `linear-gradient(rgba(0,0,0,0.18), rgba(0,0,0,0.18)), url(${boardBg})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundAttachment: 'fixed',
+              }
+            : undefined
+        }
+      >
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetection}
@@ -354,7 +428,10 @@ export default function BoardView({
               <GroupRow
                 key={group.id}
                 group={group}
+                boardHasBg={!!boardBg}
+                categories={catalog.categories}
                 onOpenCard={onOpenCard}
+                onOpenCardById={onOpenCardById}
                 onAddCard={onAddCard}
                 onAddList={onAddList}
                 onRenameList={onRenameList}
@@ -394,7 +471,84 @@ export default function BoardView({
         <InlineAdd label="Add group" placeholder="Group name" onAdd={onAddGroup} />
       </Box>
 
-      <CardEditorModal card={editingCard} opened={editorOpened} onClose={closeEditor} />
+      {/* Unsplash attribution (required when displaying their photos). */}
+      {boardBg && boardCredit && (
+        <Text size="xs" c="white" mt="sm" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>
+          Photo by{' '}
+          <Anchor href={boardCredit.link} target="_blank" rel="noopener noreferrer" inherit underline="always">
+            {boardCredit.name}
+          </Anchor>{' '}
+          on Unsplash
+        </Text>
+      )}
+      </Box>
+
+      {/* Settings drawer: slides in from the right with the board controls. */}
+      <Drawer
+        opened={settingsOpened}
+        onClose={closeSettings}
+        position="right"
+        title="Board settings"
+        size="sm"
+        padding="md"
+      >
+        <Stack gap="lg">
+          {/* Prose spacing */}
+          <div>
+            <Text size="sm" fw={600} mb="xs">Spacing</Text>
+            <DocumentSpacingMenu value={spacing} onChange={handleSpacing} />
+          </div>
+
+          <Divider />
+
+          {/* Labels + compile */}
+          <Button
+            variant="light"
+            color="gray"
+            leftSection={<IconTags size={16} />}
+            onClick={() => { closeSettings(); openLabels(); }}
+            fullWidth
+          >
+            Manage labels
+          </Button>
+          <Button
+            component={Link}
+            href={`/writing/${projectId}/${activeBoardId}/compile/board/${activeBoardId}`}
+            variant="light"
+            color="olive"
+            leftSection={<IconBook2 size={16} />}
+            fullWidth
+          >
+            Compile board
+          </Button>
+        </Stack>
+      </Drawer>
+
+      <UnsplashPicker
+        opened={bgOpened}
+        onClose={closeBg}
+        onSelect={async (photo) => {
+          await setBoardBackground(activeBoardId, photo.fullUrl, photo.credit);
+          router.refresh();
+        }}
+      />
+
+      <CardEditorModal
+        card={editingCard}
+        catalog={catalog}
+        opened={editorOpened}
+        onClose={closeEditor}
+        onManageLabels={openLabels}
+        spacing={spacing}
+        projectId={projectId}
+      />
+
+      <ManageLabelsModal
+        projectId={projectId}
+        catalog={catalog}
+        opened={labelsOpened}
+        onClose={closeLabels}
+      />
     </Box>
   );
 }

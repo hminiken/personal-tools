@@ -1,0 +1,11 @@
+/* Applies the board's document-wide prose spacing to every editor inside.
+   The CSS variables are set inline on the wrapper; the fallbacks are the
+   default prose spacing used when the board hasn't customised a value. */
+.doc :global(.ProseMirror) {
+  line-height: var(--doc-line-height, 1.6);
+}
+
+.doc :global(.ProseMirror p) {
+  margin-top: var(--doc-space-before, 0.75em);
+  margin-bottom: var(--doc-space-after, 0.75em);
+}

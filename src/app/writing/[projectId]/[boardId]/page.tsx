@@ -1,10 +1,10 @@
 // src/app/writing/[projectId]/[boardId]/page.tsx
 import { writingDb } from '@/db/writing';
-import { writingProjects, boards, groups, lists, cards } from '@/db/writing/schema';
-import { eq, desc, inArray } from 'drizzle-orm';
+import { writingProjects, boards, groups, lists, cards, cardImages, labels, labelCategories, cardLabels, cardLinks } from '@/db/writing/schema';
+import { eq, desc, inArray, or } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import BoardView from './_components/BoardView';
-import type { BoardGroup } from './types';
+import type { BoardGroup, LabelCatalog } from './types';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +54,106 @@ export default async function BoardPage({ params }: PageProps) {
     ? await writingDb.select().from(cards).where(inArray(cards.listId, listIds)).orderBy(cards.position).all()
     : [];
 
+  // Project-wide label catalog (categories + labels), used by pickers/manager.
+  const projectCategories = await writingDb
+    .select()
+    .from(labelCategories)
+    .where(eq(labelCategories.projectId, projectId))
+    .orderBy(labelCategories.position)
+    .all();
+
+  const projectLabels = await writingDb
+    .select()
+    .from(labels)
+    .where(eq(labels.projectId, projectId))
+    .orderBy(labels.position)
+    .all();
+
+  const catalog: LabelCatalog = { categories: projectCategories, labels: projectLabels };
+  const labelById = new Map(projectLabels.map((l) => [l.id, l]));
+
+  // Which labels are applied to each card on this board.
+  const cardIds = boardCards.map((c) => c.id);
+  const assignments = cardIds.length
+    ? await writingDb.select().from(cardLabels).where(inArray(cardLabels.cardId, cardIds)).all()
+    : [];
+  const labelsByCard = new Map<number, typeof projectLabels>();
+  for (const a of assignments) {
+    const lbl = labelById.get(a.labelId);
+    if (!lbl) continue;
+    const arr = labelsByCard.get(a.cardId) ?? [];
+    arr.push(lbl);
+    labelsByCard.set(a.cardId, arr);
+  }
+
+  // Gallery images attached to each card on this board.
+  const galleryImages = cardIds.length
+    ? await writingDb
+        .select()
+        .from(cardImages)
+        .where(inArray(cardImages.cardId, cardIds))
+        .orderBy(cardImages.position)
+        .all()
+    : [];
+  const imagesByCard = new Map<number, typeof galleryImages>();
+  for (const img of galleryImages) {
+    const arr = imagesByCard.get(img.cardId) ?? [];
+    arr.push(img);
+    imagesByCard.set(img.cardId, arr);
+  }
+
+  // Card links: load all link rows that involve any card on this board.
+  const cardIdSet = new Set(cardIds);
+  const linkRows = cardIds.length
+    ? await writingDb
+        .select()
+        .from(cardLinks)
+        .where(or(inArray(cardLinks.sourceCardId, cardIds), inArray(cardLinks.targetCardId, cardIds)))
+        .all()
+    : [];
+
+  // Collect IDs of linked cards that aren't on this board (they're on another board).
+  const externalLinkedIds = new Set<number>();
+  for (const l of linkRows) {
+    if (!cardIdSet.has(l.sourceCardId)) externalLinkedIds.add(l.sourceCardId);
+    if (!cardIdSet.has(l.targetCardId)) externalLinkedIds.add(l.targetCardId);
+  }
+
+  // Fetch title/board info for external linked cards so we can build previews.
+  const externalRows = externalLinkedIds.size
+    ? await writingDb
+        .select({ id: cards.id, title: cards.title, content: cards.content, boardTitle: boards.title })
+        .from(cards)
+        .innerJoin(lists, eq(cards.listId, lists.id))
+        .innerJoin(groups, eq(lists.groupId, groups.id))
+        .innerJoin(boards, eq(groups.boardId, boards.id))
+        .where(inArray(cards.id, [...externalLinkedIds]))
+        .all()
+    : [];
+
+  // Build a unified info map: current-board cards + external linked cards.
+  function stripHtml(html: string | null | undefined) {
+    if (!html) return '';
+    return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+  }
+  const cardInfoMap = new Map<number, { title: string; content: string | null; boardTitle: string }>();
+  for (const c of boardCards) cardInfoMap.set(c.id, { title: c.title, content: c.content, boardTitle: activeBoard.title });
+  for (const r of externalRows) cardInfoMap.set(r.id, { title: r.title, content: r.content, boardTitle: r.boardTitle });
+
+  // Build linksByCard (bidirectional: each card gets refs for all its links).
+  const linksByCard = new Map<number, { linkId: number; cardId: number; title: string; contentPreview: string; boardTitle: string }[]>();
+  const addRef = (forCardId: number, otherId: number, linkId: number) => {
+    const info = cardInfoMap.get(otherId);
+    if (!info) return;
+    const arr = linksByCard.get(forCardId) ?? [];
+    arr.push({ linkId, cardId: otherId, title: info.title, contentPreview: stripHtml(info.content), boardTitle: info.boardTitle });
+    linksByCard.set(forCardId, arr);
+  };
+  for (const l of linkRows) {
+    addRef(l.sourceCardId, l.targetCardId, l.id);
+    addRef(l.targetCardId, l.sourceCardId, l.id);
+  }
+
   // Nest into the shape the board UI consumes.
   const tree: BoardGroup[] = boardGroups.map((g) => ({
     ...g,
@@ -61,17 +161,22 @@ export default async function BoardPage({ params }: PageProps) {
       .filter((l) => l.groupId === g.id)
       .map((l) => ({
         ...l,
-        cards: boardCards.filter((c) => c.listId === l.id),
+        cards: boardCards
+          .filter((c) => c.listId === l.id)
+          .map((c) => ({ ...c, labels: labelsByCard.get(c.id) ?? [], images: imagesByCard.get(c.id) ?? [], links: linksByCard.get(c.id) ?? [] })),
       })),
   }));
 
+  const backUrl = project.folderId ? `/writing/folder/${project.folderId}` : '/writing';
   return (
     <BoardView
       projectId={projectId}
       projectTitle={project.title}
+      backUrl={backUrl}
       boards={projectBoards}
       activeBoardId={boardId}
       initialGroups={tree}
+      catalog={catalog}
     />
   );
 }

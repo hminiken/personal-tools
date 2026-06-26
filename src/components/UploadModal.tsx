@@ -5,13 +5,15 @@ import { IconPhotoPlus } from '@tabler/icons-react';
 // Import server actions directly
 import { getAllLibraryImages, linkLibraryImageAction } from '@app/crafting/actions/ImageActions'; 
 
-export function UploadModal({ 
-  opened, 
-  close, 
-  targetId, 
+export function UploadModal({
+  opened,
+  close,
+  targetId,
   idFieldName,
   uploadAction,
-  revalidateUrl
+  revalidateUrl,
+  showLibrary = true,   // crafting browses its shared image library; writing opts out
+  onUploaded,           // optional: receives uploadAction's return value (e.g. the new path)
 }: any) {
   
   // Upload States
@@ -25,7 +27,7 @@ export function UploadModal({
 
   // Fetch library images automatically when the modal is opened
   useEffect(() => {
-    if (opened) {
+    if (opened && showLibrary) {
       setIsLoadingLibrary(true);
       getAllLibraryImages()
         .then((data: any) => setLibraryImages(data || []))
@@ -35,7 +37,7 @@ export function UploadModal({
       setLibraryImages([]);
       setFile(null);
     }
-  }, [opened]);
+  }, [opened, showLibrary]);
 
   // 1. Global Paste Listener (catches paste events anywhere on the screen while open)
   useEffect(() => {
@@ -87,7 +89,8 @@ export function UploadModal({
       formData.append('file', file);
       formData.append('revalidateUrl', revalidateUrl); // Keep next.js router updated
 
-      await uploadAction(formData);
+      const result = await uploadAction(formData);
+      onUploaded?.(result);
       setFile(null);
       close();
     } catch (error) {
@@ -142,6 +145,7 @@ export function UploadModal({
         </Box>
 
         {/* Existing Media Library Accordion */}
+        {showLibrary && (
         <Accordion variant="separated">
             <Accordion.Item value="library">
                 <Accordion.Control>
@@ -182,6 +186,7 @@ export function UploadModal({
                 </Accordion.Panel>
             </Accordion.Item>
         </Accordion>
+        )}
 
       </Box>
     </Modal>

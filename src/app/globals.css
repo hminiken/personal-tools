@@ -42,6 +42,19 @@ a {
   text-decoration: none;
 }
 
+/* Fade scrollbars out instead of snapping to hidden.
+   Mantine uses display:none via [data-hidden], which can't be transitioned —
+   override it with opacity so the CSS transition can kick in. */
+.mantine-ScrollArea-scrollbar {
+  transition: opacity 600ms ease;
+}
+
+.mantine-ScrollArea-scrollbar[data-hidden] {
+  display: block !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
 @media (prefers-color-scheme: dark) {
   html {
     color-scheme: dark;

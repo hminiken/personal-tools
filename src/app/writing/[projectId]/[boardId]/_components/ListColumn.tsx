@@ -11,17 +11,21 @@ import { CSS } from '@dnd-kit/utilities';
 import { animateLayoutChanges, sortableTransition } from './sortableConfig';
 import CardItem from './CardItem';
 import InlineAdd from './InlineAdd';
-import type { BoardList, Card } from '../types';
+import type { BoardList, BoardCard, LabelCategory } from '../types';
 
 export default function ListColumn({
   list,
+  categories,
   onOpenCard,
+  onOpenCardById,
   onAddCard,
   onRename,
   onDelete,
 }: {
   list: BoardList;
-  onOpenCard: (card: Card) => void;
+  categories: LabelCategory[];
+  onOpenCard: (card: BoardCard) => void;
+  onOpenCardById: (cardId: number) => void;
   onAddCard: (listId: number, title: string) => void;
   onRename: (listId: number, title: string) => void;
   onDelete: (listId: number) => void;
@@ -120,13 +124,13 @@ export default function ListColumn({
         </Menu>
       </Group>
 
-      {/* Cards */}
-      <ScrollArea.Autosize mah={420} type="hover">
+      {/* Cards — mah subtracts header (~42px) + add-card row (~40px) + Paper padding (20px). */}
+      <ScrollArea.Autosize mah="max(calc(50vh - 110px), 290px)" type="hover">
         <div ref={setDropRef}>
           <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
             <Stack gap="xs" mih={8}>
               {list.cards.map((card) => (
-                <CardItem key={card.id} card={card} onOpen={onOpenCard} />
+                <CardItem key={card.id} card={card} categories={categories} onOpen={onOpenCard} onOpenLinked={onOpenCardById} />
               ))}
             </Stack>
           </SortableContext>
