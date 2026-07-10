@@ -8,6 +8,7 @@ import GalleryGrid from './GalleryGrid';
 import { GalleryControls } from './GalleryControls';
 import { FloatingAddButton } from './FloatingAddButton';
 import { Filter, FieldOption } from './FilterBuilder';
+import { alertUser } from '@/utils/dialogs';
 
 // ==========================================
 // 1. TYPES & INTERFACES
@@ -36,6 +37,9 @@ interface ItemGalleryProps<T extends BaseGalleryItem> {
   // Optional per-card menu (e.g. the writing gallery's "Move to folder…").
   // Undefined elsewhere, so other galleries render no extra control.
   renderItemMenu?: (item: T) => React.ReactNode;
+  // Overrides the "New" floating button's color; undefined keeps
+  // FloatingAddButton's own default (the site's theme accent).
+  newItemColor?: string;
 }
 
 // ==========================================
@@ -105,7 +109,7 @@ function applyFilters<T extends BaseGalleryItem>(items: T[], filters: Filter[]):
 export default function ItemGallery<T extends BaseGalleryItem>({
   items, basePath, searchPlaceholder = "Search...", newItemText = "New",
   createModalTitle = "Create New", categoryField = 'categories', deleteAction,
-  renderBadges, renderCreateForm, renderItemMenu
+  renderBadges, renderCreateForm, renderItemMenu, newItemColor
 }: ItemGalleryProps<T>) {
 
   // State Management
@@ -204,7 +208,7 @@ export default function ItemGallery<T extends BaseGalleryItem>({
       setItemToDelete(null);
     } catch (error) {
       console.error("Failed to delete item", error);
-      alert("Failed to delete. Please try again.");
+      await alertUser({ title: 'Delete failed', message: 'Failed to delete. Please try again.' });
     } finally {
       setIsDeleting(false);
     }
@@ -213,7 +217,7 @@ export default function ItemGallery<T extends BaseGalleryItem>({
   return (
     <div>
       {renderCreateForm && (
-        <FloatingAddButton onClick={openCreate} text={newItemText} />
+        <FloatingAddButton onClick={openCreate} text={newItemText} {...(newItemColor ? { color: newItemColor } : {})} />
       )}
 
       {/* CONTROLS BAR */}

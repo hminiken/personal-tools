@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Paper, Group, Text, ActionIcon, Menu, ScrollArea, TextInput, Box, Anchor } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconGripVertical, IconDots, IconPencil, IconTrash, IconBook2, IconPhoto, IconPhotoOff } from '@tabler/icons-react';
@@ -14,12 +14,17 @@ import { CSS } from '@dnd-kit/utilities';
 import { animateLayoutChanges, sortableTransition } from './sortableConfig';
 import ListColumn from './ListColumn';
 import InlineAdd from './InlineAdd';
+import { WordCountDisplay, sumGroupWords, type WordCountSettings } from '@components/WordCountDisplay';
+import { promptWordGoal } from '@/utils/dialogs';
+import { setGroupWordGoal } from '../../../_actions/writing_actions';
 import type { BoardGroup, BoardCard, LabelCategory } from '../types';
 
 export default function GroupRow({
   group,
   boardHasBg,
   categories,
+  wcSettings,
+  originDrag,
   onOpenCard,
   onOpenCardById,
   onAddCard,
@@ -32,6 +37,8 @@ export default function GroupRow({
   group: BoardGroup;
   boardHasBg: boolean;
   categories: LabelCategory[];
+  wcSettings: WordCountSettings;
+  originDrag: { card: BoardCard; listId: number; index: number } | null;
   onOpenCard: (card: BoardCard) => void;
   onOpenCardById: (cardId: number) => void;
   onAddCard: (listId: number, title: string) => void;
@@ -53,6 +60,51 @@ export default function GroupRow({
   const params = useParams();
   const router = useRouter();
 
+  const viewportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+
+    const ds = { startX: 0, startScroll: 0, active: false };
+
+    const onDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      const target = e.target as Element;
+      if (target.closest('[data-no-drag-scroll], button, a, input, textarea, select')) return;
+      ds.startX = e.clientX;
+      ds.startScroll = vp.scrollLeft;
+      ds.active = true;
+      vp.setPointerCapture(e.pointerId);
+      vp.style.cursor = 'grabbing';
+      vp.style.userSelect = 'none';
+    };
+
+    const onMove = (e: PointerEvent) => {
+      if (!ds.active) return;
+      vp.scrollLeft = ds.startScroll - (e.clientX - ds.startX);
+    };
+
+    const onUp = () => {
+      if (!ds.active) return;
+      ds.active = false;
+      vp.style.cursor = '';
+      vp.style.userSelect = '';
+    };
+
+    vp.addEventListener('pointerdown', onDown);
+    vp.addEventListener('pointermove', onMove);
+    vp.addEventListener('pointerup', onUp);
+    vp.addEventListener('pointercancel', onUp);
+
+    return () => {
+      vp.removeEventListener('pointerdown', onDown);
+      vp.removeEventListener('pointermove', onMove);
+      vp.removeEventListener('pointerup', onUp);
+      vp.removeEventListener('pointercancel', onUp);
+    };
+  }, []);
+
   const hasBg = !!group.backgroundImage;          // group has its own photo background
   const onBoardBg = boardHasBg && !hasBg;         // sits on the board's background, no photo of its own
   const credit = group.backgroundCredit ? (JSON.parse(group.backgroundCredit) as { name: string; link: string }) : null;
@@ -60,7 +112,6 @@ export default function GroupRow({
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
     transition,
-    opacity: isDragging ? 0.6 : 1,
     // A light scrim over the photo keeps list columns + header text readable.
     ...(hasBg
       ? {
@@ -80,6 +131,26 @@ export default function GroupRow({
 
   const listIds = group.lists.map((l) => `list:${l.id}`);
 
+  // Ghost placeholder — dashed outline the same width as the real group.
+  if (isDragging) {
+    return (
+      <Paper
+        ref={setNodeRef}
+        style={{ ...style, borderStyle: 'dashed' }}
+        withBorder
+        radius="md"
+        p="sm"
+        bg="light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5))"
+        {...attributes}
+      >
+        <Box style={{ opacity: 0 }}>
+          <Text fw={600} size="md">{group.title}</Text>
+          <Box style={{ height: 80 }} />
+        </Box>
+      </Paper>
+    );
+  }
+
   return (
     <Paper
       ref={setNodeRef}
@@ -92,7 +163,7 @@ export default function GroupRow({
           ? undefined
           : onBoardBg
             ? 'light-dark(rgba(255, 255, 255, 0.33), rgba(0,0,0,0.45))'
-            : 'light-dark(var(--mantine-color-olive-0), var(--mantine-color-dark-7))'
+            : 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))'
       }
       {...attributes}
     >
@@ -102,9 +173,8 @@ export default function GroupRow({
           <ActionIcon
             ref={setActivatorNodeRef}
             variant="subtle"
-            // color="gray"
             size="sm"
-            style={{ cursor: 'grab' }}
+            style={{ cursor: 'grab', color: hasBg ? 'rgba(255,255,255,0.8)' : undefined }}
             {...listeners}
             aria-label="Drag group"
           >
@@ -136,11 +206,19 @@ export default function GroupRow({
               {group.title}
             </Text>
           )}
+          {wcSettings.mode !== 'off' && (
+            <WordCountDisplay
+              count={sumGroupWords(group)}
+              goal={group.wordCountGoal ?? wcSettings.defaultGroupGoal}
+              mode={wcSettings.mode}
+              light={hasBg}
+            />
+          )}
         </Group>
 
         <Menu position="bottom-end" withinPortal>
           <Menu.Target>
-            <ActionIcon variant="subtle" color="gray" size="sm" aria-label="Group options">
+            <ActionIcon variant="subtle" color="gray" size="sm" aria-label="Group options" style={hasBg ? { color: 'rgba(255,255,255,0.8)' } : undefined}>
               <IconDots size={18} />
             </ActionIcon>
           </Menu.Target>
@@ -153,6 +231,16 @@ export default function GroupRow({
             </Menu.Item>
             <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => setEditing(true)}>
               Rename
+            </Menu.Item>
+            <Menu.Item
+              onClick={async () => {
+                const goal = await promptWordGoal({ title: 'Group word count goal', initialValue: group.wordCountGoal });
+                if (goal === undefined) return;
+                await setGroupWordGoal(group.id, goal);
+                router.refresh();
+              }}
+            >
+              Set word goal…
             </Menu.Item>
             <Menu.Item leftSection={<IconPhoto size={14} />} onClick={openBg}>
               {hasBg ? 'Change background' : 'Set background'}
@@ -173,7 +261,7 @@ export default function GroupRow({
       </Group>
 
       {/* Lists: horizontal scroll */}
-      <ScrollArea type="hover" offsetScrollbars scrollbarSize={8}>
+      <ScrollArea type="hover" offsetScrollbars scrollbarSize={8} viewportRef={viewportRef}>
         <div ref={setDropRef} style={{ minHeight: 64 }}>
           <SortableContext items={listIds} strategy={horizontalListSortingStrategy}>
             <Group align="flex-start" wrap="nowrap" gap="sm" pb="xs" style={{ minHeight: 64 }}>
@@ -182,6 +270,8 @@ export default function GroupRow({
                   key={list.id}
                   list={list}
                   categories={categories}
+                  wcSettings={wcSettings}
+                  originDrag={originDrag}
                   onOpenCard={onOpenCard}
                   onOpenCardById={onOpenCardById}
                   onAddCard={onAddCard}
@@ -197,9 +287,12 @@ export default function GroupRow({
                         alignSelf: 'stretch',
                         display: 'flex',
                         alignItems: 'center',
-                        border: '1.5px dashed var(--mantine-color-olive-3)',
+                        border: (hasBg || boardHasBg) ? '1.5px dashed rgba(255,255,255,0.35)' : '1.5px dashed var(--mantine-color-gray-4)',
                         borderRadius: 8,
                         padding: 8,
+                        background: (hasBg || boardHasBg) ? 'rgba(0,0,0,0.2)' : undefined,
+                        backdropFilter: (hasBg || boardHasBg) ? 'blur(8px)' : undefined,
+                        WebkitBackdropFilter: (hasBg || boardHasBg) ? 'blur(8px)' : undefined,
                       }
                     : { paddingTop: 4 }
                 }
@@ -208,6 +301,7 @@ export default function GroupRow({
                   label={group.lists.length === 0 ? 'Drop a list here, or add one' : 'Add list'}
                   placeholder="List title"
                   onAdd={(v) => onAddList(group.id, v)}
+                  glass={hasBg || boardHasBg}
                 />
               </Box>
             </Group>

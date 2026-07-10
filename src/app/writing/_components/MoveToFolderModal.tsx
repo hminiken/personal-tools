@@ -122,7 +122,7 @@ export function MoveToFolderModal({
           <Button
             fullWidth
             variant={isCurrent ? 'light' : 'subtle'}
-            color="olive"
+            color="gray"
             justify="flex-start"
             disabled={busy || isCurrent}
             leftSection={<IconHome size={18} />}
@@ -150,7 +150,7 @@ export function MoveToFolderModal({
           <Button
             fullWidth
             variant={isCurrent ? 'light' : 'subtle'}
-            color="olive"
+            color="gray"
             justify="flex-start"
             disabled={busy || isCurrent}
             leftSection={<IconFolder size={18} />}
@@ -193,7 +193,7 @@ export function MoveToFolderModal({
             <Button
               flex={1}
               variant={isCurrent ? 'light' : 'subtle'}
-              color="olive"
+              color="gray"
               justify="flex-start"
               disabled={busy || isExcluded || isCurrent}
               leftSection={<IconFolder size={18} />}
@@ -233,7 +233,7 @@ export function MoveToFolderModal({
               <>
                 <Button
                   variant={currentParentId == null ? 'light' : 'subtle'}
-                  color="olive"
+                  color="gray"
                   justify="flex-start"
                   leftSection={<IconHome size={18} />}
                   disabled={busy || currentParentId == null}

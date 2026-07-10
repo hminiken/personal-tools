@@ -34,6 +34,26 @@ export const writingFolders = sqliteTable('writing_folders', {
 });
 
 // ==========================================
+// 0b. SETTINGS  (singleton row — global Writing Desk preferences)
+// ==========================================
+// Always exactly one row (id fixed to 1). Holds preferences that apply across
+// every project/board rather than to one entity, so they can't live as a
+// column on any single table the way board spacing does.
+export const writingSettings = sqliteTable('writing_settings', {
+  id: integer('id').primaryKey().default(1),
+  // How word counts are displayed everywhere.
+  wordCountDisplayMode: text('word_count_display_mode', { enum: ['off', 'bar', 'text'] }).notNull().default('off'),
+  // Fallback goals used when a card/list/group has no explicit wordCountGoal
+  // of its own. Boards and projects have no default — always explicit or null.
+  defaultCardWordGoal: integer('default_card_word_goal'),
+  defaultListWordGoal: integer('default_list_word_goal'),
+  defaultGroupWordGoal: integer('default_group_word_goal'),
+
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
+});
+
+// ==========================================
 // 1. PROJECTS  (top-level gallery cards)
 // ==========================================
 export const writingProjects = sqliteTable('writing_projects', {
@@ -45,6 +65,10 @@ export const writingProjects = sqliteTable('writing_projects', {
   coverImage: text('cover_image'),
   status: text('status'),
   categories: text('categories'),
+
+  // Optional word-count goal for the whole project (sum of every board's cards).
+  // No global default — always explicit or null.
+  wordCountGoal: integer('word_count_goal'),
 
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
@@ -70,6 +94,13 @@ export const boards = sqliteTable('boards', {
   spaceBefore: text('space_before'),
   spaceAfter: text('space_after'),
 
+  // Optional word-count goal for the whole board (sum of every group's cards).
+  // No global default — always explicit or null.
+  wordCountGoal: integer('word_count_goal'),
+  // Per-board override of the global word-count display mode. Null = inherit
+  // writingSettings.wordCountDisplayMode.
+  wordCountDisplayMode: text('word_count_display_mode', { enum: ['off', 'bar', 'text'] }),
+
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
 });
@@ -89,6 +120,10 @@ export const groups = sqliteTable('groups', {
   backgroundImage: text('background_image'),
   backgroundCredit: text('background_credit'),
 
+  // Optional word-count goal for this group. Null = fall back to the global
+  // default group goal (writingSettings.defaultGroupWordGoal).
+  wordCountGoal: integer('word_count_goal'),
+
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
 });
@@ -101,6 +136,10 @@ export const lists = sqliteTable('lists', {
   groupId: integer('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   position: real('position').notNull().default(0),
+
+  // Optional word-count goal for this list. Null = fall back to the global
+  // default list goal (writingSettings.defaultListWordGoal).
+  wordCountGoal: integer('word_count_goal'),
 
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
@@ -132,6 +171,14 @@ export const cards = sqliteTable('cards', {
   // JSON: Record<commentId, { text: string; createdAt: string }>
   // Comment marks in `content` reference these by data-comment-id.
   comments: text('comments'),
+
+  // Cached plain-text word count of `content`, recomputed whenever content is
+  // saved (see countWords in utils/writingWordCount). Every ancestor level's
+  // total is a live sum of this column rather than a separately stored value.
+  wordCount: integer('word_count').notNull().default(0),
+  // Optional word-count goal for this card. Null = fall back to the global
+  // default card goal (writingSettings.defaultCardWordGoal).
+  wordCountGoal: integer('word_count_goal'),
 
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),

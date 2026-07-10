@@ -27,10 +27,12 @@ function SortableTab({
   board,
   projectId,
   active,
+  hasBg,
 }: {
   board: Board;
   projectId: number;
   active: boolean;
+  hasBg: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `board:${board.id}`,
@@ -47,7 +49,7 @@ function SortableTab({
     <Link
       ref={setNodeRef}
       href={`/writing/${projectId}/${board.id}`}
-      className={classes.tab}
+      className={hasBg ? `${classes.tab} ${classes.tabGlass}` : classes.tab}
       data-active={active || undefined}
       style={style}
       {...attributes}
@@ -68,6 +70,7 @@ export default function BoardTabs({
   hasBg,
   onSetBackground,
   onRemoveBackground,
+  onSetWordGoal,
 }: {
   projectId: number;
   boards: Board[];
@@ -78,6 +81,7 @@ export default function BoardTabs({
   hasBg: boolean;
   onSetBackground: () => void;
   onRemoveBackground: () => void;
+  onSetWordGoal: () => void;
 }) {
   const [order, setOrder] = useState<Board[]>(boards);
   useEffect(() => { setOrder(boards); }, [boards]);
@@ -113,10 +117,10 @@ export default function BoardTabs({
               gap={4}
               wrap="nowrap"
               pr="xs"
-              style={{ borderBottom: '2px solid var(--mantine-color-olive-3)' }}
+              style={{ borderBottom: hasBg ? '2px solid rgba(255,255,255,0.3)' : '2px solid var(--mantine-color-gray-4)' }}
             >
               {order.map((b) => (
-                <SortableTab key={b.id} board={b} projectId={projectId} active={b.id === activeBoardId} />
+                <SortableTab key={b.id} board={b} projectId={projectId} active={b.id === activeBoardId} hasBg={hasBg} />
               ))}
             </Group>
           </SortableContext>
@@ -124,18 +128,32 @@ export default function BoardTabs({
       </ScrollArea>
 
       <Tooltip label="Add board">
-        <ActionIcon variant="light" color="olive" size="lg" onClick={onAddBoard} aria-label="Add board">
+        <ActionIcon
+          variant="light"
+          color="gray"
+          size="lg"
+          onClick={onAddBoard}
+          aria-label="Add board"
+          style={hasBg ? { color: '#fff', background: 'rgba(109, 109, 109, 0.22)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)' } : undefined}
+        >
           <IconPlus size={18} />
         </ActionIcon>
       </Tooltip>
       <Menu position="bottom-end" withinPortal>
         <Menu.Target>
-          <ActionIcon variant="subtle" color="gray" size="lg" aria-label="Board options">
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            size="lg"
+            aria-label="Board options"
+            style={hasBg ? { color: 'rgba(255,255,255,0.85)' } : undefined}
+          >
             <IconDots size={18} />
           </ActionIcon>
         </Menu.Target>
         <Menu.Dropdown>
           <Menu.Item leftSection={<IconPencil size={14} />} onClick={onRenameBoard}>Rename board</Menu.Item>
+          <Menu.Item onClick={onSetWordGoal}>Set word goal…</Menu.Item>
           <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={onDeleteBoard}>Delete board</Menu.Item>
           <Menu.Divider />
           <Menu.Item leftSection={<IconPhoto size={14} />} onClick={onSetBackground}>

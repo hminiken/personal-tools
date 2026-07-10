@@ -2,12 +2,13 @@
 'use server';
 
 import { writingDb } from '@/db/writing';
-import { writingProjects, writingFolders, boards, groups, lists, cards, cardImages, labels, labelCategories, cardLabels, cardLinks } from '@/db/writing/schema';
+import { writingProjects, writingFolders, boards, groups, lists, cards, cardImages, labels, labelCategories, cardLabels, cardLinks, writingSettings } from '@/db/writing/schema';
 import { eq, and, desc, max, inArray, isNull, or } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { writeFile } from 'fs/promises';
 import path from 'path';
 import { compressImage } from '@/utils/compressImage';
+import { countWords } from '@/utils/writingWordCount';
 
 // Revalidate every board page (covers all dynamic [projectId]/[boardId] instances).
 function revalidateBoards() {
@@ -377,7 +378,7 @@ export async function updateCard(
 ) {
   const patch: Partial<typeof cards.$inferInsert> = {};
   if (data.title !== undefined) patch.title = data.title;
-  if (data.content !== undefined) patch.content = data.content;
+  if (data.content !== undefined) { patch.content = data.content; patch.wordCount = countWords(data.content); }
   if (data.includeInCompile !== undefined) patch.includeInCompile = data.includeInCompile;
   if (data.isImageCard !== undefined) patch.isImageCard = data.isImageCard;
   if (data.imagePath !== undefined) patch.imagePath = data.imagePath;
@@ -482,7 +483,67 @@ export async function deleteCard(cardId: number) {
 // card editor saves on blur and we don't want a refresh to rebuild editors or
 // move the cursor mid-write. Board previews refresh on next load.
 export async function saveCardContent(cardId: number, content: string) {
-  await writingDb.update(cards).set({ content }).where(eq(cards.id, cardId));
+  await writingDb.update(cards).set({ content, wordCount: countWords(content) }).where(eq(cards.id, cardId));
+}
+
+// ==========================================
+// WORD COUNT GOALS
+// ==========================================
+export async function setProjectWordGoal(projectId: number, goal: number | null) {
+  await writingDb.update(writingProjects).set({ wordCountGoal: goal }).where(eq(writingProjects.id, projectId));
+  revalidateGallery();
+}
+
+export async function setBoardWordGoal(boardId: number, goal: number | null) {
+  await writingDb.update(boards).set({ wordCountGoal: goal }).where(eq(boards.id, boardId));
+  revalidateBoards();
+}
+
+export async function setGroupWordGoal(groupId: number, goal: number | null) {
+  await writingDb.update(groups).set({ wordCountGoal: goal }).where(eq(groups.id, groupId));
+  revalidateBoards();
+}
+
+export async function setListWordGoal(listId: number, goal: number | null) {
+  await writingDb.update(lists).set({ wordCountGoal: goal }).where(eq(lists.id, listId));
+  revalidateBoards();
+}
+
+export async function setCardWordGoal(cardId: number, goal: number | null) {
+  await writingDb.update(cards).set({ wordCountGoal: goal }).where(eq(cards.id, cardId));
+  revalidateBoards();
+}
+
+// ==========================================
+// GLOBAL WRITING DESK SETTINGS  (singleton row, id = 1)
+// ==========================================
+export type WordCountDisplayMode = 'off' | 'bar' | 'text';
+
+export async function getWritingSettings() {
+  const row = await writingDb.select().from(writingSettings).where(eq(writingSettings.id, 1)).get();
+  return (
+    row ?? {
+      id: 1,
+      wordCountDisplayMode: 'off' as WordCountDisplayMode,
+      defaultCardWordGoal: null,
+      defaultListWordGoal: null,
+      defaultGroupWordGoal: null,
+    }
+  );
+}
+
+export async function updateWritingSettings(patch: {
+  wordCountDisplayMode?: WordCountDisplayMode;
+  defaultCardWordGoal?: number | null;
+  defaultListWordGoal?: number | null;
+  defaultGroupWordGoal?: number | null;
+}) {
+  await writingDb
+    .insert(writingSettings)
+    .values({ id: 1, ...patch })
+    .onConflictDoUpdate({ target: writingSettings.id, set: patch });
+  revalidateGallery();
+  revalidateBoards();
 }
 
 // Move a card to a (possibly new) list at the given position. No revalidate (optimistic).

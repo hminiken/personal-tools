@@ -52,7 +52,7 @@ export function DocumentSpacingMenu({
     <Menu position="bottom-end" withinPortal width={240} closeOnItemClick={false}>
       <Menu.Target>
         <Tooltip label="Document spacing">
-          <ActionIcon variant="light" color="olive" size="lg" aria-label="Document spacing">
+          <ActionIcon variant="light" color="gray" size="lg" aria-label="Document spacing">
             <IconLineHeight size={18} />
           </ActionIcon>
         </Tooltip>

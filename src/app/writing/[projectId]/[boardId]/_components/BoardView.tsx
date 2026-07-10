@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Box, Paper, Group, Stack, Text, Title, Button, Anchor, Drawer, ActionIcon, Divider, Tooltip,
+  SegmentedControl, NumberInput, useMantineColorScheme, useComputedColorScheme,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconArrowLeft, IconLayoutBoard, IconBook2, IconTags, IconSettings } from '@tabler/icons-react';
+import { IconArrowLeft, IconLayoutBoard, IconBook2, IconTags, IconSettings, IconFileExport, IconSun, IconMoon } from '@tabler/icons-react';
 import Link from 'next/link';
 import UnsplashPicker from '@components/UnsplashPicker';
 import { useRouter } from 'next/navigation';
@@ -16,17 +17,21 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import GroupRow from './GroupRow';
+import { CardFace } from './CardItem';
 import BoardTabs from './BoardTabs';
 import CardEditorModal from './CardEditorModal';
 import ManageLabelsModal from './ManageLabelsModal';
 import InlineAdd from './InlineAdd';
 import { DocumentSpacingMenu, type Spacing } from '@components/DocumentSpacing';
-import type { Board, BoardGroup, BoardCard, LabelCatalog } from '../types';
+import { WordCountDisplay, sumBoardWords, type WordCountSettings, type WordCountMode } from '@components/WordCountDisplay';
+import { confirmAction, promptText, promptWordGoal } from '@/utils/dialogs';
+import type { Board, BoardGroup, BoardCard, BoardList, LabelCatalog } from '../types';
 import {
   createBoard, renameBoard, deleteBoard,
   createGroup, renameGroup, deleteGroup, moveGroup,
   createList, renameList, deleteList, moveList,
   createCard, moveCard, setBoardSpacing, setBoardBackground, getCardById,
+  updateWritingSettings, setBoardWordGoal,
 } from '../../../_actions/writing_actions';
 
 // ---------- id helpers ----------
@@ -61,24 +66,39 @@ const findList = (gs: BoardGroup[], listId: number) => {
 export default function BoardView({
   projectId,
   projectTitle,
+  projectWordCount,
+  projectWordGoal,
   backUrl,
   boards,
   activeBoardId,
   initialGroups,
   catalog,
+  wcSettings: initialWcSettings,
 }: {
   projectId: number;
   projectTitle: string;
+  projectWordCount: number;
+  projectWordGoal: number | null;
   backUrl: string;
   boards: Board[];
   activeBoardId: number;
   initialGroups: BoardGroup[];
   catalog: LabelCatalog;
+  wcSettings: WordCountSettings;
 }) {
   const router = useRouter();
   const [groups, setGroups] = useState<BoardGroup[]>(initialGroups);
-  const [activeDrag, setActiveDrag] = useState<{ type: IdType; label: string } | null>(null);
+  const [activeDrag, setActiveDrag] = useState<
+    | { type: 'card'; card: BoardCard }
+    | { type: 'list'; list: BoardList }
+    | { type: 'group'; group: BoardGroup }
+    | null
+  >(null);
+  const [originDrag, setOriginDrag] = useState<{ card: BoardCard; listId: number; index: number } | null>(null);
   const activeTypeRef = useRef<IdType | null>(null);
+  // Skip processing the same over-target twice in a row (dnd-kit can fire
+  // multiple onDragOver events for the same droppable without the cursor moving).
+  const lastOverRef = useRef<string | number | null>(null);
 
   // Card editor
   const [editingCard, setEditingCard] = useState<BoardCard | null>(null);
@@ -92,6 +112,11 @@ export default function BoardView({
 
   // Settings drawer (slides in from the right) holding the board-level controls.
   const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
+
+  // The Writing Desk hides the site's top bar (see NavigationShell), so the
+  // dark mode toggle lives here instead.
+  const { setColorScheme } = useMantineColorScheme();
+  const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
 
   // Document-wide prose spacing (stored on the active board).
   const activeBoard = boards.find((b) => b.id === activeBoardId);
@@ -107,6 +132,33 @@ export default function BoardView({
   const handleSpacing = (next: Spacing) => {
     setSpacing(next);
     setBoardSpacing(activeBoardId, next);
+  };
+
+  // Global word-count display settings + default goals (singleton row).
+  // Optimistic local copy, same pattern as spacing above.
+  const [wcSettings, setWcSettings] = useState<WordCountSettings>(initialWcSettings);
+  const handleWcSettings = (patch: {
+    wordCountDisplayMode?: WordCountMode;
+    defaultCardWordGoal?: number | null;
+    defaultListWordGoal?: number | null;
+    defaultGroupWordGoal?: number | null;
+  }) => {
+    setWcSettings((prev) => ({
+      mode: patch.wordCountDisplayMode ?? prev.mode,
+      defaultCardGoal: patch.defaultCardWordGoal !== undefined ? patch.defaultCardWordGoal : prev.defaultCardGoal,
+      defaultListGoal: patch.defaultListWordGoal !== undefined ? patch.defaultListWordGoal : prev.defaultListGoal,
+      defaultGroupGoal: patch.defaultGroupWordGoal !== undefined ? patch.defaultGroupWordGoal : prev.defaultGroupGoal,
+    }));
+    updateWritingSettings(patch);
+  };
+
+  const boardWordCount = sumBoardWords(groups);
+
+  const onSetBoardWordGoal = async () => {
+    const goal = await promptWordGoal({ title: 'Board word count goal', initialValue: activeBoard?.wordCountGoal });
+    if (goal === undefined) return;
+    await setBoardWordGoal(activeBoardId, goal);
+    router.refresh();
   };
 
   // Adopt fresh server data whenever the route re-renders (after an action).
@@ -151,17 +203,27 @@ export default function BoardView({
 
   // ---------- drag handlers ----------
   function handleDragStart(e: DragStartEvent) {
+    lastOverRef.current = null;
     const { type, num } = parseId(e.active.id);
     activeTypeRef.current = type;
-    let label = '';
     if (type === 'card') {
-      for (const g of groups) for (const l of g.lists) { const c = l.cards.find((x) => x.id === num); if (c) label = c.title; }
+      for (const g of groups) for (const l of g.lists) {
+        const i = l.cards.findIndex((x) => x.id === num);
+        if (i !== -1) {
+          setActiveDrag({ type: 'card', card: l.cards[i] });
+          setOriginDrag({ card: l.cards[i], listId: l.id, index: i });
+          return;
+        }
+      }
     } else if (type === 'list') {
-      label = findList(groups, num)?.title ?? '';
+      for (const g of groups) {
+        const l = g.lists.find((x) => x.id === num);
+        if (l) { setActiveDrag({ type: 'list', list: l }); return; }
+      }
     } else if (type === 'group') {
-      label = groups.find((g) => g.id === num)?.title ?? '';
+      const g = groups.find((x) => x.id === num);
+      if (g) setActiveDrag({ type: 'group', group: g });
     }
-    setActiveDrag({ type, label });
   }
 
   function handleDragOver(e: DragOverEvent) {
@@ -184,20 +246,36 @@ export default function BoardView({
         toIndex = findList(groups, toListId)?.cards.length ?? 0;
       }
       if (fromListId == null || toListId == null || fromListId === toListId) return;
+      if (over.id === lastOverRef.current) return;
+      lastOverRef.current = over.id;
 
       setGroups((prev) => {
-        const next = structuredClone(prev) as BoardGroup[];
+        // Remove from whichever list currently holds the card.
         let moved: BoardCard | undefined;
-        for (const g of next) for (const l of g.lists) {
-          const i = l.cards.findIndex((c) => c.id === a.num);
-          if (i !== -1) { moved = l.cards.splice(i, 1)[0]; }
-        }
+        const afterRemove = prev.map((g) => {
+          const lists = g.lists.map((l) => {
+            if (moved !== undefined) return l;
+            const ci = l.cards.findIndex((c) => c.id === a.num);
+            if (ci === -1) return l;
+            moved = l.cards[ci];
+            const cards = [...l.cards];
+            cards.splice(ci, 1);
+            return { ...l, cards };
+          });
+          return lists.some((l, i) => l !== g.lists[i]) ? { ...g, lists } : g;
+        });
         if (!moved) return prev;
-        const target = findList(next, toListId!);
-        if (!target) return prev;
-        const idx = Math.min(Math.max(toIndex, 0), target.cards.length);
-        target.cards.splice(idx, 0, moved);
-        return next;
+        // Insert into the target list.
+        return afterRemove.map((g) => {
+          const lists = g.lists.map((l) => {
+            if (l.id !== toListId) return l;
+            const idx = Math.min(Math.max(toIndex, 0), l.cards.length);
+            const cards = [...l.cards];
+            cards.splice(idx, 0, moved!);
+            return { ...l, cards };
+          });
+          return lists.some((l, i) => l !== g.lists[i]) ? { ...g, lists } : g;
+        });
       });
       return;
     }
@@ -216,18 +294,28 @@ export default function BoardView({
         toIndex = groups.find((g) => g.id === toGroupId)?.lists.length ?? 0;
       }
       if (fromGroupId == null || toGroupId == null || fromGroupId === toGroupId) return;
+      if (over.id === lastOverRef.current) return;
+      lastOverRef.current = over.id;
 
       setGroups((prev) => {
-        const next = structuredClone(prev) as BoardGroup[];
-        let moved;
-        const fromG = next.find((g) => g.id === fromGroupId);
-        if (fromG) { const i = fromG.lists.findIndex((l) => l.id === a.num); if (i !== -1) moved = fromG.lists.splice(i, 1)[0]; }
+        let moved: BoardList | undefined;
+        const afterRemove = prev.map((g) => {
+          if (g.id !== fromGroupId) return g;
+          const i = g.lists.findIndex((l) => l.id === a.num);
+          if (i === -1) return g;
+          moved = g.lists[i];
+          const lists = [...g.lists];
+          lists.splice(i, 1);
+          return { ...g, lists };
+        });
         if (!moved) return prev;
-        const toG = next.find((g) => g.id === toGroupId);
-        if (!toG) return prev;
-        const idx = Math.min(Math.max(toIndex, 0), toG.lists.length);
-        toG.lists.splice(idx, 0, moved);
-        return next;
+        return afterRemove.map((g) => {
+          if (g.id !== toGroupId) return g;
+          const idx = Math.min(Math.max(toIndex, 0), g.lists.length);
+          const lists = [...g.lists];
+          lists.splice(idx, 0, moved!);
+          return { ...g, lists };
+        });
       });
     }
   }
@@ -235,7 +323,9 @@ export default function BoardView({
   function handleDragEnd(e: DragEndEvent) {
     const { active, over } = e;
     setActiveDrag(null);
+    setOriginDrag(null);
     activeTypeRef.current = null;
+    lastOverRef.current = null;
     if (!over) return;
     const a = parseId(active.id);
     const o = parseId(over.id);
@@ -310,9 +400,9 @@ export default function BoardView({
   const onAddList = async (groupId: number, title: string) => { await createList(groupId, title); refresh(); };
   const onAddCard = async (listId: number, title: string) => { await createCard(listId, title); refresh(); };
   const onRenameGroup = async (groupId: number, title: string) => { await renameGroup(groupId, title); refresh(); };
-  const onDeleteGroup = async (groupId: number) => { if (confirm('Delete this group and everything in it?')) { await deleteGroup(groupId); refresh(); } };
+  const onDeleteGroup = async (groupId: number) => { if (await confirmAction({ title: 'Delete group', message: 'Delete this group and everything in it?' })) { await deleteGroup(groupId); refresh(); } };
   const onRenameList = async (listId: number, title: string) => { await renameList(listId, title); refresh(); };
-  const onDeleteList = async (listId: number) => { if (confirm('Delete this list and its cards?')) { await deleteList(listId); refresh(); } };
+  const onDeleteList = async (listId: number) => { if (await confirmAction({ title: 'Delete list', message: 'Delete this list and its cards?' })) { await deleteList(listId); refresh(); } };
 
   const onOpenCard = (card: BoardCard) => { setEditingCard(card); openEditor(); };
 
@@ -331,14 +421,14 @@ export default function BoardView({
 
   // ---------- board (tab) handlers ----------
   const onAddBoard = async () => {
-    const name = prompt('New board name:')?.trim();
+    const name = (await promptText({ title: 'New board', label: 'Board name' }))?.trim();
     if (!name) return;
     const id = await createBoard(projectId, name);
     if (id) router.push(`/writing/${projectId}/${id}`);
   };
   const onRenameBoard = async () => {
     const current = boards.find((b) => b.id === activeBoardId);
-    const name = prompt('Rename board:', current?.title)?.trim();
+    const name = (await promptText({ title: 'Rename board', label: 'Board name', initialValue: current?.title }))?.trim();
     if (name) { await renameBoard(activeBoardId, name); refresh(); }
   };
   const onRemoveBackground = async () => {
@@ -347,7 +437,7 @@ export default function BoardView({
   };
 
   const onDeleteBoard = async () => {
-    if (!confirm('Delete this entire board?')) return;
+    if (!(await confirmAction({ title: 'Delete board', message: 'Delete this entire board?' }))) return;
     await deleteBoard(activeBoardId);
     const remaining = boards.filter((b) => b.id !== activeBoardId);
     if (remaining.length) router.push(`/writing/${projectId}/${remaining[0].id}`);
@@ -357,15 +447,39 @@ export default function BoardView({
   const groupIds = groups.map((g) => `group:${g.id}`);
 
   return (
-    <Box>
+    <Box
+      mx={boardBg ? { base: '-xs', sm: '-xl' } : undefined}
+      mt={boardBg ? '-md' : undefined}
+      px={boardBg ? { base: 'xs', sm: 'xl' } : undefined}
+      py={boardBg ? 'md' : undefined}
+      style={
+        boardBg
+          ? {
+              backgroundImage: `linear-gradient(rgba(0,0,0,0.18), rgba(0,0,0,0.18)), url(${boardBg})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundAttachment: 'fixed',
+              minHeight: '100vh',
+            }
+          : undefined
+      }
+    >
       {/* Header */}
       <Group justify="space-between" mb="sm" mt={'10px'} wrap="nowrap">
         <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
-          <Button component={Link} href={backUrl} variant="subtle" color="gray" size="compact-sm" leftSection={<IconArrowLeft size={16} />}>
+          <Button
+            component={Link}
+            href={backUrl}
+            variant="subtle"
+            color="gray"
+            size="compact-sm"
+            leftSection={<IconArrowLeft size={16} />}
+            style={boardBg ? { color: 'rgba(255,255,255,0.9)', textShadow: '0 1px 2px rgba(0,0,0,0.4)' } : undefined}
+          >
             Projects
           </Button>
-          <IconLayoutBoard size={20} stroke={1.5} />
-          <Title order={4} lineClamp={1}>{projectTitle}</Title>
+          <IconLayoutBoard size={20} stroke={1.5} style={boardBg ? { color: 'white', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))' } : undefined} />
+          <Title order={4} lineClamp={1} style={boardBg ? { color: 'white', textShadow: '0 1px 3px rgba(0,0,0,0.4)' } : undefined}>{projectTitle}</Title>
         </Group>
         <Tooltip label="Board settings" withArrow>
           <ActionIcon
@@ -374,11 +488,26 @@ export default function BoardView({
             size="lg"
             onClick={openSettings}
             aria-label="Board settings"
+            style={boardBg ? { color: '#fff', background: 'rgba(0,0,0,0.20)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)' } : undefined}
           >
             <IconSettings size={20} stroke={1.5} />
           </ActionIcon>
         </Tooltip>
       </Group>
+
+      {/* Word count rollups: project total, then this board's total. */}
+      {wcSettings.mode !== 'off' && (
+        <Group gap="lg" mb="sm" wrap="wrap">
+          <Group gap={6} wrap="nowrap">
+            <Text size="xs" c={boardBg ? 'gray.3' : 'dimmed'} fw={600}>Project</Text>
+            <WordCountDisplay count={projectWordCount} goal={projectWordGoal} mode={wcSettings.mode} light={!!boardBg} />
+          </Group>
+          <Group gap={6} wrap="nowrap">
+            <Text size="xs" c={boardBg ? 'gray.3' : 'dimmed'} fw={600}>Board</Text>
+            <WordCountDisplay count={boardWordCount} goal={activeBoard?.wordCountGoal ?? null} mode={wcSettings.mode} light={!!boardBg} />
+          </Group>
+        </Group>
+      )}
 
       {/* Board tabs (reorderable) */}
       <BoardTabs
@@ -386,6 +515,7 @@ export default function BoardView({
         boards={boards}
         activeBoardId={activeBoardId}
         onAddBoard={onAddBoard}
+        onSetWordGoal={onSetBoardWordGoal}
         onRenameBoard={onRenameBoard}
         onDeleteBoard={onDeleteBoard}
         hasBg={!!boardBg}
@@ -393,31 +523,12 @@ export default function BoardView({
         onRemoveBackground={onRemoveBackground}
       />
 
-      {/* Board body: vertical scroll of groups, optionally over an Unsplash bg.
-          When a background is set we cancel the AppShell.Main left/right padding
-          (xs mobile / xl desktop) with matching negative margins so the image
-          bleeds to the screen edges, then restore that padding inside so the
-          groups stay aligned with the rest of the page. */}
-      <Box
-        mx={boardBg ? { base: '-xs', sm: '-xl' } : undefined}
-        mt={boardBg ? '-md' : undefined}
-        px={boardBg ? { base: 'xs', sm: 'xl' } : undefined}
-        py={boardBg ? 'lg' : undefined}
-        style={
-          boardBg
-            ? {
-                backgroundImage: `linear-gradient(rgba(0,0,0,0.18), rgba(0,0,0,0.18)), url(${boardBg})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundAttachment: 'fixed',
-              }
-            : undefined
-        }
-      >
+      {/* Board body: groups + drag context */}
+      <Box>
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetection}
-        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+        measuring={{ droppable: { strategy: MeasuringStrategy.Always, frequency: 100 } }}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
@@ -430,6 +541,8 @@ export default function BoardView({
                 group={group}
                 boardHasBg={!!boardBg}
                 categories={catalog.categories}
+                wcSettings={wcSettings}
+                originDrag={originDrag}
                 onOpenCard={onOpenCard}
                 onOpenCardById={onOpenCardById}
                 onAddCard={onAddCard}
@@ -447,20 +560,50 @@ export default function BoardView({
             the drop target, so the overlay just fades out instead of flying to a
             position that doesn't match (which read as a "pop"). */}
         <DragOverlay dropAnimation={null}>
-          {activeDrag ? (
+          {activeDrag?.type === 'card' ? (
             <Paper
               withBorder
-              shadow="lg"
+              shadow="xl"
               radius="sm"
-              p="xs"
-              bg="var(--mantine-color-body)"
+              p={activeDrag.card.isImageCard && (activeDrag.card.coverImage ?? activeDrag.card.imagePath) ? 0 : 'xs'}
+              w={248}
               style={{
-                width: activeDrag.type === 'card' ? 248 : activeDrag.type === 'list' ? 272 : 360,
-                cursor: 'grabbing',
                 transform: 'rotate(2deg)',
+                cursor: 'grabbing',
+                overflow: activeDrag.card.isImageCard ? 'hidden' : undefined,
               }}
             >
-              <Text size="sm" fw={600} lineClamp={1}>{activeDrag.label}</Text>
+              <CardFace card={activeDrag.card} categories={catalog.categories} />
+            </Paper>
+          ) : activeDrag?.type === 'list' ? (
+            <Paper
+              withBorder
+              shadow="xl"
+              radius="md"
+              p="xs"
+              bg="light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6))"
+              w={272}
+              style={{ transform: 'rotate(1.5deg)', cursor: 'grabbing' }}
+            >
+              <Group gap={4} wrap="nowrap">
+                <Text fw={600} size="sm" lineClamp={1} style={{ flex: 1 }}>{activeDrag.list.title}</Text>
+                <Text size="xs" c="dimmed">{activeDrag.list.cards.length}</Text>
+              </Group>
+            </Paper>
+          ) : activeDrag?.type === 'group' ? (
+            <Paper
+              withBorder
+              shadow="xl"
+              radius="md"
+              p="sm"
+              bg="light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))"
+              maw={360}
+              style={{ transform: 'rotate(1deg)', cursor: 'grabbing' }}
+            >
+              <Text fw={600} lineClamp={1}>{activeDrag.group.title}</Text>
+              <Text size="xs" c="dimmed" mt={2}>
+                {activeDrag.group.lists.length} {activeDrag.group.lists.length === 1 ? 'list' : 'lists'}
+              </Text>
             </Paper>
           ) : null}
         </DragOverlay>
@@ -468,7 +611,7 @@ export default function BoardView({
 
       {/* Add group */}
       <Box mt="md" maw={360}>
-        <InlineAdd label="Add group" placeholder="Group name" onAdd={onAddGroup} />
+        <InlineAdd label="Add group" placeholder="Group name" onAdd={onAddGroup} glass={!!boardBg} />
       </Box>
 
       {/* Unsplash attribution (required when displaying their photos). */}
@@ -493,6 +636,67 @@ export default function BoardView({
         padding="md"
       >
         <Stack gap="lg">
+          {/* Appearance — the top bar's toggle lives here since it's hidden in the Writing Desk. */}
+          <Group justify="space-between">
+            <Text size="sm" fw={600}>Dark mode</Text>
+            <ActionIcon
+              onClick={() => setColorScheme(computedColorScheme === 'light' ? 'dark' : 'light')}
+              variant="default"
+              size="lg"
+              aria-label="Toggle color scheme"
+            >
+              <IconSun stroke={1.5} className="mantine-light-hidden" />
+              <IconMoon stroke={1.5} className="mantine-dark-hidden" />
+            </ActionIcon>
+          </Group>
+
+          <Divider />
+
+          {/* Word count (applies to every project/board in the Writing Desk) */}
+          <div>
+            <Text size="sm" fw={600} mb="xs">Word count display</Text>
+            <SegmentedControl
+              fullWidth
+              size="xs"
+              value={wcSettings.mode}
+              onChange={(v) => handleWcSettings({ wordCountDisplayMode: v as WordCountMode })}
+              data={[
+                { label: 'Off', value: 'off' },
+                { label: 'Progress bar', value: 'bar' },
+                { label: 'Text', value: 'text' },
+              ]}
+            />
+            <Text size="xs" c="dimmed" mt="md" mb={4}>Default goals (cards/lists/groups can override)</Text>
+            <Stack gap="xs">
+              <NumberInput
+                label="Card"
+                placeholder="No default"
+                size="xs"
+                min={0}
+                value={wcSettings.defaultCardGoal ?? ''}
+                onChange={(v) => handleWcSettings({ defaultCardWordGoal: v === '' ? null : Number(v) })}
+              />
+              <NumberInput
+                label="List"
+                placeholder="No default"
+                size="xs"
+                min={0}
+                value={wcSettings.defaultListGoal ?? ''}
+                onChange={(v) => handleWcSettings({ defaultListWordGoal: v === '' ? null : Number(v) })}
+              />
+              <NumberInput
+                label="Group"
+                placeholder="No default"
+                size="xs"
+                min={0}
+                value={wcSettings.defaultGroupGoal ?? ''}
+                onChange={(v) => handleWcSettings({ defaultGroupWordGoal: v === '' ? null : Number(v) })}
+              />
+            </Stack>
+          </div>
+
+          <Divider />
+
           {/* Prose spacing */}
           <div>
             <Text size="sm" fw={600} mb="xs">Spacing</Text>
@@ -515,11 +719,21 @@ export default function BoardView({
             component={Link}
             href={`/writing/${projectId}/${activeBoardId}/compile/board/${activeBoardId}`}
             variant="light"
-            color="olive"
+            color="gray"
             leftSection={<IconBook2 size={16} />}
             fullWidth
           >
             Compile board
+          </Button>
+          <Button
+            component={Link}
+            href={`/writing/${projectId}/export/epub?board=${activeBoardId}`}
+            variant="light"
+            color="gray"
+            leftSection={<IconFileExport size={16} />}
+            fullWidth
+          >
+            Export (epub / docx)
           </Button>
         </Stack>
       </Drawer>
@@ -541,6 +755,7 @@ export default function BoardView({
         onManageLabels={openLabels}
         spacing={spacing}
         projectId={projectId}
+        wcSettings={wcSettings}
       />
 
       <ManageLabelsModal

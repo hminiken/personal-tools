@@ -2,6 +2,7 @@
 
 import { RichTextEditor, useRichTextEditorContext } from '@mantine/tiptap';
 import { IconPhoto } from '@tabler/icons-react';
+import { promptText } from '@/utils/dialogs';
 
 // Toolbar for the Writing Desk editors. Line/paragraph spacing is NOT here —
 // it's a document-wide setting (see components/DocumentSpacing). This toolbar
@@ -41,8 +42,8 @@ export function WritingEditorToolbar() {
 
       <RichTextEditor.ControlsGroup>
         <RichTextEditor.Control
-          onClick={() => {
-            const url = window.prompt('Enter Image URL');
+          onClick={async () => {
+            const url = await promptText({ title: 'Insert image', label: 'Image URL', placeholder: 'https://...' });
             if (url) editor?.chain().focus().setImage({ src: url }).run();
           }}
           aria-label="Insert image"

@@ -2,6 +2,7 @@
 
 import '@mantine/core/styles.css';
 import {  MantineProvider, createTheme, MantineColorsTuple, ColorSchemeScript } from '@mantine/core';
+import { ModalsProvider } from '@mantine/modals';
 import NavigationShell from '@/components/NavigationShell';
 import { PageTitleProvider } from '@/components/PageTitleContext';
 
@@ -85,11 +86,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <MantineProvider theme={theme} defaultColorScheme="auto">
-          <PageTitleProvider>
-            <NavigationShell>
-              {children}
-            </NavigationShell>
-          </PageTitleProvider>
+          <ModalsProvider>
+            <PageTitleProvider>
+              <NavigationShell>
+                {children}
+              </NavigationShell>
+            </PageTitleProvider>
+          </ModalsProvider>
         </MantineProvider>
       </body>
     </html>

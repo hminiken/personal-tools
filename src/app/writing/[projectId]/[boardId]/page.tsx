@@ -1,9 +1,10 @@
 // src/app/writing/[projectId]/[boardId]/page.tsx
 import { writingDb } from '@/db/writing';
 import { writingProjects, boards, groups, lists, cards, cardImages, labels, labelCategories, cardLabels, cardLinks } from '@/db/writing/schema';
-import { eq, desc, inArray, or } from 'drizzle-orm';
+import { eq, desc, inArray, or, sql } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import BoardView from './_components/BoardView';
+import { getWritingSettings } from '../../_actions/writing_actions';
 import type { BoardGroup, LabelCatalog } from './types';
 
 export const dynamic = 'force-dynamic';
@@ -68,6 +69,20 @@ export default async function BoardPage({ params }: PageProps) {
     .where(eq(labels.projectId, projectId))
     .orderBy(labels.position)
     .all();
+
+  // Project-wide word total (sum of every card across every board in this
+  // project), for the header display next to the project title.
+  const projectWordTotal = await writingDb
+    .select({ total: sql<number>`sum(${cards.wordCount})` })
+    .from(cards)
+    .innerJoin(lists, eq(cards.listId, lists.id))
+    .innerJoin(groups, eq(lists.groupId, groups.id))
+    .innerJoin(boards, eq(groups.boardId, boards.id))
+    .where(eq(boards.projectId, projectId))
+    .get();
+  const projectWordCount = Number(projectWordTotal?.total ?? 0);
+
+  const settings = await getWritingSettings();
 
   const catalog: LabelCatalog = { categories: projectCategories, labels: projectLabels };
   const labelById = new Map(projectLabels.map((l) => [l.id, l]));
@@ -172,11 +187,19 @@ export default async function BoardPage({ params }: PageProps) {
     <BoardView
       projectId={projectId}
       projectTitle={project.title}
+      projectWordCount={projectWordCount}
+      projectWordGoal={project.wordCountGoal}
       backUrl={backUrl}
       boards={projectBoards}
       activeBoardId={boardId}
       initialGroups={tree}
       catalog={catalog}
+      wcSettings={{
+        mode: settings.wordCountDisplayMode,
+        defaultCardGoal: settings.defaultCardWordGoal,
+        defaultListGoal: settings.defaultListWordGoal,
+        defaultGroupGoal: settings.defaultGroupWordGoal,
+      }}
     />
   );
 }

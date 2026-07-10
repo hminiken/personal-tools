@@ -30,6 +30,7 @@ import { useCraftingEditor } from '@hooks/useCraftingEditor';
 import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
 import type { CraftType } from '@/utils/knittingNeedles';
 import { sanitizePatternHtml } from '@/utils/sanitizeHtml';
+import { alertUser, confirmAction } from '@/utils/dialogs';
 function ReadOnlyHTML({ html, fallback }: { html: string | null, fallback: string }) {
     return (
         <Typography p={0}>
@@ -102,7 +103,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
             if (!result.success) throw new Error('Database update failed');
         } catch {
             setStatus(previousStatus);
-            alert('Failed to save status. Reverting...');
+            await alertUser({ title: 'Save failed', message: 'Failed to save status. Reverting...' });
         }
     };
 
@@ -110,7 +111,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
     const [contentOpened, { toggle: toggleContent, open: openContent }] = useDisclosure(true);
 
     const handleUnlinkYarn = async (yarnId: number) => {
-        if (confirm("Remove this yarn from the project?")) {
+        if (await confirmAction({ title: 'Remove yarn', message: 'Remove this yarn from the project?' })) {
             await unlinkYarnFromProject(project.id, yarnId);
         }
     };

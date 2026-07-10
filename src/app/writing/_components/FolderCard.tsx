@@ -67,20 +67,20 @@ export function FolderCard({
               alignItems: 'center',
               justifyContent: 'center',
               // A folder color tints the placeholder (~13% alpha hex); otherwise
-              // fall back to the default olive tint.
+              // fall back to the default gray tint.
               background: folder.color
                 ? `${folder.color}22`
-                : 'light-dark(var(--mantine-color-olive-1), var(--mantine-color-dark-5))',
+                : 'light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5))',
             }}
           >
-            <IconFolder size={40} stroke={1.3} color={folder.color ?? 'var(--mantine-color-olive-6)'} />
+            <IconFolder size={40} stroke={1.3} color={folder.color ?? 'var(--mantine-color-gray-6)'} />
           </Box>
         )}
 
         <Box style={{ position: 'absolute', top: 3, right: 3, zIndex: 10 }} onClick={(e) => e.preventDefault()}>
           <Menu shadow="md" position="bottom-end" withinPortal>
             <Menu.Target>
-              <ActionIcon variant="filled" color="olive.6" size="sm" radius="xl">
+              <ActionIcon variant="filled" color="dark.6" size="sm" radius="xl">
                 <IconDots size={13} stroke={1.5} />
               </ActionIcon>
             </Menu.Target>

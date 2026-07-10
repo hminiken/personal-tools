@@ -41,7 +41,7 @@ export default function EmptyProject({
         >
           Back to Projects
         </Button>
-        <IconLayoutBoard size={48} stroke={1.5} color="var(--mantine-color-olive-6)" />
+        <IconLayoutBoard size={48} stroke={1.5} color="var(--mantine-color-gray-6)" />
         <Title order={3} ta="center">{projectTitle}</Title>
         <Text c="dimmed" ta="center">
           No boards yet. Create your first board to start organizing groups, lists, and cards.

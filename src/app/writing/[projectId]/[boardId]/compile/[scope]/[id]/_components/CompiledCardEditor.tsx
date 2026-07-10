@@ -115,7 +115,7 @@ export default function CompiledCardEditor({
           {card.title}
         </Text>
         {saved && (
-          <Group gap={2} c="olive.7">
+          <Group gap={2} c="dimmed">
             <IconCheck size={13} />
             <Text size="xs">saved</Text>
           </Group>
@@ -142,7 +142,7 @@ export default function CompiledCardEditor({
                     {comments[activeCommentId].text}
                   </Text>
                   <Tooltip label="Remove comment" withinPortal>
-                    <ActionIcon size="xs" color="rust.7" variant="subtle"
+                    <ActionIcon size="xs" color="red.7" variant="subtle"
                       onClick={() => { removeComment(activeCommentId); setBubbleMode('idle'); }}>
                       <IconMessageOff size={13} />
                     </ActionIcon>
@@ -165,7 +165,7 @@ export default function CompiledCardEditor({
                     maxRows={4}
                     style={{ minWidth: 200 }}
                   />
-                  <ActionIcon size="sm" color="olive.6" variant="filled" onClick={addComment} disabled={!newCommentText.trim()}>
+                  <ActionIcon size="sm" color="dark.6" variant="filled" onClick={addComment} disabled={!newCommentText.trim()}>
                     <IconCheck size={13} />
                   </ActionIcon>
                   <ActionIcon size="sm" variant="subtle" onClick={() => { setBubbleMode('idle'); setNewCommentText(''); }}>
@@ -174,7 +174,7 @@ export default function CompiledCardEditor({
                 </>
               ) : (
                 <Tooltip label="Add comment" withinPortal>
-                  <ActionIcon size="sm" variant="subtle" color="olive.6" onClick={() => setBubbleMode('adding')}>
+                  <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setBubbleMode('adding')}>
                     <IconMessage size={15} />
                   </ActionIcon>
                 </Tooltip>

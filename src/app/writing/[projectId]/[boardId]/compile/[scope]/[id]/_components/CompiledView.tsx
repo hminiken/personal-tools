@@ -85,7 +85,7 @@ function ListBlock({
 }) {
   return (
     <Box mb="xl">
-      <Title order={3} c="olive.8" mb="sm">{list.title}</Title>
+      <Title order={3} c="dark.6" mb="sm">{list.title}</Title>
       <CardList cards={list.cards} cardComments={cardComments} onCommentsChange={onCommentsChange} />
     </Box>
   );
@@ -260,7 +260,7 @@ export default function CompiledView({
                   }}
                   onClick={() => jumpToComment(cardId, commentId)}
                 >
-                  <Text size="xs" fw={500} c="olive.7" lineClamp={1}>{cardTitle}</Text>
+                  <Text size="xs" fw={500} c="dark.4" lineClamp={1}>{cardTitle}</Text>
                   <Text size="xs" mt={2}>{text}</Text>
                   <Text size="10px" c="dimmed" mt={2}>
                     {new Date(createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}

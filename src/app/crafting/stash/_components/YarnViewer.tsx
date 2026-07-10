@@ -20,6 +20,7 @@ import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/I
 import { useCraftingEditor } from '@hooks/useCraftingEditor';
 import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
 import { YARN_WEIGHTS } from '@/utils/yarnWeights';
+import { confirmAction } from '@/utils/dialogs';
 
 // Interfaces
 interface Yarn {
@@ -127,7 +128,7 @@ export default function YarnViewer({
 
     const handleUnlinkProject = async (e: React.MouseEvent, projectId: number) => {
         e.preventDefault();
-        if (confirm("Are you sure you want to unlink this project?")) {
+        if (await confirmAction({ title: 'Unlink project', message: 'Are you sure you want to unlink this project?' })) {
             await unlinkProjectFromYarn(yarn.id, projectId); // Passes yarnId, then projectId
         }
     };

@@ -12,12 +12,14 @@ export default function InlineAdd({
   onAdd,
   variant = 'default',
   fullWidth = false,
+  glass = false,
 }: {
   label: string;
   placeholder?: string;
   onAdd: (value: string) => void | Promise<void>;
   variant?: 'default' | 'subtle';
   fullWidth?: boolean;
+  glass?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
@@ -33,12 +35,20 @@ export default function InlineAdd({
     return (
       <Button
         variant={variant === 'subtle' ? 'subtle' : 'light'}
-        color="olive"
+        color="gray"
         size="xs"
         leftSection={<IconPlus size={14} />}
         onClick={() => setEditing(true)}
         fullWidth={fullWidth}
         justify={fullWidth ? 'flex-start' : undefined}
+        style={glass ? {
+          color: 'rgba(255,255,255,0.92)',
+          background: 'rgba(0,0,0,0.20)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.18)',
+          textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+        } : undefined}
       >
         {label}
       </Button>
@@ -62,7 +72,7 @@ export default function InlineAdd({
         autoFocus
         style={{ flex: 1 }}
       />
-      <ActionIcon variant="filled" color="olive" size="md" onClick={submit} aria-label="Add">
+      <ActionIcon variant="filled" color="dark" size="md" onClick={submit} aria-label="Add">
         <IconCheck size={16} />
       </ActionIcon>
       <ActionIcon variant="subtle" color="gray" size="md" onClick={() => { setValue(''); setEditing(false); }} aria-label="Cancel">

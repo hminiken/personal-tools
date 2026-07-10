@@ -16,12 +16,15 @@ import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 import { FloatingAddButton } from '@/components/FloatingAddButton';
 import { UploadModal } from '@/components/UploadModal';
 import UnsplashPicker from '@/components/UnsplashPicker';
+import { WordCountDisplay, type WordCountSettings } from '@/components/WordCountDisplay';
+import { promptWordGoal } from '@/utils/dialogs';
 import { InferSelectModel } from 'drizzle-orm';
 import { writingProjects } from '@/db/writing/schema';
 import {
   createWritingProject, deleteWritingProject, createFolder, renameFolder,
   deleteFolder, moveProjectToFolder, moveFolderToFolder,
   setFolderCover, setFolderColor, setProjectCover, uploadFolderCover, uploadProjectCover,
+  setProjectWordGoal,
 } from '../_actions/writing_actions';
 import type { FolderRow, Breadcrumb, ProjectRow } from '../_lib/loadGalleryLevel';
 import { FolderCard } from './FolderCard';
@@ -34,6 +37,7 @@ type CoverTarget = { kind: 'folder' | 'project'; id: number };
 
 export type WritingProject = InferSelectModel<typeof writingProjects> & {
   coverImagePath?: string;
+  wordCount?: number;
 };
 
 type MoveTarget =
@@ -48,6 +52,7 @@ export default function WritingGalleryView({
   breadcrumbs,
   childCounts,
   currentFolderId,
+  wcSettings,
 }: {
   folders: FolderRow[];
   projects: WritingProject[];
@@ -56,6 +61,7 @@ export default function WritingGalleryView({
   breadcrumbs: Breadcrumb[];
   childCounts: Record<number, number>;
   currentFolderId: number | null;
+  wcSettings: WordCountSettings;
 }) {
   const router = useRouter();
   const [newFolderOpened, { open: openNewFolder, close: closeNewFolder }] = useDisclosure(false);
@@ -154,7 +160,7 @@ export default function WritingGalleryView({
       </Breadcrumbs>
 
       {/* New Folder button, stacked above ItemGallery's New Project button */}
-      <FloatingAddButton onClick={openNewFolder} text="New Folder" color="mustard.5" botOffset={56} />
+      <FloatingAddButton onClick={openNewFolder} text="New Folder" color="dark.4" botOffset={56} />
 
       {/* Folders strip */}
       {folders.length > 0 && (
@@ -201,18 +207,22 @@ export default function WritingGalleryView({
         basePath="/writing"
         searchPlaceholder="Search projects..."
         newItemText="New Project"
+        newItemColor="dark"
         createModalTitle="Start a Writing Project"
         deleteAction={deleteWritingProject}
         renderBadges={(project: WritingProject) => (
-          <Group gap="xs" mb="md">
-            {project.status && <Badge color="mustard" variant="light">{project.status}</Badge>}
-            {project.categories && <Badge color="olive" variant="outline">{project.categories}</Badge>}
-          </Group>
+          <Stack gap={4} mb="md">
+            <Group gap="xs">
+              {project.status && <Badge color="dark" variant="light">{project.status}</Badge>}
+              {project.categories && <Badge color="gray" variant="outline">{project.categories}</Badge>}
+            </Group>
+            <WordCountDisplay count={project.wordCount ?? 0} goal={project.wordCountGoal} mode={wcSettings.mode} />
+          </Stack>
         )}
         renderItemMenu={(project: WritingProject) => (
           <Menu shadow="md" position="bottom-start" withinPortal>
             <Menu.Target>
-              <ActionIcon variant="filled" color="olive.6" size="md" radius="xl">
+              <ActionIcon variant="filled" color="dark.6" size="md" radius="xl">
                 <IconDots size={16} stroke={1.5} />
               </ActionIcon>
             </Menu.Target>
@@ -222,6 +232,15 @@ export default function WritingGalleryView({
                 onClick={() => setMoveTarget({ kind: 'project', id: project.id, name: project.title, currentParentId: project.folderId ?? null })}
               >
                 Move to…
+              </Menu.Item>
+              <Menu.Item
+                onClick={async () => {
+                  const goal = await promptWordGoal({ title: 'Word count goal', initialValue: project.wordCountGoal });
+                  if (goal === undefined) return;
+                  setProjectWordGoal(project.id, goal);
+                }}
+              >
+                Set word goal…
               </Menu.Item>
               <Menu.Divider />
               <Menu.Label>Cover image</Menu.Label>

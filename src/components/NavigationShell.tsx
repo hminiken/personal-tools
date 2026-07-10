@@ -55,24 +55,30 @@ useEffect(() => {
   
   const { isAwake, setIsAwake, isSupported } = useWakeLock();
 
+  // Writing Desk is meant to feel full-screen, app-like — no site chrome up
+  // top. Its own pages provide back navigation; the dark mode toggle moves
+  // into the board settings drawer (see BoardView).
+  const isWriting = pathname.startsWith('/writing');
+
   return (
     <AppShell
-      header={{ height: 60 }}
-      navbar={{ 
-        width: 260, 
-        breakpoint: 'sm', 
+      header={{ height: isWriting ? 0 : 60 }}
+      navbar={{
+        width: 260,
+        breakpoint: 'sm',
        collapsed: { desktop: !opened, mobile: !opened }
       }}
       pl={{ base: 'xs', sm: 'xl'}}
       pr={{ base: 'xs', sm: 'xl'}}
     >
-     <AppShell.Header bg={"olive.8"}>
+     {!isWriting && (
+       <AppShell.Header bg={"olive.8"}>
         <Group h="100%" px="md" justify="space-between">
           <Group>
             <Burger color={"neutrals.1"} opened={opened} onClick={toggle} size="sm" />
             <Title c={"neutrals.1"} order={3}>{getPageTitle()}</Title>
           </Group>
-          
+
           <Group>
             {/* 3. Add the Keep Awake Toggle (Only renders if the browser supports it) */}
             {isSupported && (
@@ -100,9 +106,10 @@ useEffect(() => {
               <IconMoon stroke={1.5} className="mantine-dark-hidden" />
             </ActionIcon>
           </Group>
-          
+
         </Group>
       </AppShell.Header>
+     )}
 
       <AppShell.Navbar>
         {/* TOP BAR OF THE SIDEBAR (Logo and Close Button) */}

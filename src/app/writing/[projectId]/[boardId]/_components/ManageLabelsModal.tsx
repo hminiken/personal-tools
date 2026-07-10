@@ -84,7 +84,7 @@ function AddLabelForm({
         onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
         style={{ flex: 1 }}
       />
-      <ActionIcon variant="light" color="olive" onClick={submit} aria-label="Add label" disabled={!name.trim()}>
+      <ActionIcon variant="light" color="gray" onClick={submit} aria-label="Add label" disabled={!name.trim()}>
         <IconPlus size={16} />
       </ActionIcon>
     </Group>
@@ -168,7 +168,7 @@ export default function ManageLabelsModal({
           />
           <Button
             variant={addingCategory ? 'light' : 'default'}
-            color="olive"
+            color="gray"
             leftSection={<IconPlus size={16} />}
             onClick={() => setAddingCategory((a) => !a)}
           >
@@ -178,7 +178,7 @@ export default function ManageLabelsModal({
 
         {/* New category form */}
         {addingCategory && (
-          <Paper withBorder radius="md" p="sm" bg="light-dark(var(--mantine-color-olive-0), var(--mantine-color-dark-7))">
+          <Paper withBorder radius="md" p="sm" bg="light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))">
             <Group gap={8} wrap="nowrap">
               <TextInput
                 size="xs"
@@ -193,7 +193,7 @@ export default function ManageLabelsModal({
                 <Switch size="xs" label="Single-select" checked={newCatSingle} onChange={(e) => setNewCatSingle(e.currentTarget.checked)} />
                 <HelpDot text={SINGLE_SELECT_HELP} />
               </Group>
-              <Button size="compact-sm" color="olive" onClick={addCategory} disabled={!newCatName.trim()}>Add</Button>
+              <Button size="compact-sm" color="dark" onClick={addCategory} disabled={!newCatName.trim()}>Add</Button>
             </Group>
           </Paper>
         )}

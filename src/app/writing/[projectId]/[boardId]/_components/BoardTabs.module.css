@@ -24,16 +24,42 @@
 }
 
 .tab[data-active] {
-  background-color: var(--mantine-color-olive-6);
-  border-color: var(--mantine-color-olive-6);
-  color: var(--mantine-color-white);
+  background-color: light-dark(var(--mantine-color-dark-7), var(--mantine-color-gray-2));
+  border-color: light-dark(var(--mantine-color-dark-7), var(--mantine-color-gray-2));
+  color: light-dark(var(--mantine-color-white), var(--mantine-color-dark-9));
 }
 
 .tab[data-active]:hover {
-  background-color: var(--mantine-color-olive-7);
-  color: var(--mantine-color-white);
+  background-color: light-dark(var(--mantine-color-dark-8), var(--mantine-color-gray-3));
+  color: light-dark(var(--mantine-color-white), var(--mantine-color-dark-9));
 }
 
 .tab:active {
   cursor: grabbing;
+}
+
+/* Frosted glass variant — added alongside .tab when the board has a background photo */
+.tabGlass {
+  background: rgba(0, 0, 0, 0.20);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.18);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.tabGlass:hover {
+  background: rgba(0, 0, 0, 0.32);
+  color: #fff;
+}
+
+.tabGlass[data-active] {
+  background: rgba(0, 0, 0, 0.42);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+
+.tabGlass[data-active]:hover {
+  background: rgba(0, 0, 0, 0.52);
+  color: #fff;
 }

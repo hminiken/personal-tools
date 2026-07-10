@@ -7,6 +7,7 @@ import { writingFolders } from '@/db/writing/schema';
 import { eq } from 'drizzle-orm';
 import WritingGalleryView from '../../_components/WritingGalleryView';
 import { loadGalleryLevel } from '../../_lib/loadGalleryLevel';
+import { getWritingSettings } from '../../_actions/writing_actions';
 import { SetPageTitleSuffix } from '@/components/PageTitleContext';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,7 @@ export default async function WritingFolderPage({ params }: PageProps) {
   if (!folder) notFound();
 
   const { folders, projects, allFolders, allProjects, breadcrumbs, childCounts } = await loadGalleryLevel(folderId);
+  const settings = await getWritingSettings();
 
   const normalized = projects.map((p) => ({ ...p, coverImagePath: p.coverImage ?? '' }));
 
@@ -38,6 +40,12 @@ export default async function WritingFolderPage({ params }: PageProps) {
         breadcrumbs={breadcrumbs}
         childCounts={childCounts}
         currentFolderId={folderId}
+        wcSettings={{
+          mode: settings.wordCountDisplayMode,
+          defaultCardGoal: settings.defaultCardWordGoal,
+          defaultListGoal: settings.defaultListWordGoal,
+          defaultGroupGoal: settings.defaultGroupWordGoal,
+        }}
       />
     </main>
   );

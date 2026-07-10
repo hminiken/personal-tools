@@ -5,7 +5,7 @@
 // directly inside it, the breadcrumb trail back to the top, and a flat list of
 // every folder (to power the "Move to…" picker). Pass null for the top level.
 import { writingDb } from '@/db/writing';
-import { writingFolders, writingProjects } from '@/db/writing/schema';
+import { writingFolders, writingProjects, boards, groups, lists, cards } from '@/db/writing/schema';
 import { eq, isNull, desc, sql } from 'drizzle-orm';
 
 export interface FolderRow {
@@ -43,6 +43,19 @@ export async function loadGalleryLevel(parentFolderId: number | null) {
     .where(parentFolderId == null ? isNull(writingProjects.folderId) : eq(writingProjects.folderId, parentFolderId))
     .orderBy(desc(writingProjects.createdAt))
     .all();
+
+  // Total word count per project (sum of every card under it), for the
+  // gallery card's word-count/goal display. One aggregate query for every
+  // project at this level rather than N+1 per-project queries.
+  const wordTotals = await writingDb
+    .select({ projectId: boards.projectId, total: sql<number>`sum(${cards.wordCount})` })
+    .from(cards)
+    .innerJoin(lists, eq(cards.listId, lists.id))
+    .innerJoin(groups, eq(lists.groupId, groups.id))
+    .innerJoin(boards, eq(groups.boardId, boards.id))
+    .groupBy(boards.projectId)
+    .all();
+  const wordCountByProject = new Map(wordTotals.map((r) => [r.projectId, Number(r.total)]));
 
   // Every folder, flat — the picker indents these by depth client-side.
   const allFolders = await writingDb
@@ -90,5 +103,7 @@ export async function loadGalleryLevel(parentFolderId: number | null) {
     cursor = f.parentFolderId;
   }
 
-  return { folders, projects, allFolders, allProjects, breadcrumbs, childCounts };
+  const projectsWithWordCount = projects.map((p) => ({ ...p, wordCount: wordCountByProject.get(p.id) ?? 0 }));
+
+  return { folders, projects: projectsWithWordCount, allFolders, allProjects, breadcrumbs, childCounts };
 }

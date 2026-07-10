@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Paper, Group, Text, ActionIcon, Menu, ScrollArea, Stack, TextInput } from '@mantine/core';
+import { Paper, Group, Text, ActionIcon, Menu, ScrollArea, Stack, TextInput, Box } from '@mantine/core';
 import { IconGripVertical, IconDots, IconPencil, IconTrash, IconBook2 } from '@tabler/icons-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSortable } from '@dnd-kit/sortable';
@@ -9,13 +9,18 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { animateLayoutChanges, sortableTransition } from './sortableConfig';
-import CardItem from './CardItem';
+import CardItem, { CardFace } from './CardItem';
 import InlineAdd from './InlineAdd';
+import { WordCountDisplay, sumListWords, type WordCountSettings } from '@components/WordCountDisplay';
+import { promptWordGoal } from '@/utils/dialogs';
+import { setListWordGoal } from '../../../_actions/writing_actions';
 import type { BoardList, BoardCard, LabelCategory } from '../types';
 
 export default function ListColumn({
   list,
   categories,
+  wcSettings,
+  originDrag,
   onOpenCard,
   onOpenCardById,
   onAddCard,
@@ -24,6 +29,8 @@ export default function ListColumn({
 }: {
   list: BoardList;
   categories: LabelCategory[];
+  wcSettings: WordCountSettings;
+  originDrag: { card: BoardCard; listId: number; index: number } | null;
   onOpenCard: (card: BoardCard) => void;
   onOpenCardById: (cardId: number) => void;
   onAddCard: (listId: number, title: string) => void;
@@ -44,7 +51,6 @@ export default function ListColumn({
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
   };
 
   const commitRename = () => {
@@ -55,6 +61,45 @@ export default function ListColumn({
   };
 
   const cardIds = list.cards.map((c) => `card:${c.id}`);
+
+  // Show a static ghost at the origin position when the dragged card has moved
+  // to a different list (optimistic update removed it from here).
+  const showOriginGhost =
+    originDrag?.listId === list.id && !list.cards.some((c) => c.id === originDrag!.card.id);
+
+  // Build the display list, inserting the ghost placeholder at the original index.
+  type DisplayItem = { kind: 'card'; card: BoardCard } | { kind: 'ghost' };
+  const displayItems: DisplayItem[] = list.cards.map((card) => ({ kind: 'card', card }));
+  if (showOriginGhost) {
+    const insertAt = Math.min(originDrag!.index, displayItems.length);
+    displayItems.splice(insertAt, 0, { kind: 'ghost' });
+  }
+
+  // Ghost placeholder — dashed outline the same size as the real list.
+  if (isDragging) {
+    return (
+      <Paper
+        ref={setNodeRef}
+        style={{ ...style, borderStyle: 'dashed' }}
+        withBorder
+        radius="md"
+        bg="light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5))"
+        w={272}
+        miw={272}
+        p="xs"
+        {...attributes}
+      >
+        <Box style={{ opacity: 0 }}>
+          <Group justify="space-between" wrap="nowrap" mb="xs" gap={4}>
+            <Text fw={600} size="sm">{list.title}</Text>
+          </Group>
+          {list.cards.slice(0, 3).map((c) => (
+            <Box key={c.id} style={{ height: 36, marginBottom: 4 }} />
+          ))}
+        </Box>
+      </Paper>
+    );
+  }
 
   return (
     <Paper
@@ -117,6 +162,16 @@ export default function ListColumn({
             <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => setEditing(true)}>
               Rename
             </Menu.Item>
+            <Menu.Item
+              onClick={async () => {
+                const goal = await promptWordGoal({ title: 'List word count goal', initialValue: list.wordCountGoal });
+                if (goal === undefined) return;
+                await setListWordGoal(list.id, goal);
+                router.refresh();
+              }}
+            >
+              Set word goal…
+            </Menu.Item>
             <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => onDelete(list.id)}>
               Delete list
             </Menu.Item>
@@ -124,14 +179,38 @@ export default function ListColumn({
         </Menu>
       </Group>
 
+      {wcSettings.mode !== 'off' && (
+        <WordCountDisplay
+          count={sumListWords(list)}
+          goal={list.wordCountGoal ?? wcSettings.defaultListGoal}
+          mode={wcSettings.mode}
+        />
+      )}
+
       {/* Cards — mah subtracts header (~42px) + add-card row (~40px) + Paper padding (20px). */}
       <ScrollArea.Autosize mah="max(calc(50vh - 110px), 290px)" type="hover">
-        <div ref={setDropRef}>
+        <div ref={setDropRef} style={list.cards.length === 0 && !showOriginGhost ? { minHeight: 80 } : undefined}>
           <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
             <Stack gap="xs" mih={8}>
-              {list.cards.map((card) => (
-                <CardItem key={card.id} card={card} categories={categories} onOpen={onOpenCard} onOpenLinked={onOpenCardById} />
-              ))}
+              {displayItems.map((item) =>
+                item.kind === 'ghost' ? (
+                  <Paper
+                    key="origin-ghost"
+                    radius="sm"
+                    p={originDrag!.card.isImageCard && (originDrag!.card.coverImage ?? originDrag!.card.imagePath) ? 0 : 'xs'}
+                    withBorder
+                    style={{
+                      opacity: 0.35,
+                      overflow: originDrag!.card.isImageCard ? 'hidden' : undefined,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <CardFace card={originDrag!.card} categories={categories} />
+                  </Paper>
+                ) : (
+                  <CardItem key={item.card.id} card={item.card} categories={categories} wcSettings={wcSettings} onOpen={onOpenCard} onOpenLinked={onOpenCardById} />
+                )
+              )}
             </Stack>
           </SortableContext>
         </div>

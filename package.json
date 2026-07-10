@@ -16,6 +16,7 @@
     "@libsql/client": "^0.17.3",
     "@mantine/core": "^9.2.2",
     "@mantine/hooks": "^9.2.2",
+    "@mantine/modals": "^9.2.2",
     "@mantine/tiptap": "^9.2.2",
     "@tabler/icons-react": "^3.44.0",
     "@tiptap/extension-color": "^3.23.6",

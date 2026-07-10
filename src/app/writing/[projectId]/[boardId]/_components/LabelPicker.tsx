@@ -70,7 +70,7 @@ export default function LabelPicker({
         <Button
           size="compact-xs"
           variant="light"
-          color="olive"
+          color="gray"
           leftSection={<IconTag size={14} />}
           onClick={() => setPickerOpened((o) => !o)}
         >

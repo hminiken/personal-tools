@@ -2,6 +2,7 @@ import { RichTextEditor } from '@mantine/tiptap';
 import { IconPhoto } from '@tabler/icons-react';
 import { ActionIcon } from '@mantine/core';
 import { useRichTextEditorContext } from '@mantine/tiptap';
+import { promptText } from '@/utils/dialogs';
 
 export function CraftingEditorToolbar() {
   const { editor } = useRichTextEditorContext();
@@ -32,8 +33,8 @@ export function CraftingEditorToolbar() {
 
       <RichTextEditor.ControlsGroup>
   <RichTextEditor.Control
-    onClick={() => {
-      const url = window.prompt('Enter Image URL');
+    onClick={async () => {
+      const url = await promptText({ title: 'Insert image', label: 'Image URL', placeholder: 'https://...' });
       if (url) {
         editor?.chain().focus().setImage({ src: url }).run();
       }

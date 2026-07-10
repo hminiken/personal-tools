@@ -20,9 +20,11 @@ import { useWritingEditor } from '@hooks/useWritingEditor';
 import { WritingEditorToolbar } from '@components/WritingEditorToolbar';
 import { docSpacingClass, spacingVars, type Spacing } from '@components/DocumentSpacing';
 import { UploadModal } from '@components/UploadModal';
+import { WordCountDisplay, type WordCountSettings } from '@components/WordCountDisplay';
+import { confirmAction, promptWordGoal } from '@/utils/dialogs';
 import {
   updateCard, deleteCard, addCardImage, deleteCardImage, setCardCover,
-  addCardLink, removeCardLink, getCardById, getProjectCards,
+  addCardLink, removeCardLink, getCardById, getProjectCards, setCardWordGoal,
 } from '../../../_actions/writing_actions';
 import LabelPicker from './LabelPicker';
 import type { BoardCard, LabelCatalog, LinkedCardRef } from '../types';
@@ -39,6 +41,7 @@ export default function CardEditorModal({
   onManageLabels,
   spacing,
   projectId,
+  wcSettings,
 }: {
   card: BoardCard | null;
   catalog: LabelCatalog;
@@ -47,6 +50,7 @@ export default function CardEditorModal({
   onManageLabels: () => void;
   spacing: Spacing;
   projectId: number;
+  wcSettings: WordCountSettings;
 }) {
   const router = useRouter();
 
@@ -83,6 +87,7 @@ export default function CardEditorModal({
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [liveWordCount, setLiveWordCount] = useState(0);
   const [galleryOpened, { open: openGallery, close: closeGallery }] = useDisclosure(false);
   const [viewerOpened, { open: openViewer, close: closeViewer }] = useDisclosure(false);
   const [viewerIndex, setViewerIndex] = useState(0);
@@ -126,6 +131,7 @@ export default function CardEditorModal({
   useEffect(() => {
     setTitle(viewingCard?.title ?? '');
     setEditingTitle(false);
+    setLiveWordCount(viewingCard?.wordCount ?? 0);
     setIncludeInCompile(viewingCard?.includeInCompile ?? true);
     setIsImageCard(viewingCard?.isImageCard ?? false);
     setCoverImage(viewingCard?.coverImage ?? null);
@@ -167,6 +173,18 @@ export default function CardEditorModal({
     return () => { editor.off('blur', onBlur); };
   }, [editor]);
 
+  // Live word count while typing — recomputed from the editor's plain text,
+  // not the DB-cached count (which only updates on blur/save).
+  useEffect(() => {
+    if (!editor) return;
+    const onUpdate = () => {
+      const text = editor.getText().trim();
+      setLiveWordCount(text ? text.split(/\s+/).length : 0);
+    };
+    editor.on('update', onUpdate);
+    return () => { editor.off('update', onUpdate); };
+  }, [editor]);
+
   const showPrev = () => setViewerIndex((i) => (i > 0 ? i - 1 : images.length - 1));
   const showNext = () => setViewerIndex((i) => (i < images.length - 1 ? i + 1 : 0));
 
@@ -205,7 +223,7 @@ export default function CardEditorModal({
 
   const handleDelete = async () => {
     if (!viewingCard) return;
-    if (!confirm('Delete this card?')) return;
+    if (!(await confirmAction({ title: 'Delete card', message: 'Delete this card?' }))) return;
     setIsSaving(true);
     await deleteCard(viewingCard.id);
     router.refresh();
@@ -415,10 +433,10 @@ export default function CardEditorModal({
         {viewingCard && (
           <LabelPicker key={viewingCard.id} card={viewingCard} catalog={catalog} onManage={onManageLabels} inline>
             <Tooltip label="When off, this card is skipped in the compiled chapter/board view." withinPortal multiline w={260} position="top-start">
-              <Switch label="Include in compile" checked={includeInCompile} onChange={(e) => handleToggleCompile(e.currentTarget.checked)} color="olive.6" w="fit-content" />
+              <Switch label="Include in compile" checked={includeInCompile} onChange={(e) => handleToggleCompile(e.currentTarget.checked)} color="dark" w="fit-content" />
             </Tooltip>
             <Tooltip label="Show an image on the board instead of the title and text." withinPortal multiline w={260} position="top-start">
-              <Switch label="Image card" checked={isImageCard} onChange={(e) => handleToggleImageCard(e.currentTarget.checked)} color="olive.6" w="fit-content" />
+              <Switch label="Image card" checked={isImageCard} onChange={(e) => handleToggleImageCard(e.currentTarget.checked)} color="dark" w="fit-content" />
             </Tooltip>
           </LabelPicker>
         )}
@@ -516,7 +534,7 @@ export default function CardEditorModal({
         <Box>
           <Group justify="space-between" mb="xs">
             <Text size="sm" fw={500}>Images ({images.length})</Text>
-            <Button color="olive.7" size="compact-sm" leftSection={<IconPhotoPlus size={16} />} onClick={openGallery} disabled={!viewingCard}>
+            <Button color="dark" size="compact-sm" leftSection={<IconPhotoPlus size={16} />} onClick={openGallery} disabled={!viewingCard}>
               Add image
             </Button>
           </Group>
@@ -526,19 +544,19 @@ export default function CardEditorModal({
                 <Box key={img.id} style={{ position: 'relative' }}>
                   <Image
                     src={img.path} alt="" h={90} radius="sm" fit="cover"
-                    style={{ cursor: 'pointer', outline: coverImage === img.path ? '2px solid var(--mantine-color-olive-6)' : 'none' }}
+                    style={{ cursor: 'pointer', outline: coverImage === img.path ? '2px solid var(--mantine-color-dark-6)' : 'none' }}
                     onClick={() => handleViewImage(index)}
                     fallbackSrc="https://placehold.co/120x120?text=Image"
                   />
                   <Tooltip label={coverImage === img.path ? 'Cover image' : 'Set as cover'} withinPortal>
-                    <ActionIcon variant="filled" color={coverImage === img.path ? 'olive.6' : 'gray'} size="sm"
+                    <ActionIcon variant="filled" color={coverImage === img.path ? 'dark.6' : 'gray'} size="sm"
                       style={{ position: 'absolute', top: 4, left: 4, zIndex: 2 }}
                       onClick={() => handleSetCover(img.path)} aria-label="Set as cover">
                       <IconPhotoStar size={14} />
                     </ActionIcon>
                   </Tooltip>
                   <Tooltip label="Delete image" withinPortal>
-                    <ActionIcon variant="filled" color="rust.7" size="sm"
+                    <ActionIcon variant="filled" color="red.7" size="sm"
                       style={{ position: 'absolute', top: 4, right: 4, zIndex: 2 }}
                       onClick={() => handleDeleteImage(img)} aria-label="Delete image">
                       <IconTrash size={14} />
@@ -551,6 +569,32 @@ export default function CardEditorModal({
             <Text size="sm" c="dimmed">No images yet.</Text>
           )}
         </Box>
+
+        {wcSettings.mode !== 'off' && (
+          <Group justify="space-between" gap="xs">
+            <WordCountDisplay
+              count={liveWordCount}
+              goal={viewingCard?.wordCountGoal ?? wcSettings.defaultCardGoal}
+              mode={wcSettings.mode}
+              size="sm"
+            />
+            <Button
+              variant="subtle"
+              size="compact-xs"
+              color="gray"
+              disabled={!viewingCard}
+              onClick={async () => {
+                if (!viewingCard) return;
+                const goal = await promptWordGoal({ title: 'Card word count goal', initialValue: viewingCard.wordCountGoal });
+                if (goal === undefined) return;
+                await setCardWordGoal(viewingCard.id, goal);
+                router.refresh();
+              }}
+            >
+              Set goal…
+            </Button>
+          </Group>
+        )}
 
         {/* Editor + bubble menu */}
         <div className={docSpacingClass} style={spacingVars(spacing)}>
@@ -571,7 +615,7 @@ export default function CardEditorModal({
                     <>
                       <Text size="xs" style={{ maxWidth: 200 }} lineClamp={3}>{comments[activeCommentId].text}</Text>
                       <Tooltip label="Remove comment" withinPortal>
-                        <ActionIcon size="xs" color="rust.7" variant="subtle"
+                        <ActionIcon size="xs" color="red.7" variant="subtle"
                           onClick={() => { removeComment(activeCommentId); setBubbleMode('idle'); }}>
                           <IconMessageOff size={13} />
                         </ActionIcon>
@@ -594,7 +638,7 @@ export default function CardEditorModal({
                         maxRows={4}
                         style={{ minWidth: 200 }}
                       />
-                      <ActionIcon size="sm" color="olive.6" variant="filled" onClick={addComment} disabled={!newCommentText.trim()}>
+                      <ActionIcon size="sm" color="dark.6" variant="filled" onClick={addComment} disabled={!newCommentText.trim()}>
                         <IconCheck size={13} />
                       </ActionIcon>
                       <ActionIcon size="sm" variant="subtle" onClick={() => { setBubbleMode('idle'); setNewCommentText(''); }}>
@@ -603,7 +647,7 @@ export default function CardEditorModal({
                     </>
                   ) : (
                     <Tooltip label="Add comment" withinPortal>
-                      <ActionIcon size="sm" variant="subtle" color="olive.6"
+                      <ActionIcon size="sm" variant="subtle" color="gray"
                         onClick={() => setBubbleMode('adding')}>
                         <IconMessage size={15} />
                       </ActionIcon>
@@ -647,7 +691,7 @@ export default function CardEditorModal({
                         </Text>
                       </Box>
                       <Tooltip label="Remove comment" withinPortal>
-                        <ActionIcon size="xs" color="rust.7" variant="subtle"
+                        <ActionIcon size="xs" color="red.7" variant="subtle"
                           onClick={(e) => { e.stopPropagation(); removeComment(id); }}>
                           <IconTrash size={12} />
                         </ActionIcon>
@@ -661,11 +705,11 @@ export default function CardEditorModal({
         </Box>
 
         <Group justify="space-between" mt="md">
-          <Button variant="subtle" color="rust.7" onClick={handleDelete} disabled={isSaving}>Delete</Button>
+          <Button variant="subtle" color="red.7" onClick={handleDelete} disabled={isSaving}>Delete</Button>
           <Group>
             {autoSaved && <Text size="xs" c="dimmed">Saved</Text>}
             <Button variant="default" onClick={handleClose} disabled={isSaving}>Cancel</Button>
-            <Button color="olive.6" onClick={handleSave} loading={isSaving}>Save</Button>
+            <Button color="dark" onClick={handleSave} loading={isSaving}>Save</Button>
           </Group>
         </Group>
       </Stack>
