@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import {
-  Group, Popover, Button, Stack, Text, Checkbox, ScrollArea, Divider, ActionIcon,
+  Group, Popover, Button, Stack, Text, Checkbox, ScrollArea, Divider,
 } from '@mantine/core';
 import { IconTag, IconSettings, IconX } from '@tabler/icons-react';
 import LabelBadge from './LabelBadge';
 import { addCardLabel, removeCardLabel } from '../../../_actions/writing_actions';
 import type { BoardCard, Label, LabelCatalog } from '../types';
+import classes from './LabelPicker.module.css';
 
 // Label assignment UI for the card editor. Holds applied labels in local state
 // for instant feedback; the underlying board revalidates on each toggle.
@@ -115,22 +116,17 @@ export default function LabelPicker({
   );
 
   const chips = applied.map((label) => (
-    <LabelBadge
-      key={label.id}
-      label={label}
-      categories={catalog.categories}
-      rightSection={
-        <ActionIcon
-          size={14}
-          variant="transparent"
-          color={label.color}
-          aria-label="Remove label"
-          onClick={() => toggle(label, false)}
-        >
-          <IconX size={12} />
-        </ActionIcon>
-      }
-    />
+    <div key={label.id} className={classes.chip}>
+      <LabelBadge label={label} categories={catalog.categories} />
+      <div
+        className={classes.removeOverlay}
+        role="button"
+        aria-label="Remove label"
+        onClick={() => toggle(label, false)}
+      >
+        <IconX size={13} color="white" />
+      </div>
+    </div>
   ));
 
   // Inline: controls row (trigger + any children) with chips on the row below.

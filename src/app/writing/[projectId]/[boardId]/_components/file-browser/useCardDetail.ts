@@ -12,7 +12,10 @@ import {
 import type { BoardCard, LinkedCardRef } from '../../types';
 
 export type GalleryImage = { id: number; path: string };
-export type CommentRecord = Record<string, { text: string; createdAt: string }>;
+// `anchored: false` (or absent) marks a general card note with no text-span
+// mark in the document — added directly from the sidebar rather than via the
+// editor's selection bubble menu, so there's nothing to jump to.
+export type CommentRecord = Record<string, { text: string; createdAt: string; anchored?: boolean }>;
 export type ProjectCardOption = { id: number; title: string; boardTitle: string; listTitle: string };
 export type BubbleMode = 'idle' | 'adding' | 'viewing';
 
@@ -242,7 +245,7 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
     if (!text || !editor || !viewingCard) return;
     const commentId = crypto.randomUUID();
     editor.chain().focus().setMark('comment', { commentId }).run();
-    const next = { ...comments, [commentId]: { text, createdAt: new Date().toISOString() } };
+    const next = { ...comments, [commentId]: { text, createdAt: new Date().toISOString(), anchored: true } };
     setComments(next);
     setCommentsOpen(true);
     setNewCommentText('');
@@ -250,6 +253,18 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
     const html = editor.getHTML() || '';
     lastSavedContent.current = html;
     updateCard(viewingCard.id, { content: html, comments: JSON.stringify(next) });
+  };
+
+  // A card-level note: no text selection, no mark in the document — just an
+  // entry in the same comments list, distinguished by `anchored: false`.
+  const addGeneralNote = (text: string) => {
+    const t = text.trim();
+    if (!t || !viewingCard) return;
+    const commentId = crypto.randomUUID();
+    const next = { ...comments, [commentId]: { text: t, createdAt: new Date().toISOString(), anchored: false } };
+    setComments(next);
+    setCommentsOpen(true);
+    updateCard(viewingCard.id, { comments: JSON.stringify(next) });
   };
 
   const removeComment = (commentId: string) => {
@@ -338,7 +353,7 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
     bubbleMode, setBubbleMode,
     newCommentText, setNewCommentText,
     activeCommentId, commentInputRef,
-    addComment, removeComment, jumpToComment, handleBubbleShow,
+    addComment, addGeneralNote, removeComment, jumpToComment, handleBubbleShow,
 
     handleDelete,
     flushSave,

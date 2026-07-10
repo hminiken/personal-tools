@@ -649,10 +649,12 @@ export default function BoardView({
       {viewMode === 'files' && (
         <FileBrowserView
           projectId={projectId}
+          boardTitle={activeBoard?.title ?? 'Board'}
           groups={groups}
           catalog={catalog}
           wcSettings={wcSettings}
           spacing={spacing}
+          hasBg={!!boardBg}
           onManageLabels={openLabels}
         />
       )}

@@ -9,7 +9,7 @@ import type { BoardCard, BoardGroup, BoardList } from '../../types';
 import type { FileBrowserSelection } from './types';
 
 const ROW_PAD_BASE = 8;
-const ROW_INDENT = 18;
+const ROW_INDENT = 14;
 
 function TreeRow({
   depth,
@@ -39,7 +39,7 @@ function TreeRow({
       style={{
         cursor: 'pointer',
         borderRadius: 4,
-        background: selected ? 'light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-6))' : undefined,
+        background: selected ? 'light-dark(rgba(0,0,0,0.06), rgba(255,255,255,0.08))' : undefined,
       }}
     >
       {chevron}
@@ -51,16 +51,24 @@ function TreeRow({
   );
 }
 
-// Read/navigate-only tree: boards→groups→lists as folders, cards as files.
-// No dnd-kit here — reordering stays the Kanban view's job.
+// Navigate-only tree: the board, groups, and lists are folders (click the
+// name to compile that scope in the center pane; the chevron expands or
+// collapses without selecting), cards are files. No dnd-kit here —
+// reordering stays the Kanban view's job.
 export default function FileTree({
+  boardTitle,
   groups,
   selection,
+  onSelectBoard,
+  onSelectGroup,
   onSelectList,
   onSelectCard,
 }: {
+  boardTitle: string;
   groups: BoardGroup[];
   selection: FileBrowserSelection;
+  onSelectBoard: () => void;
+  onSelectGroup: (group: BoardGroup) => void;
   onSelectList: (list: BoardList) => void;
   onSelectCard: (card: BoardCard) => void;
 }) {
@@ -80,16 +88,36 @@ export default function FileTree({
       return next;
     });
 
+  const expandChevron = (collapsed: boolean, onToggle: () => void, what: string) => (
+    <ActionIcon
+      size="xs"
+      variant="transparent"
+      color="gray"
+      onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      aria-label={collapsed ? `Expand ${what}` : `Collapse ${what}`}
+    >
+      {collapsed ? <IconChevronRight size={13} /> : <IconChevronDown size={13} />}
+    </ActionIcon>
+  );
+
   return (
     <Box style={{ overflowY: 'auto' }}>
+      <TreeRow
+        depth={0}
+        selected={selection?.type === 'board'}
+        onClick={onSelectBoard}
+        icon={<IconFolderOpen size={16} />}
+        label={boardTitle}
+      />
       {groups.map((group) => {
         const groupCollapsed = collapsedGroups.has(group.id);
         return (
           <Box key={group.id}>
             <TreeRow
-              depth={0}
-              onClick={() => toggleGroup(group.id)}
-              chevron={groupCollapsed ? <IconChevronRight size={14} /> : <IconChevronDown size={14} />}
+              depth={1}
+              selected={selection?.type === 'group' && selection.groupId === group.id}
+              onClick={() => onSelectGroup(group)}
+              chevron={expandChevron(groupCollapsed, () => toggleGroup(group.id), 'group')}
               icon={groupCollapsed ? <IconFolder size={16} /> : <IconFolderOpen size={16} />}
               label={group.title}
             />
@@ -99,20 +127,10 @@ export default function FileTree({
               return (
                 <Box key={list.id}>
                   <TreeRow
-                    depth={1}
+                    depth={2}
                     selected={listSelected}
                     onClick={() => onSelectList(list)}
-                    chevron={
-                      <ActionIcon
-                        size="xs"
-                        variant="transparent"
-                        color="gray"
-                        onClick={(e) => { e.stopPropagation(); toggleList(list.id); }}
-                        aria-label={listCollapsed ? 'Expand list' : 'Collapse list'}
-                      >
-                        {listCollapsed ? <IconChevronRight size={13} /> : <IconChevronDown size={13} />}
-                      </ActionIcon>
-                    }
+                    chevron={expandChevron(listCollapsed, () => toggleList(list.id), 'list')}
                     icon={listCollapsed ? <IconFolder size={16} /> : <IconFolderOpen size={16} />}
                     label={list.title}
                   />
@@ -121,7 +139,7 @@ export default function FileTree({
                     return (
                       <TreeRow
                         key={card.id}
-                        depth={2}
+                        depth={3}
                         selected={cardSelected}
                         dimmed={!card.includeInCompile}
                         onClick={() => onSelectCard(card)}

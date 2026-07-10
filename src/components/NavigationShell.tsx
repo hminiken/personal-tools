@@ -68,8 +68,8 @@ useEffect(() => {
         breakpoint: 'sm',
        collapsed: { desktop: !opened, mobile: !opened }
       }}
-      pl={{ base: 'xs', sm: 'xl'}}
-      pr={{ base: 'xs', sm: 'xl'}}
+      pl={{ base: 'xs', sm: isWriting ? 'sm' : 'xl'}}
+      pr={{ base: 'xs', sm: isWriting ? 'sm' : 'xl'}}
     >
      {!isWriting && (
        <AppShell.Header bg={"olive.8"}>

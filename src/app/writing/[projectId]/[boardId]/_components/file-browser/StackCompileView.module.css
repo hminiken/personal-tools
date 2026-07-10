@@ -1,0 +1,18 @@
+/* Select mode renders one read-only merged document; the card boundaries are
+   real <hr> nodes in that document, styled to match edit mode's dashed
+   dividers so the two modes look identical. */
+.selectDoc :global(.ProseMirror) hr {
+  border: none;
+  border-top: 2px dashed var(--mantine-color-gray-4);
+  margin: 10px 0;
+}
+
+/* Flat sticky toolbar bar — first thing in the pane, opaque so scrolled text
+   never shows through it, no boxed/padded panel look. */
+.stickyToolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: calc(var(--mantine-spacing-sm) * -1) calc(var(--mantine-spacing-sm) * -1) 0;
+  padding: 4px var(--mantine-spacing-sm) 2px;
+}
