@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button, TextInput, Group, ActionIcon } from '@mantine/core';
 import { IconPlus, IconCheck, IconX } from '@tabler/icons-react';
+import { glassStyle, glassTextStyle } from './glass';
 
 // A compact "+ Add ___" control that expands into a text input. Used for
 // adding groups, lists, and cards. Calls onAdd with the trimmed value.
@@ -41,14 +42,7 @@ export default function InlineAdd({
         onClick={() => setEditing(true)}
         fullWidth={fullWidth}
         justify={fullWidth ? 'flex-start' : undefined}
-        style={glass ? {
-          color: 'rgba(255,255,255,0.92)',
-          background: 'rgba(0,0,0,0.20)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255,255,255,0.18)',
-          textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-        } : undefined}
+        style={glass ? { ...glassStyle, ...glassTextStyle } : undefined}
       >
         {label}
       </Button>

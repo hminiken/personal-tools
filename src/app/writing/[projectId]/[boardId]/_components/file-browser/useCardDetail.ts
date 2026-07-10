@@ -10,12 +10,16 @@ import {
   addCardLink, removeCardLink, getCardById, getProjectCards, setCardWordGoal,
 } from '../../../../_actions/writing_actions';
 import type { BoardCard, LinkedCardRef } from '../../types';
+import {
+  type CommentRecord,
+  parseComments,
+  serializeComments,
+  removeCommentMarkFromEditor,
+  jumpToCommentInEditor,
+} from '@/utils/writingComments';
 
 export type GalleryImage = { id: number; path: string };
-// `anchored: false` (or absent) marks a general card note with no text-span
-// mark in the document — added directly from the sidebar rather than via the
-// editor's selection bubble menu, so there's nothing to jump to.
-export type CommentRecord = Record<string, { text: string; createdAt: string; anchored?: boolean }>;
+export type { CommentRecord };
 export type ProjectCardOption = { id: number; title: string; boardTitle: string; listTitle: string };
 export type BubbleMode = 'idle' | 'adding' | 'viewing';
 
@@ -78,8 +82,7 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
     const overrideLinks = cardId != null ? linksOverrideRef.current.get(cardId) : undefined;
     setLinks(overrideLinks ?? viewingCard?.links ?? []);
 
-    let parsed: CommentRecord = {};
-    try { if (viewingCard?.comments) parsed = JSON.parse(viewingCard.comments); } catch { /* ignore */ }
+    const parsed = parseComments(viewingCard?.comments);
     setComments(parsed);
     setCommentsOpen(Object.keys(parsed).length > 0);
     setBubbleMode('idle');
@@ -112,10 +115,9 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
     const html = editor.getHTML() || '';
     if (html === lastSavedContent.current) return;
     lastSavedContent.current = html;
-    const cur = commentsRef.current;
     updateCard(c.id, {
       content: html,
-      comments: Object.keys(cur).length > 0 ? JSON.stringify(cur) : null,
+      comments: serializeComments(commentsRef.current),
     });
   }, [editor, commitTitleNow]);
 
@@ -127,10 +129,9 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
       const html = editor.getHTML() || '';
       if (html === lastSavedContent.current) return;
       lastSavedContent.current = html;
-      const cur = commentsRef.current;
       updateCard(c.id, {
         content: html,
-        comments: Object.keys(cur).length > 0 ? JSON.stringify(cur) : null,
+        comments: serializeComments(commentsRef.current),
       }).then(() => {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
@@ -252,7 +253,7 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
     setBubbleMode('idle');
     const html = editor.getHTML() || '';
     lastSavedContent.current = html;
-    updateCard(viewingCard.id, { content: html, comments: JSON.stringify(next) });
+    updateCard(viewingCard.id, { content: html, comments: serializeComments(next) });
   };
 
   // A card-level note: no text selection, no mark in the document — just an
@@ -264,21 +265,12 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
     const next = { ...comments, [commentId]: { text: t, createdAt: new Date().toISOString(), anchored: false } };
     setComments(next);
     setCommentsOpen(true);
-    updateCard(viewingCard.id, { comments: JSON.stringify(next) });
+    updateCard(viewingCard.id, { comments: serializeComments(next) });
   };
 
   const removeComment = (commentId: string) => {
     if (!editor || !viewingCard) return;
-    const { state } = editor;
-    const tr = state.tr;
-    const markType = state.schema.marks.comment;
-    if (markType) {
-      state.doc.descendants((node, pos) => {
-        const m = node.marks.find((mk) => mk.type === markType && mk.attrs.commentId === commentId);
-        if (m) tr.removeMark(pos, pos + node.nodeSize, markType);
-      });
-      editor.view.dispatch(tr);
-    }
+    removeCommentMarkFromEditor(editor, commentId);
     const next = { ...comments };
     delete next[commentId];
     setComments(next);
@@ -286,7 +278,7 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
     lastSavedContent.current = html;
     updateCard(viewingCard.id, {
       content: html,
-      comments: Object.keys(next).length > 0 ? JSON.stringify(next) : null,
+      comments: serializeComments(next),
     });
   };
 
@@ -303,19 +295,7 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
   };
 
   const jumpToComment = (commentId: string) => {
-    if (!editor) return;
-    const markType = editor.state.schema.marks.comment;
-    if (markType) {
-      let foundPos: number | null = null;
-      editor.state.doc.descendants((node, pos) => {
-        if (foundPos !== null) return false;
-        const m = node.marks.find((mk) => mk.type === markType && mk.attrs.commentId === commentId);
-        if (m) { foundPos = pos; return false; }
-      });
-      if (foundPos !== null) editor.commands.setTextSelection(foundPos);
-    }
-    const el = editor.view.dom.querySelector(`[data-comment-id="${commentId}"]`) as HTMLElement | null;
-    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (editor) jumpToCommentInEditor(editor, commentId);
   };
 
   const handleDelete = async () => {

@@ -1,5 +1,6 @@
 'use client';
 
+import { memo, useMemo } from 'react';
 import { Paper, Text, Group, Tooltip, Image, Box, HoverCard, Badge } from '@mantine/core';
 import { IconBan, IconLink } from '@tabler/icons-react';
 import { useSortable } from '@dnd-kit/sortable';
@@ -55,7 +56,9 @@ export function CardFace({
   wcSettings?: WordCountSettings;
   onOpenLinked?: (cardId: number) => void;
 }) {
-  const text = preview(card.content);
+  // Card content can be a whole scene — don't re-run the tag-stripping regex
+  // over it on every render (cards re-render often during drags).
+  const text = useMemo(() => preview(card.content), [card.content]);
   const imageSrc = card.coverImage ?? card.imagePath;
   const isImage = card.isImageCard && !!imageSrc;
 
@@ -139,7 +142,9 @@ export function CardFace({
               <Text size="xs" c="dimmed" lineClamp={3} mt={2}>{text}</Text>
             )}
             {wcSettings && wcSettings.mode !== 'off' && (
-              <WordCountDisplay count={card.wordCount} goal={card.wordCountGoal ?? wcSettings.defaultCardGoal} mode={wcSettings.mode} />
+              <Box mt={6}>
+                <WordCountDisplay count={card.wordCount} goal={card.wordCountGoal ?? wcSettings.defaultCardGoal} mode={wcSettings.mode} />
+              </Box>
             )}
           </Box>
         </Group>
@@ -171,13 +176,17 @@ export function CardFace({
         <Text size="xs" c="dimmed" lineClamp={2} mt={2}>{text}</Text>
       )}
       {wcSettings && wcSettings.mode !== 'off' && (
-        <WordCountDisplay count={card.wordCount} goal={card.wordCountGoal ?? wcSettings.defaultCardGoal} mode={wcSettings.mode} />
+        <Box mt={6}>
+          <WordCountDisplay count={card.wordCount} goal={card.wordCountGoal ?? wcSettings.defaultCardGoal} mode={wcSettings.mode} />
+        </Box>
       )}
     </>
   );
 }
 
-export default function CardItem({
+// Memoized: see GroupRow/ListColumn — an unmoved card keeps its identity
+// through drag updates, so only the affected cards re-render mid-drag.
+function CardItem({
   card,
   categories,
   wcSettings,
@@ -241,3 +250,5 @@ export default function CardItem({
     </Paper>
   );
 }
+
+export default memo(CardItem);

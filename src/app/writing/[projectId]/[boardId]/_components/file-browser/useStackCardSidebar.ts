@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useRouter } from 'next/navigation';
 import { promptWordGoal } from '@/utils/dialogs';
@@ -9,7 +9,14 @@ import {
   addCardLink, removeCardLink, getProjectCards, setCardWordGoal,
 } from '../../../../_actions/writing_actions';
 import type { BoardCard, LinkedCardRef } from '../../types';
-import type { CommentRecord, GalleryImage, ProjectCardOption } from './useCardDetail';
+import {
+  type CommentRecord,
+  parseComments,
+  serializeComments,
+  removeCommentMarkFromEditor,
+  jumpToCommentInEditor,
+} from '@/utils/writingComments';
+import type { GalleryImage, ProjectCardOption } from './useCardDetail';
 import type { CardSidebarController } from './CardDetailSidebar';
 
 // CardSidebarController implementation for the compile stack: binds the
@@ -39,6 +46,10 @@ export function useStackCardSidebar({
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [links, setLinks] = useState<LinkedCardRef[]>([]);
+  // Optimistic link edits survive focus moving away and back: the card prop
+  // is only as fresh as the last router.refresh(), so re-seeding straight
+  // from card.links would silently revert an add/remove made this session.
+  const linksOverrideRef = useRef<Map<number, LinkedCardRef[]>>(new Map());
   const [projectCards, setProjectCards] = useState<ProjectCardOption[]>([]);
   const [liveWordCount, setLiveWordCount] = useState(0);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -49,11 +60,10 @@ export function useStackCardSidebar({
     setIsImageCard(card?.isImageCard ?? false);
     setCoverImage(card?.coverImage ?? null);
     setImages((card?.images ?? []).map((i) => ({ id: i.id, path: i.path })));
-    setLinks(card?.links ?? []);
+    const overrideLinks = card ? linksOverrideRef.current.get(card.id) : undefined;
+    setLinks(overrideLinks ?? card?.links ?? []);
     setLiveWordCount(card?.wordCount ?? 0);
-    let parsed: CommentRecord = {};
-    try { if (card?.comments) parsed = JSON.parse(card.comments); } catch { /* ignore */ }
-    setCommentsOpen(Object.keys(parsed).length > 0);
+    setCommentsOpen(Object.keys(parseComments(card?.comments)).length > 0);
   }, [card?.id]);
 
   useEffect(() => {
@@ -107,18 +117,22 @@ export function useStackCardSidebar({
     await addCardLink(card.id, targetCardId);
     const target = projectCards.find((c) => c.id === targetCardId);
     if (target) {
-      setLinks((prev) => [...prev, {
+      const newLinks = [...links, {
         linkId: -Date.now(),
         cardId: targetCardId,
         title: target.title,
         contentPreview: '',
         boardTitle: target.boardTitle,
-      }]);
+      }];
+      setLinks(newLinks);
+      linksOverrideRef.current.set(card.id, newLinks);
     }
   };
 
   const handleRemoveLink = (linkId: number) => {
-    setLinks((prev) => prev.filter((l) => l.linkId !== linkId));
+    const newLinks = links.filter((l) => l.linkId !== linkId);
+    setLinks(newLinks);
+    if (card) linksOverrideRef.current.set(card.id, newLinks);
     removeCardLink(linkId);
   };
 
@@ -139,44 +153,23 @@ export function useStackCardSidebar({
     const next = { ...comments, [commentId]: { text: t, createdAt: new Date().toISOString(), anchored: false } };
     onCommentsChange(next);
     setCommentsOpen(true);
-    updateCard(card.id, { comments: JSON.stringify(next) });
+    updateCard(card.id, { comments: serializeComments(next) });
   };
 
   const removeComment = (commentId: string) => {
     if (!editor || !card) return;
-    const { state } = editor;
-    const tr = state.tr;
-    const markType = state.schema.marks.comment;
-    if (markType) {
-      state.doc.descendants((node, pos) => {
-        const m = node.marks.find((mk) => mk.type === markType && mk.attrs.commentId === commentId);
-        if (m) tr.removeMark(pos, pos + node.nodeSize, markType);
-      });
-      editor.view.dispatch(tr);
-    }
+    removeCommentMarkFromEditor(editor, commentId);
     const next = { ...comments };
     delete next[commentId];
     onCommentsChange(next);
     updateCard(card.id, {
       content: editor.getHTML() || '',
-      comments: Object.keys(next).length > 0 ? JSON.stringify(next) : null,
+      comments: serializeComments(next),
     });
   };
 
   const jumpToComment = (commentId: string) => {
-    if (!editor) return;
-    const markType = editor.state.schema.marks.comment;
-    if (markType) {
-      let foundPos: number | null = null;
-      editor.state.doc.descendants((node, pos) => {
-        if (foundPos !== null) return false;
-        const m = node.marks.find((mk) => mk.type === markType && mk.attrs.commentId === commentId);
-        if (m) { foundPos = pos; return false; }
-      });
-      if (foundPos !== null) editor.commands.setTextSelection(foundPos);
-    }
-    const el = editor.view.dom.querySelector(`[data-comment-id="${commentId}"]`) as HTMLElement | null;
-    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (editor) jumpToCommentInEditor(editor, commentId);
   };
 
   return {

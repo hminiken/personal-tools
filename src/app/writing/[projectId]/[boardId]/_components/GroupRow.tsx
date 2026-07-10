@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { Paper, Group, Text, ActionIcon, Menu, ScrollArea, TextInput, Box, Anchor } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconGripVertical, IconDots, IconPencil, IconTrash, IconBook2, IconPhoto, IconPhotoOff } from '@tabler/icons-react';
@@ -17,9 +17,13 @@ import InlineAdd from './InlineAdd';
 import { WordCountDisplay, sumGroupWords, type WordCountSettings } from '@components/WordCountDisplay';
 import { promptWordGoal } from '@/utils/dialogs';
 import { setGroupWordGoal } from '../../../_actions/writing_actions';
+import { useInlineRename } from './useInlineRename';
 import type { BoardGroup, BoardCard, LabelCategory } from '../types';
 
-export default function GroupRow({
+// Memoized: BoardView re-renders on every cross-list drag-over tick, but a
+// group whose contents didn't change keeps its object identity (useBoardDnd
+// returns untouched groups as-is), so it can skip re-rendering entirely.
+function GroupRow({
   group,
   boardHasBg,
   categories,
@@ -54,8 +58,10 @@ export default function GroupRow({
   // Droppable zone so lists can be dropped into this group (even when empty).
   const { setNodeRef: setDropRef } = useDroppable({ id: `groupzone:${group.id}`, data: { type: 'groupzone', groupId: group.id } });
 
-  const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(group.title);
+  const { editing, setEditing, inputProps: titleInputProps } = useInlineRename({
+    value: group.title,
+    onCommit: (next) => onRenameGroup(group.id, next),
+  });
   const [bgOpened, { open: openBg, close: closeBg }] = useDisclosure(false);
   const params = useParams();
   const router = useRouter();
@@ -122,14 +128,10 @@ export default function GroupRow({
       : {}),
   };
 
-  const commitRename = () => {
-    const t = title.trim();
-    if (t && t !== group.title) onRenameGroup(group.id, t);
-    else setTitle(group.title);
-    setEditing(false);
-  };
-
   const listIds = group.lists.map((l) => `list:${l.id}`);
+
+  // Word-count sum only needs to be recomputed when the group's lists/cards change.
+  const groupWordCount = useMemo(() => sumGroupWords(group), [group]);
 
   // Ghost placeholder — dashed outline the same width as the real group.
   if (isDragging) {
@@ -184,14 +186,7 @@ export default function GroupRow({
           {editing ? (
             <TextInput
               size="sm"
-              value={title}
-              onChange={(e) => setTitle(e.currentTarget.value)}
-              onBlur={commitRename}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitRename();
-                if (e.key === 'Escape') { setTitle(group.title); setEditing(false); }
-              }}
-              autoFocus
+              {...titleInputProps}
               style={{ maxWidth: 320 }}
             />
           ) : (
@@ -208,7 +203,7 @@ export default function GroupRow({
           )}
           {wcSettings.mode !== 'off' && (
             <WordCountDisplay
-              count={sumGroupWords(group)}
+              count={groupWordCount}
               goal={group.wordCountGoal ?? wcSettings.defaultGroupGoal}
               mode={wcSettings.mode}
               light={hasBg}
@@ -331,3 +326,5 @@ export default function GroupRow({
     </Paper>
   );
 }
+
+export default memo(GroupRow);

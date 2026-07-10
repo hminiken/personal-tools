@@ -3,7 +3,7 @@
 
 import { writingDb } from '@/db/writing';
 import { writingProjects, writingFolders, boards, groups, lists, cards, cardImages, labels, labelCategories, cardLabels, cardLinks, writingSettings } from '@/db/writing/schema';
-import { eq, and, desc, max, inArray, isNull, or } from 'drizzle-orm';
+import { eq, and, max, inArray, isNull, or } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { writeFile } from 'fs/promises';
 import path from 'path';
@@ -34,6 +34,20 @@ async function nextPosition(
 function revalidateGallery() {
   revalidatePath('/writing');
   revalidatePath('/writing/folder/[folderId]', 'page');
+}
+
+// Compress an uploaded/pasted image (crafting pipeline: ~1MB WebP, longest
+// edge 2000px), store it under public/uploads, and return its serving path.
+async function storeUploadedImage(imageFile: File): Promise<string> {
+  const originalBuffer = Buffer.from(await imageFile.arrayBuffer());
+  const buffer = await compressImage(originalBuffer);
+
+  const baseName = imageFile.name.replaceAll(' ', '_').replace(/\.[^.]+$/, '');
+  const filename = `${Date.now()}-${baseName}.webp`;
+  const filepath = path.join(process.cwd(), 'public/uploads', filename);
+  await writeFile(filepath, buffer);
+
+  return `/uploads/${filename}`;
 }
 
 // ==========================================
@@ -85,23 +99,14 @@ export async function setFolderColor(folderId: number, color: string | null) {
   revalidateGallery();
 }
 
-// Upload (or paste) a cover image for a folder. Mirrors uploadCardImage: reuse
-// the crafting compression pipeline + shared /uploads route. Sets the folder's
-// coverImage and returns the new path so the caller can refresh.
+// Upload (or paste) a cover image for a folder. Sets the folder's coverImage
+// and returns the new path so the caller can refresh.
 export async function uploadFolderCover(formData: FormData): Promise<{ path: string } | null> {
   const folderId = formData.get('folderId') ? Number(formData.get('folderId')) : null;
   const imageFile = formData.get('file') as File | null;
   if (!folderId || !imageFile || imageFile.size === 0) return null;
 
-  const originalBuffer = Buffer.from(await imageFile.arrayBuffer());
-  const buffer = await compressImage(originalBuffer);
-
-  const baseName = imageFile.name.replaceAll(' ', '_').replace(/\.[^.]+$/, '');
-  const filename = `${Date.now()}-${baseName}.webp`;
-  const filepath = path.join(process.cwd(), 'public/uploads', filename);
-  await writeFile(filepath, buffer);
-
-  const newPath = `/uploads/${filename}`;
+  const newPath = await storeUploadedImage(imageFile);
   await writingDb.update(writingFolders).set({ coverImage: newPath }).where(eq(writingFolders.id, folderId));
   revalidateGallery();
   return { path: newPath };
@@ -154,11 +159,6 @@ export async function moveFolderToFolder(folderId: number, parentFolderId: numbe
   revalidateGallery();
 }
 
-// All folders, flat — used to build the "Move to…" picker tree.
-export async function getAllFolders() {
-  return writingDb.select().from(writingFolders).orderBy(writingFolders.name).all();
-}
-
 // ==========================================
 // PROJECTS
 // ==========================================
@@ -181,24 +181,6 @@ export async function createWritingProject(formData: FormData) {
   revalidateGallery();
 }
 
-export async function updateWritingProject(formData: FormData) {
-  const id = Number(formData.get('id'));
-  if (!id || isNaN(id)) return;
-
-  const data: Partial<typeof writingProjects.$inferInsert> = {};
-  if (formData.has('title')) data.title = formData.get('title') as string;
-  if (formData.has('description')) data.description = formData.get('description') as string;
-  if (formData.has('status')) data.status = formData.get('status') as string;
-  if (formData.has('categories')) data.categories = formData.get('categories') as string;
-  if (formData.has('coverImage')) data.coverImage = formData.get('coverImage') as string;
-
-  if (Object.keys(data).length > 0) {
-    await writingDb.update(writingProjects).set(data).where(eq(writingProjects.id, id));
-  }
-  revalidatePath('/writing');
-  revalidatePath(`/writing/${id}`);
-}
-
 // Set (or clear) a project's cover image. Pass null to remove it.
 export async function setProjectCover(projectId: number, coverImage: string | null) {
   if (!projectId) return;
@@ -212,15 +194,7 @@ export async function uploadProjectCover(formData: FormData): Promise<{ path: st
   const imageFile = formData.get('file') as File | null;
   if (!projectId || !imageFile || imageFile.size === 0) return null;
 
-  const originalBuffer = Buffer.from(await imageFile.arrayBuffer());
-  const buffer = await compressImage(originalBuffer);
-
-  const baseName = imageFile.name.replaceAll(' ', '_').replace(/\.[^.]+$/, '');
-  const filename = `${Date.now()}-${baseName}.webp`;
-  const filepath = path.join(process.cwd(), 'public/uploads', filename);
-  await writeFile(filepath, buffer);
-
-  const newPath = `/uploads/${filename}`;
+  const newPath = await storeUploadedImage(imageFile);
   await writingDb.update(writingProjects).set({ coverImage: newPath }).where(eq(writingProjects.id, projectId));
   revalidateGallery();
   return { path: newPath };
@@ -307,11 +281,6 @@ export async function renameGroup(groupId: number, title: string) {
   revalidateBoards();
 }
 
-export async function setGroupColor(groupId: number, color: string | null) {
-  await writingDb.update(groups).set({ color }).where(eq(groups.id, groupId));
-  revalidateBoards();
-}
-
 // Set (or clear) a group's Unsplash background. See setBoardBackground.
 export async function setGroupBackground(
   groupId: number,
@@ -390,54 +359,18 @@ export async function updateCard(
   revalidateBoards();
 }
 
-// Upload (or paste) an image onto a card. Reuses the crafting compression
-// pipeline (cap to ~1MB WebP, longest edge 2000px) and the shared
-// /uploads/<file> serving route. Marks the card as an image card and returns
-// the new path so the open editor can preview it without a full refresh.
-export async function uploadCardImage(formData: FormData): Promise<string | null> {
-  const cardId = formData.get('cardId') ? Number(formData.get('cardId')) : null;
-  const imageFile = formData.get('file') as File | null;
-  if (!cardId || !imageFile || imageFile.size === 0) return null;
-
-  const originalBuffer = Buffer.from(await imageFile.arrayBuffer());
-  const buffer = await compressImage(originalBuffer);
-
-  const baseName = imageFile.name.replaceAll(' ', '_').replace(/\.[^.]+$/, '');
-  const filename = `${Date.now()}-${baseName}.webp`;
-  const filepath = path.join(process.cwd(), 'public/uploads', filename);
-  await writeFile(filepath, buffer);
-
-  const newImagePath = `/uploads/${filename}`;
-  await writingDb
-    .update(cards)
-    .set({ imagePath: newImagePath, isImageCard: true })
-    .where(eq(cards.id, cardId));
-
-  revalidateBoards();
-  return newImagePath;
-}
-
 // ==========================================
 // CARD GALLERY IMAGES (any card may hold several reference photos)
 // ==========================================
-// Upload (or paste) an image into a card's gallery. Reuses the crafting
-// compression pipeline + the shared /uploads serving route. Returns the new
-// path. Unlike uploadCardImage, this does NOT flip the card into image-card
-// mode — it just appends to the gallery.
+// Upload (or paste) an image into a card's gallery. Returns the new path.
+// Does NOT flip the card into image-card mode — it just appends to the
+// gallery (the first image does become the cover by default, below).
 export async function addCardImage(formData: FormData): Promise<{ id: number; path: string } | null> {
   const cardId = formData.get('cardId') ? Number(formData.get('cardId')) : null;
   const imageFile = formData.get('file') as File | null;
   if (!cardId || !imageFile || imageFile.size === 0) return null;
 
-  const originalBuffer = Buffer.from(await imageFile.arrayBuffer());
-  const buffer = await compressImage(originalBuffer);
-
-  const baseName = imageFile.name.replaceAll(' ', '_').replace(/\.[^.]+$/, '');
-  const filename = `${Date.now()}-${baseName}.webp`;
-  const filepath = path.join(process.cwd(), 'public/uploads', filename);
-  await writeFile(filepath, buffer);
-
-  const newImagePath = `/uploads/${filename}`;
+  const newImagePath = await storeUploadedImage(imageFile);
   const position = await nextPosition(cardImages, cardImages.cardId, cardId);
   const inserted = await writingDb
     .insert(cardImages)
@@ -477,13 +410,6 @@ export async function setCardCover(cardId: number, imagePath: string | null) {
 export async function deleteCard(cardId: number) {
   await writingDb.delete(cards).where(eq(cards.id, cardId));
   revalidateBoards();
-}
-
-// Silent content save used by the compiled chapter view. No revalidate: each
-// card editor saves on blur and we don't want a refresh to rebuild editors or
-// move the cursor mid-write. Board previews refresh on next load.
-export async function saveCardContent(cardId: number, content: string) {
-  await writingDb.update(cards).set({ content, wordCount: countWords(content) }).where(eq(cards.id, cardId));
 }
 
 // ==========================================
@@ -680,18 +606,6 @@ export async function removeCardLabel(cardId: number, labelId: number) {
     .delete(cardLabels)
     .where(and(eq(cardLabels.cardId, cardId), eq(cardLabels.labelId, labelId)));
   revalidateBoards();
-}
-
-// ==========================================
-// READ HELPERS
-// ==========================================
-export async function getProjectBoards(projectId: number) {
-  return writingDb
-    .select()
-    .from(boards)
-    .where(eq(boards.projectId, projectId))
-    .orderBy(boards.position, desc(boards.createdAt))
-    .all();
 }
 
 // ==========================================

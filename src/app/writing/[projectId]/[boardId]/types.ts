@@ -3,9 +3,9 @@ import type { InferSelectModel } from 'drizzle-orm';
 import { boards, groups, lists, cards, cardImages, labels, labelCategories } from '@/db/writing/schema';
 
 export type Board = InferSelectModel<typeof boards>;
-export type Group = InferSelectModel<typeof groups>;
-export type List = InferSelectModel<typeof lists>;
-export type Card = InferSelectModel<typeof cards>;
+type Group = InferSelectModel<typeof groups>;
+type List = InferSelectModel<typeof lists>;
+type Card = InferSelectModel<typeof cards>;
 export type CardImage = InferSelectModel<typeof cardImages>;
 export type Label = InferSelectModel<typeof labels>;
 export type LabelCategory = InferSelectModel<typeof labelCategories>;

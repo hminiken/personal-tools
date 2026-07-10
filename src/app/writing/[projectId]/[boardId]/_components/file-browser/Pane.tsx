@@ -1,6 +1,7 @@
 'use client';
 
 import { Paper } from '@mantine/core';
+import { glassStyle, glassTextStyle } from '../glass';
 
 // Pins a pane to the viewport as the page scrolls (the center editor can grow
 // arbitrarily tall, so the page itself scrolls) and scrolls its own content
@@ -44,12 +45,8 @@ export default function Pane({
       style={{
         ...(hasBg
           ? ({
-              background: 'rgba(0,0,0,0.20)',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255,255,255,0.18)',
-              color: 'rgba(255,255,255,0.92)',
-              textShadow: '0 1px 2px rgba(0,0,0,0.45)',
+              ...glassStyle,
+              ...glassTextStyle,
               '--mantine-color-text': 'rgba(255,255,255,0.92)',
               '--mantine-color-dimmed': 'rgba(255,255,255,0.65)',
             } as React.CSSProperties)

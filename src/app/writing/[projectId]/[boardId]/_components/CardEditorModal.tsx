@@ -8,7 +8,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
-  IconPhotoPlus, IconPencil, IconTrash, IconPhotoStar, IconChevronLeft, IconChevronRight,
+  IconPhotoPlus, IconPencil, IconTrash, IconPhotoStar,
   IconMessage, IconCheck, IconX, IconMessageOff, IconChevronDown, IconChevronUp,
   IconLink, IconArrowLeft, IconPlus,
 } from '@tabler/icons-react';
@@ -27,10 +27,17 @@ import {
   addCardLink, removeCardLink, getCardById, getProjectCards, setCardWordGoal,
 } from '../../../_actions/writing_actions';
 import LabelPicker from './LabelPicker';
+import ImageViewerModal, { useImageViewer } from './ImageViewerModal';
+import {
+  type CommentRecord,
+  parseComments,
+  serializeComments,
+  removeCommentMarkFromEditor,
+  jumpToCommentInEditor,
+} from '@/utils/writingComments';
 import type { BoardCard, LabelCatalog, LinkedCardRef } from '../types';
 
 type GalleryImage = { id: number; path: string };
-type CommentRecord = Record<string, { text: string; createdAt: string }>;
 type ProjectCard = { id: number; title: string; boardTitle: string; listTitle: string };
 
 export default function CardEditorModal({
@@ -89,8 +96,6 @@ export default function CardEditorModal({
   const [isSaving, setIsSaving] = useState(false);
   const [liveWordCount, setLiveWordCount] = useState(0);
   const [galleryOpened, { open: openGallery, close: closeGallery }] = useDisclosure(false);
-  const [viewerOpened, { open: openViewer, close: closeViewer }] = useDisclosure(false);
-  const [viewerIndex, setViewerIndex] = useState(0);
 
   // --- Links state ---
   const [links, setLinks] = useState<LinkedCardRef[]>([]);
@@ -124,9 +129,6 @@ export default function CardEditorModal({
 
   const editor = useWritingEditor(viewingCard?.content, true);
 
-  useEffect(() => { cardRef.current = viewingCard; }, [viewingCard]);
-  useEffect(() => { commentsRef.current = comments; }, [comments]);
-
   // Re-init all card-level state whenever viewingCard changes.
   useEffect(() => {
     setTitle(viewingCard?.title ?? '');
@@ -140,8 +142,7 @@ export default function CardEditorModal({
     const overrideLinks = cardId != null ? linksOverrideRef.current.get(cardId) : undefined;
     setLinks(overrideLinks ?? viewingCard?.links ?? []);
 
-    let parsed: CommentRecord = {};
-    try { if (viewingCard?.comments) parsed = JSON.parse(viewingCard.comments); } catch { /* ignore */ }
+    const parsed = parseComments(viewingCard?.comments);
     setComments(parsed);
     setCommentsOpen(Object.keys(parsed).length > 0);
     setBubbleMode('idle');
@@ -162,9 +163,7 @@ export default function CardEditorModal({
       if (!c) return;
       await updateCard(c.id, {
         content: editor.getHTML() || '',
-        comments: Object.keys(commentsRef.current).length > 0
-          ? JSON.stringify(commentsRef.current)
-          : null,
+        comments: serializeComments(commentsRef.current),
       });
       setAutoSaved(true);
       setTimeout(() => setAutoSaved(false), 2000);
@@ -185,18 +184,7 @@ export default function CardEditorModal({
     return () => { editor.off('update', onUpdate); };
   }, [editor]);
 
-  const showPrev = () => setViewerIndex((i) => (i > 0 ? i - 1 : images.length - 1));
-  const showNext = () => setViewerIndex((i) => (i < images.length - 1 ? i + 1 : 0));
-
-  useEffect(() => {
-    if (!viewerOpened) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') showPrev();
-      if (e.key === 'ArrowRight') showNext();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [viewerOpened, images.length]);
+  const viewer = useImageViewer(images.length);
 
   const commitTitle = async () => {
     setEditingTitle(false);
@@ -214,7 +202,7 @@ export default function CardEditorModal({
       includeInCompile,
       isImageCard,
       coverImage,
-      comments: Object.keys(comments).length > 0 ? JSON.stringify(comments) : null,
+      comments: serializeComments(comments),
     });
     router.refresh();
     setIsSaving(false);
@@ -250,10 +238,7 @@ export default function CardEditorModal({
     await deleteCardImage(img.id);
   };
 
-  const handleViewImage = (index: number) => {
-    setViewerIndex(index);
-    openViewer();
-  };
+  const handleViewImage = (index: number) => viewer.open(index);
 
   const handleToggleImageCard = async (value: boolean) => {
     setIsImageCard(value);
@@ -318,33 +303,24 @@ export default function CardEditorModal({
     if (!text || !editor) return;
     const commentId = crypto.randomUUID();
     editor.chain().focus().setMark('comment', { commentId }).run();
-    const next = { ...comments, [commentId]: { text, createdAt: new Date().toISOString() } };
+    const next: CommentRecord = { ...comments, [commentId]: { text, createdAt: new Date().toISOString(), anchored: true } };
     setComments(next);
     setCommentsOpen(true);
     setNewCommentText('');
     setBubbleMode('idle');
-    if (viewingCard) updateCard(viewingCard.id, { content: editor.getHTML() || '', comments: JSON.stringify(next) });
+    if (viewingCard) updateCard(viewingCard.id, { content: editor.getHTML() || '', comments: serializeComments(next) });
   };
 
   const removeComment = (commentId: string) => {
     if (!editor) return;
-    const { state } = editor;
-    const tr = state.tr;
-    const markType = state.schema.marks.comment;
-    if (markType) {
-      state.doc.descendants((node, pos) => {
-        const m = node.marks.find((mk) => mk.type === markType && mk.attrs.commentId === commentId);
-        if (m) tr.removeMark(pos, pos + node.nodeSize, markType);
-      });
-      editor.view.dispatch(tr);
-    }
+    removeCommentMarkFromEditor(editor, commentId);
     const next = { ...comments };
     delete next[commentId];
     setComments(next);
     if (viewingCard) {
       updateCard(viewingCard.id, {
         content: editor.getHTML() || '',
-        comments: Object.keys(next).length > 0 ? JSON.stringify(next) : null,
+        comments: serializeComments(next),
       });
     }
   };
@@ -364,19 +340,7 @@ export default function CardEditorModal({
   const commentCount = Object.keys(comments).length;
 
   const jumpToComment = (commentId: string) => {
-    if (!editor) return;
-    const markType = editor.state.schema.marks.comment;
-    if (markType) {
-      let foundPos: number | null = null;
-      editor.state.doc.descendants((node, pos) => {
-        if (foundPos !== null) return false;
-        const m = node.marks.find((mk) => mk.type === markType && mk.attrs.commentId === commentId);
-        if (m) { foundPos = pos; return false; }
-      });
-      if (foundPos !== null) editor.commands.setTextSelection(foundPos);
-    }
-    const el = editor.view.dom.querySelector(`[data-comment-id="${commentId}"]`) as HTMLElement | null;
-    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (editor) jumpToCommentInEditor(editor, commentId);
   };
 
   // --- Title node (shown in Modal title slot) ---
@@ -733,35 +697,7 @@ export default function CardEditorModal({
       )}
 
       {/* Full-size image viewer */}
-      <Modal
-        opened={viewerOpened}
-        onClose={closeViewer}
-        withCloseButton={false}
-        size="auto"
-        centered
-        padding={0}
-        styles={{ content: { backgroundColor: 'transparent', boxShadow: 'none' } }}
-      >
-        {images[viewerIndex] && (
-          <Box style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {images.length > 1 && (
-              <ActionIcon variant="filled" color="dark" size="xl" radius="xl"
-                style={{ position: 'absolute', left: 10, zIndex: 10, opacity: 0.7 }}
-                onClick={showPrev} aria-label="Previous image">
-                <IconChevronLeft size={24} />
-              </ActionIcon>
-            )}
-            <Image src={images[viewerIndex].path} alt="" style={{ maxHeight: '90vh', maxWidth: '90vw', objectFit: 'contain' }} />
-            {images.length > 1 && (
-              <ActionIcon variant="filled" color="dark" size="xl" radius="xl"
-                style={{ position: 'absolute', right: 10, zIndex: 10, opacity: 0.7 }}
-                onClick={showNext} aria-label="Next image">
-                <IconChevronRight size={24} />
-              </ActionIcon>
-            )}
-          </Box>
-        )}
-      </Modal>
+      <ImageViewerModal images={images} viewer={viewer} />
     </Modal>
   );
 }

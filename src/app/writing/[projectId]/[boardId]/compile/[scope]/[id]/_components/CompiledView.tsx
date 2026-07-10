@@ -6,7 +6,8 @@ import { IconArrowLeft } from '@tabler/icons-react';
 import Link from 'next/link';
 import { DocumentSpacingMenu, docSpacingClass, spacingVars, type Spacing } from '@components/DocumentSpacing';
 import { setBoardSpacing } from '@app/writing/_actions/writing_actions';
-import CompiledCardEditor, { type CommentRecord } from './CompiledCardEditor';
+import CardSectionEditor from '../../../../_components/CardSectionEditor';
+import { type CommentRecord, parseComments } from '@/utils/writingComments';
 import type { CompiledData, CompiledList, Card } from '../types';
 
 type CommentEntry = { commentId: string; text: string; createdAt: string; cardId: number; cardTitle: string };
@@ -63,8 +64,10 @@ function CardList({
       {cards.map((card, i) => (
         <Box key={card.id}>
           {i > 0 && <CardDivider />}
-          <CompiledCardEditor
+          <CardSectionEditor
             card={card}
+            heading={card.title ?? 'Untitled'}
+            withToolbar
             comments={cardComments[card.id] ?? {}}
             onCommentsChange={(next) => onCommentsChange(card.id, next)}
           />
@@ -109,8 +112,7 @@ export default function CompiledView({
   const [cardComments, setCardComments] = useState<Record<number, CommentRecord>>(() => {
     const init: Record<number, CommentRecord> = {};
     for (const card of getAllCards(data)) {
-      if (!card.comments) continue;
-      try { init[card.id] = JSON.parse(card.comments); } catch { /* ignore */ }
+      if (card.comments) init[card.id] = parseComments(card.comments);
     }
     return init;
   });

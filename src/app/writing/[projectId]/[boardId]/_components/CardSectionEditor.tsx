@@ -8,35 +8,45 @@ import { IconCheck, IconMessage, IconMessageOff, IconX } from '@tabler/icons-rea
 import { BubbleMenu } from '@tiptap/react/menus';
 import type { Editor } from '@tiptap/react';
 import { useWritingEditor } from '@hooks/useWritingEditor';
+import { WritingEditorToolbar } from '@components/WritingEditorToolbar';
 import { updateCard } from '@app/writing/_actions/writing_actions';
+import {
+  type CommentRecord,
+  removeCommentMarkFromEditor,
+  serializeComments,
+} from '@/utils/writingComments';
 
-export type CommentRecord = Record<string, { text: string; createdAt: string }>;
+type SectionCard = { id: number; content: string | null };
 
-type SectionCard = { id: number; title: string; content: string | null };
-
-// One section of the stacked compile view: a fork of CompiledCardEditor with
-// the per-card toolbar and border stripped (the stack renders one shared
-// sticky toolbar for whichever section holds focus) and hooks for the parent
-// to track the focused/live editor instances. Saving is identical: this
-// card's editor writes to this card only, on blur, when content changed.
-export default function StackedCardEditor({
+// One card rendered as a section of a larger compiled document, with its own
+// TipTap editor writing back to that card only — on blur, when content
+// changed. Serves both compile surfaces:
+//  - the /compile route gives each section its own toolbar (withToolbar,
+//    revealed while the section has focus);
+//  - the file browser's stack view strips per-section chrome and instead
+//    registers its editor with the parent (onEditorReady/onEditorFocus),
+//    which drives one shared sticky toolbar for whichever section has focus.
+export default function CardSectionEditor({
   card,
-  label,
+  heading,
   comments,
   onCommentsChange,
+  withToolbar = false,
   onEditorReady,
   onEditorFocus,
 }: {
   card: SectionCard;
   // Section heading shown above the prose (card title, optionally prefixed
   // with list/group context for wider compile scopes).
-  label: string;
+  heading: string;
   comments: CommentRecord;
   onCommentsChange: (next: CommentRecord) => void;
-  onEditorReady: (cardId: number, editor: Editor | null) => void;
-  onEditorFocus: (editor: Editor) => void;
+  withToolbar?: boolean;
+  onEditorReady?: (cardId: number, editor: Editor | null) => void;
+  onEditorFocus?: (editor: Editor) => void;
 }) {
   const editor = useWritingEditor(card.content, true);
+  const [focused, setFocused] = useState(false);
   const [saved, setSaved] = useState(false);
   const lastSaved = useRef(card.content ?? '');
 
@@ -45,10 +55,12 @@ export default function StackedCardEditor({
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Keep a ref so async handlers always see current comments.
   const commentsRef = useRef(comments);
   useEffect(() => { commentsRef.current = comments; }, [comments]);
 
   useEffect(() => {
+    if (!onEditorReady) return;
     onEditorReady(card.id, editor);
     return () => onEditorReady(card.id, null);
   }, [editor, card.id, onEditorReady]);
@@ -60,15 +72,18 @@ export default function StackedCardEditor({
   // Save content + comments on blur (only when content actually changed).
   useEffect(() => {
     if (!editor) return;
-    const onFocus = () => onEditorFocus(editor);
+    const onFocus = () => {
+      setFocused(true);
+      onEditorFocus?.(editor);
+    };
     const onBlur = () => {
+      setFocused(false);
       const html = editor.getHTML();
       if (html === lastSaved.current) return;
       lastSaved.current = html;
-      const cur = commentsRef.current;
       updateCard(card.id, {
         content: html,
-        comments: Object.keys(cur).length > 0 ? JSON.stringify(cur) : null,
+        comments: serializeComments(commentsRef.current),
       }).then(() => {
         setSaved(true);
         setTimeout(() => setSaved(false), 1500);
@@ -84,31 +99,25 @@ export default function StackedCardEditor({
     if (!text || !editor) return;
     const commentId = crypto.randomUUID();
     editor.chain().focus().setMark('comment', { commentId }).run();
-    const next = { ...commentsRef.current, [commentId]: { text, createdAt: new Date().toISOString() } };
+    const next: CommentRecord = {
+      ...commentsRef.current,
+      [commentId]: { text, createdAt: new Date().toISOString(), anchored: true },
+    };
     onCommentsChange(next);
     setNewCommentText('');
     setBubbleMode('idle');
-    updateCard(card.id, { content: editor.getHTML() || '', comments: JSON.stringify(next) });
+    updateCard(card.id, { content: editor.getHTML() || '', comments: serializeComments(next) });
   };
 
   const removeComment = (commentId: string) => {
     if (!editor) return;
-    const { state } = editor;
-    const tr = state.tr;
-    const markType = state.schema.marks.comment;
-    if (markType) {
-      state.doc.descendants((node, pos) => {
-        const m = node.marks.find((mk) => mk.type === markType && mk.attrs.commentId === commentId);
-        if (m) tr.removeMark(pos, pos + node.nodeSize, markType);
-      });
-      editor.view.dispatch(tr);
-    }
+    removeCommentMarkFromEditor(editor, commentId);
     const next = { ...commentsRef.current };
     delete next[commentId];
     onCommentsChange(next);
     updateCard(card.id, {
       content: editor.getHTML() || '',
-      comments: Object.keys(next).length > 0 ? JSON.stringify(next) : null,
+      comments: serializeComments(next),
     });
   };
 
@@ -128,7 +137,7 @@ export default function StackedCardEditor({
     <Box data-card-id={card.id}>
       <Group justify="space-between" mb={4} gap="xs">
         <Text size="xs" tt="uppercase" c="dimmed" fw={700} style={{ letterSpacing: 0.5 }}>
-          {label}
+          {heading}
         </Text>
         {saved && (
           <Group gap={2} c="dimmed">
@@ -138,6 +147,12 @@ export default function StackedCardEditor({
         )}
       </Group>
       <RichTextEditor editor={editor} style={{ border: 'none' }}>
+        {withToolbar && (
+          <div style={{ visibility: focused ? 'visible' : 'hidden' }}>
+            <WritingEditorToolbar />
+          </div>
+        )}
+
         {editor && (
           <BubbleMenu
             editor={editor}

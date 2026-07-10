@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Box, Group, SegmentedControl, Text, Title, Tooltip } from '@mantine/core';
 import { RichTextEditor } from '@mantine/tiptap';
 import '@mantine/tiptap/styles.css';
@@ -9,7 +9,8 @@ import { useWritingEditor } from '@hooks/useWritingEditor';
 import { WritingEditorToolbar } from '@components/WritingEditorToolbar';
 import { docSpacingClass, spacingVars, type Spacing } from '@components/DocumentSpacing';
 import type { WordCountSettings } from '@components/WordCountDisplay';
-import StackedCardEditor, { type CommentRecord } from './StackedCardEditor';
+import CardSectionEditor from '../CardSectionEditor';
+import { type CommentRecord, parseComments } from '@/utils/writingComments';
 import CardDetailSidebar from './CardDetailSidebar';
 import { useStackCardSidebar } from './useStackCardSidebar';
 import Pane, { stickyPaneStyle } from './Pane';
@@ -74,14 +75,14 @@ export default function StackCompileView({
   const [mergedHtml, setMergedHtml] = useState('');
 
   // Live editor instances by card id, used to snapshot current (possibly
-  // not-yet-blur-saved) text when building the select-mode document.
-  const editorsRef = useRef<Map<number, Editor>>(new Map());
+  // not-yet-blur-saved) text when building the select-mode document, and to
+  // pick a fallback toolbar target before any section has been focused.
+  const [editors, setEditors] = useState<Map<number, Editor>>(() => new Map());
 
   const [cardComments, setCardComments] = useState<Record<number, CommentRecord>>(() => {
     const init: Record<number, CommentRecord> = {};
     for (const { card } of sections) {
-      if (!card.comments) continue;
-      try { init[card.id] = JSON.parse(card.comments); } catch { /* ignore */ }
+      if (card.comments) init[card.id] = parseComments(card.comments);
     }
     return init;
   });
@@ -91,11 +92,13 @@ export default function StackCompileView({
   }, []);
 
   const handleEditorReady = useCallback((cardId: number, editor: Editor | null) => {
-    if (editor) editorsRef.current.set(cardId, editor);
-    else {
-      editorsRef.current.delete(cardId);
-      setActive((prev) => (prev && prev.cardId === cardId ? null : prev));
-    }
+    setEditors((prev) => {
+      const next = new Map(prev);
+      if (editor) next.set(cardId, editor);
+      else next.delete(cardId);
+      return next;
+    });
+    if (!editor) setActive((prev) => (prev && prev.cardId === cardId ? null : prev));
   }, []);
 
   const activeCard = active ? sections.find((s) => s.card.id === active.cardId)?.card ?? null : null;
@@ -114,14 +117,14 @@ export default function StackCompileView({
       // Snapshot from the live editors so just-typed (blur-pending) text is
       // included; fall back to stored content for anything not mounted.
       const merged = sections
-        .map(({ card }) => editorsRef.current.get(card.id)?.getHTML() ?? card.content ?? '')
+        .map(({ card }) => editors.get(card.id)?.getHTML() ?? card.content ?? '')
         .join('<hr>');
       setMergedHtml(merged);
     }
     setMode(next as 'edit' | 'select');
   };
 
-  const toolbarEditor = active?.editor ?? editorsRef.current.get(sections[0]?.card.id) ?? null;
+  const toolbarEditor = active?.editor ?? editors.get(sections[0]?.card.id) ?? null;
   const showSidebar = mode === 'edit' && !!activeCard;
 
   return (
@@ -173,9 +176,9 @@ export default function StackCompileView({
                 {sections.map(({ card, label }, i) => (
                   <Box key={card.id}>
                     {i > 0 && <CardDivider />}
-                    <StackedCardEditor
+                    <CardSectionEditor
                       card={card}
-                      label={label}
+                      heading={label}
                       comments={cardComments[card.id] ?? {}}
                       onCommentsChange={(next) => handleCommentsChange(card.id, next)}
                       onEditorReady={handleEditorReady}

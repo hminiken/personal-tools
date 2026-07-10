@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { memo, useMemo } from 'react';
 import { Paper, Group, Text, ActionIcon, Menu, ScrollArea, Stack, TextInput, Box } from '@mantine/core';
 import { IconGripVertical, IconDots, IconPencil, IconTrash, IconBook2 } from '@tabler/icons-react';
 import { useParams, useRouter } from 'next/navigation';
@@ -14,9 +14,12 @@ import InlineAdd from './InlineAdd';
 import { WordCountDisplay, sumListWords, type WordCountSettings } from '@components/WordCountDisplay';
 import { promptWordGoal } from '@/utils/dialogs';
 import { setListWordGoal } from '../../../_actions/writing_actions';
+import { useInlineRename } from './useInlineRename';
 import type { BoardList, BoardCard, LabelCategory } from '../types';
 
-export default function ListColumn({
+// Memoized: see GroupRow — lists that didn't change keep their identity
+// through drag updates, so only the affected list re-renders mid-drag.
+function ListColumn({
   list,
   categories,
   wcSettings,
@@ -43,8 +46,10 @@ export default function ListColumn({
   // Droppable zone so cards can be dropped onto this list (even when empty).
   const { setNodeRef: setDropRef } = useDroppable({ id: `listzone:${list.id}`, data: { type: 'listzone', listId: list.id } });
 
-  const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(list.title);
+  const { editing, setEditing, inputProps: titleInputProps } = useInlineRename({
+    value: list.title,
+    onCommit: (next) => onRename(list.id, next),
+  });
   const params = useParams();
   const router = useRouter();
 
@@ -53,14 +58,10 @@ export default function ListColumn({
     transition,
   };
 
-  const commitRename = () => {
-    const t = title.trim();
-    if (t && t !== list.title) onRename(list.id, t);
-    else setTitle(list.title);
-    setEditing(false);
-  };
-
   const cardIds = list.cards.map((c) => `card:${c.id}`);
+
+  // Word-count sum only needs to be recomputed when the list's cards change.
+  const listWordCount = useMemo(() => sumListWords(list), [list]);
 
   // Show a static ghost at the origin position when the dragged card has moved
   // to a different list (optimistic update removed it from here).
@@ -130,14 +131,7 @@ export default function ListColumn({
         {editing ? (
           <TextInput
             size="xs"
-            value={title}
-            onChange={(e) => setTitle(e.currentTarget.value)}
-            onBlur={commitRename}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitRename();
-              if (e.key === 'Escape') { setTitle(list.title); setEditing(false); }
-            }}
-            autoFocus
+            {...titleInputProps}
             style={{ flex: 1 }}
           />
         ) : (
@@ -180,11 +174,13 @@ export default function ListColumn({
       </Group>
 
       {wcSettings.mode !== 'off' && (
-        <WordCountDisplay
-          count={sumListWords(list)}
-          goal={list.wordCountGoal ?? wcSettings.defaultListGoal}
-          mode={wcSettings.mode}
-        />
+        <Box mb="xs" px={4}>
+          <WordCountDisplay
+            count={listWordCount}
+            goal={list.wordCountGoal ?? wcSettings.defaultListGoal}
+            mode={wcSettings.mode}
+          />
+        </Box>
       )}
 
       {/* Cards — mah subtracts header (~42px) + add-card row (~40px) + Paper padding (20px). */}
@@ -228,3 +224,5 @@ export default function ListColumn({
     </Paper>
   );
 }
+
+export default memo(ListColumn);

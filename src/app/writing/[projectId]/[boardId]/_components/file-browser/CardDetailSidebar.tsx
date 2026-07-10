@@ -2,19 +2,21 @@
 
 import { useState } from 'react';
 import {
-  ActionIcon, Badge, Box, Button, Collapse, Combobox, Group, HoverCard, Image, Modal, Paper,
+  ActionIcon, Badge, Box, Button, Collapse, Combobox, Group, HoverCard, Image, Paper,
   ScrollArea, SimpleGrid, Stack, Switch, Text, Textarea, Tooltip, useCombobox,
 } from '@mantine/core';
 import {
-  IconCheck, IconChevronDown, IconChevronLeft, IconChevronRight, IconChevronUp, IconLink,
+  IconCheck, IconChevronDown, IconChevronUp, IconLink,
   IconMessage, IconPhotoPlus, IconPhotoStar, IconPlus, IconTrash, IconX,
 } from '@tabler/icons-react';
 import { WordCountDisplay, type WordCountSettings } from '@components/WordCountDisplay';
 import { UploadModal } from '@components/UploadModal';
 import { addCardImage } from '../../../../_actions/writing_actions';
 import LabelPicker from '../LabelPicker';
+import ImageViewerModal, { useImageViewer } from '../ImageViewerModal';
 import type { BoardCard, LabelCatalog, LinkedCardRef } from '../../types';
-import type { CommentRecord, GalleryImage, ProjectCardOption } from './useCardDetail';
+import type { CommentRecord } from '@/utils/writingComments';
+import type { GalleryImage, ProjectCardOption } from './useCardDetail';
 
 // The slice of card state this sidebar needs. Satisfied by useCardDetail's
 // return value (single-card view) and by useStackCardSidebar (the compile
@@ -76,7 +78,7 @@ export default function CardDetailSidebar({
     onDropdownClose: () => { pickerCombobox.resetSelectedOption(); setPickerSearch(''); },
   });
   const [galleryOpened, setGalleryOpened] = useState(false);
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const viewer = useImageViewer(detail.images.length);
   const [addingNote, setAddingNote] = useState(false);
   const [noteText, setNoteText] = useState('');
 
@@ -90,9 +92,6 @@ export default function CardDetailSidebar({
     setNoteText('');
     setAddingNote(false);
   };
-
-  const showPrev = () => setViewerIndex((i) => (i === null ? null : i > 0 ? i - 1 : detail.images.length - 1));
-  const showNext = () => setViewerIndex((i) => (i === null ? null : i < detail.images.length - 1 ? i + 1 : 0));
 
   const handleOpenPicker = async () => {
     await detail.loadProjectCards();
@@ -132,7 +131,7 @@ export default function CardDetailSidebar({
                 <Image
                   src={img.path} alt="" h={80} radius="sm" fit="cover"
                   style={{ cursor: 'pointer', outline: detail.coverImage === img.path ? '2px solid var(--mantine-color-dark-6)' : 'none' }}
-                  onClick={() => setViewerIndex(index)}
+                  onClick={() => viewer.open(index)}
                   fallbackSrc="https://placehold.co/120x120?text=Image"
                 />
                 <Tooltip label={detail.coverImage === img.path ? 'Cover image' : 'Set as cover'} withinPortal>
@@ -336,35 +335,7 @@ export default function CardDetailSidebar({
         onUploaded={detail.handleImageUploaded}
       />
 
-      <Modal
-        opened={viewerIndex !== null}
-        onClose={() => setViewerIndex(null)}
-        withCloseButton={false}
-        size="auto"
-        centered
-        padding={0}
-        styles={{ content: { backgroundColor: 'transparent', boxShadow: 'none' } }}
-      >
-        {viewerIndex !== null && detail.images[viewerIndex] && (
-          <Box style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {detail.images.length > 1 && (
-              <ActionIcon variant="filled" color="dark" size="xl" radius="xl"
-                style={{ position: 'absolute', left: 10, zIndex: 10, opacity: 0.7 }}
-                onClick={showPrev} aria-label="Previous image">
-                <IconChevronLeft size={24} />
-              </ActionIcon>
-            )}
-            <Image src={detail.images[viewerIndex].path} alt="" style={{ maxHeight: '90vh', maxWidth: '90vw', objectFit: 'contain' }} />
-            {detail.images.length > 1 && (
-              <ActionIcon variant="filled" color="dark" size="xl" radius="xl"
-                style={{ position: 'absolute', right: 10, zIndex: 10, opacity: 0.7 }}
-                onClick={showNext} aria-label="Next image">
-                <IconChevronRight size={24} />
-              </ActionIcon>
-            )}
-          </Box>
-        )}
-      </Modal>
+      <ImageViewerModal images={detail.images} viewer={viewer} />
     </Stack>
   );
 }

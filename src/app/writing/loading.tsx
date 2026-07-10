@@ -1,39 +1,12 @@
-import { Box, Flex, SimpleGrid, Skeleton, Stack } from '@mantine/core';
+import { Skeleton } from '@mantine/core';
+import GallerySkeleton from './_components/GallerySkeleton';
 
 export default function WritingLoading() {
   return (
-    <Box mt="10px">
-      {/* Breadcrumbs */}
-      <Skeleton h={16} w={80} radius="sm" mb="lg" />
-
-      {/* Folders strip */}
-      <Box mb="xl">
-        <Skeleton h={14} w={55} radius="sm" mb="sm" />
-        <Flex wrap="wrap" gap="md">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Stack key={i} gap={6}>
-              <Skeleton h={80} w={115} radius="md" />
-              <Skeleton h={11} w={90} radius="sm" />
-              <Skeleton h={10} w={55} radius="sm" />
-            </Stack>
-          ))}
-        </Flex>
-      </Box>
-
-      {/* Projects section heading + controls */}
-      <Skeleton h={16} w={130} radius="sm" mb="sm" />
-      <Skeleton h={36} w="100%" radius="sm" mb="md" />
-
-      {/* Project cards */}
-      <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="lg">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <Stack key={i} gap={8}>
-            <Skeleton h={160} radius="md" />
-            <Skeleton h={14} w="80%" radius="sm" />
-            <Skeleton h={22} w={70} radius="xl" />
-          </Stack>
-        ))}
-      </SimpleGrid>
-    </Box>
+    <GallerySkeleton
+      breadcrumb={<Skeleton h={16} w={80} radius="sm" mb="lg" />}
+      folderCount={4}
+      projectCount={8}
+    />
   );
 }
