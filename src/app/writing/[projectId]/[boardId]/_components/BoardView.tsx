@@ -6,7 +6,7 @@ import {
   SegmentedControl, NumberInput, useMantineColorScheme, useComputedColorScheme,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconArrowLeft, IconLayoutBoard, IconBook2, IconTags, IconSettings, IconFileExport, IconSun, IconMoon } from '@tabler/icons-react';
+import { IconArrowLeft, IconLayoutBoard, IconBook2, IconTags, IconSettings, IconFileExport, IconSun, IconMoon, IconFolders } from '@tabler/icons-react';
 import Link from 'next/link';
 import UnsplashPicker from '@components/UnsplashPicker';
 import { useRouter } from 'next/navigation';
@@ -22,6 +22,7 @@ import BoardTabs from './BoardTabs';
 import CardEditorModal from './CardEditorModal';
 import ManageLabelsModal from './ManageLabelsModal';
 import InlineAdd from './InlineAdd';
+import FileBrowserView from './file-browser/FileBrowserView';
 import { DocumentSpacingMenu, type Spacing } from '@components/DocumentSpacing';
 import { WordCountDisplay, sumBoardWords, type WordCountSettings, type WordCountMode } from '@components/WordCountDisplay';
 import { confirmAction, promptText, promptWordGoal } from '@/utils/dialogs';
@@ -99,6 +100,9 @@ export default function BoardView({
   // Skip processing the same over-target twice in a row (dnd-kit can fire
   // multiple onDragOver events for the same droppable without the cursor moving).
   const lastOverRef = useRef<string | number | null>(null);
+
+  // Kanban board vs. file-browser view.
+  const [viewMode, setViewMode] = useState<'kanban' | 'files'>('kanban');
 
   // Card editor
   const [editingCard, setEditingCard] = useState<BoardCard | null>(null);
@@ -481,18 +485,31 @@ export default function BoardView({
           <IconLayoutBoard size={20} stroke={1.5} style={boardBg ? { color: 'white', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))' } : undefined} />
           <Title order={4} lineClamp={1} style={boardBg ? { color: 'white', textShadow: '0 1px 3px rgba(0,0,0,0.4)' } : undefined}>{projectTitle}</Title>
         </Group>
-        <Tooltip label="Board settings" withArrow>
-          <ActionIcon
-            variant="light"
-            color="gray"
-            size="lg"
-            onClick={openSettings}
-            aria-label="Board settings"
-            style={boardBg ? { color: '#fff', background: 'rgba(0,0,0,0.20)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)' } : undefined}
-          >
-            <IconSettings size={20} stroke={1.5} />
-          </ActionIcon>
-        </Tooltip>
+        <Group gap="xs" wrap="nowrap">
+          <SegmentedControl
+            size="xs"
+            color="dark"
+            value={viewMode}
+            onChange={(v) => setViewMode(v as 'kanban' | 'files')}
+            data={[
+              { value: 'kanban', label: <IconLayoutBoard size={16} style={{ display: 'block' }} /> },
+              { value: 'files', label: <IconFolders size={16} style={{ display: 'block' }} /> },
+            ]}
+            style={boardBg ? { background: 'rgba(0,0,0,0.20)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)' } : undefined}
+          />
+          <Tooltip label="Board settings" withArrow>
+            <ActionIcon
+              variant="light"
+              color="gray"
+              size="lg"
+              onClick={openSettings}
+              aria-label="Board settings"
+              style={boardBg ? { color: '#fff', background: 'rgba(0,0,0,0.20)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)' } : undefined}
+            >
+              <IconSettings size={20} stroke={1.5} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
       </Group>
 
       {/* Word count rollups: project total, then this board's total. */}
@@ -523,7 +540,8 @@ export default function BoardView({
         onRemoveBackground={onRemoveBackground}
       />
 
-      {/* Board body: groups + drag context */}
+      {/* Board body: groups + drag context (Kanban view) */}
+      {viewMode === 'kanban' && (
       <Box>
       <DndContext
         sensors={sensors}
@@ -625,6 +643,19 @@ export default function BoardView({
         </Text>
       )}
       </Box>
+      )}
+
+      {/* File browser view: same board data, folder/file navigation. */}
+      {viewMode === 'files' && (
+        <FileBrowserView
+          projectId={projectId}
+          groups={groups}
+          catalog={catalog}
+          wcSettings={wcSettings}
+          spacing={spacing}
+          onManageLabels={openLabels}
+        />
+      )}
 
       {/* Settings drawer: slides in from the right with the board controls. */}
       <Drawer
