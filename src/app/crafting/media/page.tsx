@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { images, patterns, projects, yarns } from '@/db/schema';
 import { MediaGrid } from './_components/MediaGrid';
 
+export const dynamic = 'force-dynamic';
 
 export default async function MediaLibraryPage() {
     const allMedia = await db.query.images.findMany({

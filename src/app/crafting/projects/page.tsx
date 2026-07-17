@@ -4,6 +4,8 @@ import { projects } from '@/db/schema';
 import { desc } from 'drizzle-orm';
 import ProjectGallery from '../patterns/_components/ProjectGallery';
 
+export const dynamic = 'force-dynamic';
+
 export default async function PatternsPage() {
   // Fetch all patterns from the database, ordering by the newest first
   const allProjects = await db.select().from(projects).orderBy(desc(projects.createdAt));
