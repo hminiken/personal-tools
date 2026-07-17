@@ -14,7 +14,8 @@ import {
   IconCategory,
   IconMoon,
   IconSun,
-  IconCoffee
+  IconCoffee,
+  IconTool
 } from '@tabler/icons-react';
 import { useWakeLock } from '@hooks/useWakeLock';
 import { useEffect } from 'react';
@@ -41,7 +42,8 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     if (pathname.includes('/crafting/stash')) return 'Yarn Stash'; // Just in case you add this later!
     if (pathname.includes('/crafting/media')) return 'Manage Media'; // Just in case you add this later!
     if (pathname.includes('/crafting/references')) return 'References';
-    if (pathname.startsWith('/writing')) return suffix ? `Writing Desk - ${suffix}` : 'Writing Desk';
+    if (pathname.startsWith('/writing')) return 'Writing Desk';
+    if (pathname.startsWith('/misc')) return 'Misc Tools';
 
     return 'Command Center'; // A safe fallback
   };
@@ -180,12 +182,20 @@ useEffect(() => {
             active={pathname.startsWith('/writing')}
           />
 
-          <NavLink 
-            component={Link} 
-            href="/budget" 
-            label="Budget" 
-            leftSection={<IconCurrencyDollar size="1rem" stroke={1.5} />} 
+          <NavLink
+            component={Link}
+            href="/budget"
+            label="Budget"
+            leftSection={<IconCurrencyDollar size="1rem" stroke={1.5} />}
             active={pathname.startsWith('/budget')}
+          />
+
+          <NavLink
+            component={Link}
+            href="/misc"
+            label="Misc Tools"
+            leftSection={<IconTool size="1rem" stroke={1.5} />}
+            active={pathname.startsWith('/misc')}
           />
         </AppShell.Section>
       </AppShell.Navbar>

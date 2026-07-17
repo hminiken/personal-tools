@@ -22,6 +22,10 @@ WORKDIR /app
 # COPY only what's needed for the build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# /app/data is a runtime bind mount (see docker-compose.yml), so it doesn't
+# exist yet at build time. Create it so the sqlite client can open a
+# throwaway build-time db instead of failing to find the directory.
+RUN mkdir -p /app/data
 # Skip unnecessary installs by using the existing global pnpm
 RUN pnpm run build
 
