@@ -66,7 +66,18 @@ function LinkChip({ link, onOpenLinked }: { link: LinkedCardRef; onOpenLinked: (
 }
 
 // Pure render — no dnd-kit hooks. Used both inside CardItem and in the DragOverlay.
-export function CardFace({
+//
+// MEMOIZED — this is the board's single biggest drag-perf lever. dnd-kit's
+// SortableContext hands every `useSortable` consumer a new context value each
+// time droppable rects are re-measured (every ~100ms mid-drag, per the board's
+// `measuring` config), so every CardItem re-renders many times per second
+// during a drag no matter what. CardFace holds all the expensive chrome (the
+// Progress ring, Tooltip portals, Badges, text preview); memoizing it means
+// that on those churn re-renders only CardItem's thin Paper wrapper re-runs
+// (to apply the transform) while this heavy subtree is skipped. Props stay
+// referentially stable during a drag — even a moved card keeps its object
+// identity (handleDragOver splices the same object across lists).
+export const CardFace = memo(function CardFace({
   card,
   categories,
   wcSettings,
@@ -160,7 +171,7 @@ export function CardFace({
               <Text size="sm" fw={500} lineClamp={2}>{card.title}</Text>
             </Group>
             {text && (
-              <Text size="xs" c="dimmed" lineClamp={3} mt={2}>{text}</Text>
+              <Text size="xs" lineClamp={3} mt={2} style={{ color: 'var(--theme-card-muted-text, var(--mantine-color-dimmed))' }}>{text}</Text>
             )}
             {wcSettings && wcSettings.mode !== 'off' && !card.hideWordCount && (
               <Box mt={6}>
@@ -194,7 +205,7 @@ export function CardFace({
         <Text size="sm" fw={500} lineClamp={2}>{card.title}</Text>
       </Group>
       {text && (
-        <Text size="xs" c="dimmed" lineClamp={2} mt={2}>{text}</Text>
+        <Text size="xs" lineClamp={2} mt={2} style={{ color: 'var(--theme-card-muted-text, var(--mantine-color-dimmed))' }}>{text}</Text>
       )}
       {wcSettings && wcSettings.mode !== 'off' && !card.hideWordCount && (
         <Box mt={6}>
@@ -203,7 +214,7 @@ export function CardFace({
       )}
     </>
   );
-}
+});
 
 // Memoized: see GroupRow/ListColumn — an unmoved card keeps its identity
 // through drag updates, so only the affected cards re-render mid-drag.
@@ -237,11 +248,29 @@ function CardItem({
 
   // Ghost placeholder — card stays visible at reduced opacity to show its origin
   // while the DragOverlay follows the cursor.
+  // Base card chrome from the board's theme (if any) — background, border,
+  // and text color. Listed BEFORE borderTop below so the accent strip (an
+  // explicit per-card/per-label color, a more specific override) always wins
+  // on the top edge; theme border color only shows on the other three sides.
+  const themedChrome: React.CSSProperties = {
+    background: 'var(--theme-card-bg, var(--mantine-color-body))',
+    borderColor: 'var(--theme-card-border, var(--mantine-color-default-border))',
+    color: 'var(--theme-card-text, inherit)',
+  };
+
+  // Only include a `borderTop` key when the card actually has an accent color.
+  // Passing `borderTop: undefined` alongside `borderColor` makes React clear
+  // the border-top shorthand AFTER borderColor set it, so the themed top color
+  // is wiped and the top edge reverts to Mantine's default --paper-border-color
+  // (a light gray) — showing as a stray white line only along the top.
+  const accentTop = cardAccentBorder(effectiveCardColor(card));
+  const accentTopStyle = accentTop ? { borderTop: accentTop } : {};
+
   if (isDragging) {
     return (
       <Paper
         ref={setNodeRef}
-        style={{ ...style, cursor: 'grab', overflow: isImage ? 'hidden' : undefined, opacity: 0.35, borderTop: cardAccentBorder(effectiveCardColor(card)) }}
+        style={{ ...style, ...themedChrome, ...accentTopStyle, cursor: 'grab', overflow: isImage ? 'hidden' : undefined, opacity: 0.35 }}
         withBorder
         radius="sm"
         p={isImage ? 0 : 'xs'}
@@ -257,7 +286,7 @@ function CardItem({
   return (
     <Paper
       ref={setNodeRef}
-      style={{ ...style, cursor: 'grab', overflow: isImage ? 'hidden' : undefined, borderTop: cardAccentBorder(effectiveCardColor(card)) }}
+      style={{ ...style, ...themedChrome, ...accentTopStyle, cursor: 'grab', overflow: isImage ? 'hidden' : undefined }}
       withBorder
       shadow="xs"
       radius="sm"

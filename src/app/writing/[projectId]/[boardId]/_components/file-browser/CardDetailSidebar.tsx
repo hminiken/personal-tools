@@ -333,7 +333,7 @@ export default function CardDetailSidebar({
                       {anchored === false && (
                         <Text size="9px" c="light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-1))" fw={700} tt="uppercase" style={{ letterSpacing: 0.5 }}>Note</Text>
                       )}
-                      <Text size="sm" c="light-dark(var(--mantine-color-black), var(--mantine-color-gray-0))">{text}</Text>
+                      <Text size="sm" c="light-dark(var(--mantine-color-black), var(--mantine-color-gray-0))" style={{ whiteSpace: 'pre-wrap' }}>{text}</Text>
                       <Text size="10px" c="light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-1))" mt={2}>
                         {new Date(createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </Text>

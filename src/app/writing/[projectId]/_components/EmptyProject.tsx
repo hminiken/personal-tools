@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Paper, Stack, Title, Text, TextInput, Button, Group } from '@mantine/core';
-import { IconLayoutBoard, IconArrowLeft } from '@tabler/icons-react';
+import { Paper, Stack, Title, Text, TextInput, Button, Group, Divider } from '@mantine/core';
+import { IconLayoutBoard, IconArrowLeft, IconUpload } from '@tabler/icons-react';
+import { useDisclosure } from '@mantine/hooks';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createBoard } from '../../_actions/writing_actions';
+import ImportTrelloModal from '../../_components/ImportTrelloModal';
 
 export default function EmptyProject({
   projectId,
@@ -18,6 +20,7 @@ export default function EmptyProject({
 }) {
   const [title, setTitle] = useState('');
   const [isPending, startTransition] = useTransition();
+  const [importOpened, { open: openImport, close: closeImport }] = useDisclosure(false);
   const router = useRouter();
 
   const handleCreate = () => {
@@ -57,7 +60,25 @@ export default function EmptyProject({
         <Group justify="flex-end" w="100%">
           <Button onClick={handleCreate} loading={isPending}>Create Board</Button>
         </Group>
+
+        <Divider label="or" labelPosition="center" w="100%" />
+
+        <Button
+          variant="light"
+          color="gray"
+          leftSection={<IconUpload size={16} />}
+          onClick={openImport}
+        >
+          Import from Trello
+        </Button>
       </Stack>
+
+      <ImportTrelloModal
+        opened={importOpened}
+        onClose={closeImport}
+        projects={[{ id: projectId, title: projectTitle }]}
+        defaultProjectId={projectId}
+      />
     </Paper>
   );
 }

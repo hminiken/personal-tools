@@ -1,8 +1,9 @@
 // src/app/writing/[projectId]/[boardId]/types.ts
 import type { InferSelectModel } from 'drizzle-orm';
-import { boards, groups, lists, cards, cardImages, labels, labelCategories } from '@/db/writing/schema';
+import { boards, groups, lists, cards, cardImages, labels, labelCategories, writingThemes } from '@/db/writing/schema';
 
 export type Board = InferSelectModel<typeof boards>;
+export type WritingTheme = InferSelectModel<typeof writingThemes>;
 type Group = InferSelectModel<typeof groups>;
 type List = InferSelectModel<typeof lists>;
 type Card = InferSelectModel<typeof cards>;

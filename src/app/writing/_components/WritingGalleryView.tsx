@@ -31,6 +31,7 @@ import type { FolderRow, Breadcrumb, ProjectRow } from '../_lib/loadGalleryLevel
 import { FolderCard } from './FolderCard';
 import { MoveToFolderModal } from './MoveToFolderModal';
 import { FolderColorModal } from './FolderColorModal';
+import ImportTrelloModal from './ImportTrelloModal';
 
 // A cover image can be set on either a folder or a project; the upload action
 // and the id field name differ by kind.
@@ -67,6 +68,7 @@ export default function WritingGalleryView({
   const router = useRouter();
   const { toggle: toggleNavShell } = useNavShell();
   const [newFolderOpened, { open: openNewFolder, close: closeNewFolder }] = useDisclosure(false);
+  const [importTrelloOpened, { open: openImportTrello, close: closeImportTrello }] = useDisclosure(false);
   const [renameTarget, setRenameTarget] = useState<FolderRow | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<FolderRow | null>(null);
@@ -168,8 +170,9 @@ export default function WritingGalleryView({
       </Breadcrumbs>
       </Group>
 
-      {/* New Folder button, stacked above ItemGallery's New Project button */}
+      {/* New Folder + Import from Trello buttons, stacked above ItemGallery's New Project button */}
       <FloatingAddButton onClick={openNewFolder} text="New Folder" color="dark.4" botOffset={56} />
+      <FloatingAddButton onClick={openImportTrello} text="Import from Trello" color="blue.7" botOffset={112} />
 
       {/* Folders strip */}
       {folders.length > 0 && (
@@ -365,6 +368,13 @@ export default function WritingGalleryView({
         folderName={colorTarget?.name ?? ''}
         value={colorTarget?.color ?? null}
         onPick={applyColor}
+      />
+
+      {/* Import from Trello */}
+      <ImportTrelloModal
+        opened={importTrelloOpened}
+        onClose={closeImportTrello}
+        projects={allProjects.map((p) => ({ id: p.id, title: p.title }))}
       />
     </Box>
   );

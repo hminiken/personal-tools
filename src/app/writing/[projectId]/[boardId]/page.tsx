@@ -4,7 +4,7 @@ import { writingProjects, boards, groups, lists, cards, cardImages, labels, labe
 import { eq, desc, inArray, or, and, sql } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import BoardView from './_components/BoardView';
-import { getWritingSettings } from '../../_actions/writing_actions';
+import { getWritingSettings, listThemes } from '../../_actions/writing_actions';
 import type { BoardGroup, LabelCatalog } from './types';
 
 export const dynamic = 'force-dynamic';
@@ -85,6 +85,7 @@ export default async function BoardPage({ params }: PageProps) {
   const projectWordCount = Number(projectWordTotal?.total ?? 0);
 
   const settings = await getWritingSettings();
+  const themes = await listThemes();
 
   const catalog: LabelCatalog = { categories: projectCategories, labels: projectLabels };
   const labelById = new Map(projectLabels.map((l) => [l.id, l]));
@@ -196,6 +197,7 @@ export default async function BoardPage({ params }: PageProps) {
       activeBoardId={boardId}
       initialGroups={tree}
       catalog={catalog}
+      themes={themes}
       wcSettings={{
         mode: settings.wordCountDisplayMode,
         defaultCardGoal: settings.defaultCardWordGoal,

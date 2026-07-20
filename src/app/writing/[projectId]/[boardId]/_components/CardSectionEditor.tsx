@@ -10,6 +10,7 @@ import type { Editor } from '@tiptap/react';
 import { useWritingEditor } from '@hooks/useWritingEditor';
 import { WritingEditorToolbar } from '@components/WritingEditorToolbar';
 import { updateCard } from '@app/writing/_actions/writing_actions';
+import { writingEditorStyles } from '@/utils/writingTheme';
 import {
   type CommentRecord,
   removeCommentMarkFromEditor,
@@ -146,7 +147,7 @@ export default function CardSectionEditor({
           </Group>
         )}
       </Group>
-      <RichTextEditor editor={editor} style={{ border: 'none' }}>
+      <RichTextEditor editor={editor} style={{ border: 'none' }} styles={writingEditorStyles()}>
         {withToolbar && (
           <div style={{ visibility: focused ? 'visible' : 'hidden' }}>
             <WritingEditorToolbar />

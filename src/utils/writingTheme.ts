@@ -1,4 +1,5 @@
 // src/utils/writingTheme.ts
+import type { CSSProperties } from 'react';
 //
 // The Writing Desk theme contract: a flat, all-optional set of named CSS
 // tokens a user can supply (as JSON) to restyle the board without touching
@@ -37,6 +38,10 @@ export const THEME_TOKENS: TokenSpec[] = [
   { key: 'groupBorder', cssVar: '--theme-group-border', kind: 'color', label: 'Group row border' },
   { key: 'groupShadow', cssVar: '--theme-group-shadow', kind: 'shadow', label: 'Group row shadow' },
 
+  { key: 'listBackground', cssVar: '--theme-list-bg', kind: 'color', label: 'List/panel background (Kanban lists, file-view tree & sidebar)', pairedTextKey: 'listText' },
+  { key: 'listBorder', cssVar: '--theme-list-border', kind: 'color', label: 'List/panel border' },
+  { key: 'listText', cssVar: '--theme-list-text', kind: 'color', label: 'List/panel text' },
+
   { key: 'cardBackground', cssVar: '--theme-card-bg', kind: 'color', label: 'Card background', pairedTextKey: 'cardText' },
   { key: 'cardBorder', cssVar: '--theme-card-border', kind: 'color', label: 'Card border' },
   { key: 'cardText', cssVar: '--theme-card-text', kind: 'color', label: 'Card title/body text' },
@@ -47,9 +52,31 @@ export const THEME_TOKENS: TokenSpec[] = [
   { key: 'editorHeaderBackground', cssVar: '--theme-editor-header-bg', kind: 'color', label: 'Editor toolbar background', pairedTextKey: 'editorHeaderText' },
   { key: 'editorHeaderText', cssVar: '--theme-editor-header-text', kind: 'color', label: 'Editor toolbar icons/text' },
 
-  { key: 'headingColor', cssVar: '--theme-heading', kind: 'color', label: 'Headings/titles' },
-  { key: 'mutedText', cssVar: '--theme-muted-text', kind: 'color', label: 'General secondary text' },
+  // headingColor also overrides Mantine's own --mantine-color-text (see
+  // themeVars() below), which the board-tabs CSS module and any `c`/color
+  // prop reference directly — but default Text/Title set no `color` of their
+  // own at all (verified in @mantine/core's Text.css/Title.css), so they only
+  // pick this up because BoardView's wrapper also sets a literal inherited
+  // `color: var(--theme-heading, inherit)` that cascades down to them.
+  { key: 'headingColor', cssVar: '--theme-heading', kind: 'color', label: 'Headings/titles + default text color' },
+  { key: 'mutedText', cssVar: '--theme-muted-text', kind: 'color', label: 'General secondary/dimmed text' },
   { key: 'accentColor', cssVar: '--theme-accent', kind: 'color', label: 'Buttons/active-state accent' },
+
+  // These two double as overrides of Mantine's own --mantine-color-gray-light(-color)
+  // vars (see themeVars() below) — every "gray" light/subtle Button and ActionIcon in
+  // the board (Add list/group/card, the ••• menus, Add board, toolbar icons) computes
+  // its background/text directly from those vars, so this is the one lever that
+  // reaches all of them at once without touching each component.
+  { key: 'buttonBackground', cssVar: '--mantine-color-gray-light', kind: 'color', label: 'Button background (Add list/group/card, toolbar icon buttons)', pairedTextKey: 'buttonText' },
+  { key: 'buttonText', cssVar: '--mantine-color-gray-light-color', kind: 'color', label: 'Button text/icon color' },
+
+  // Unlike buttonBackground/buttonText, these get their own dedicated vars
+  // rather than hijacking a shared Mantine one — WordCountDisplay passes them
+  // straight through as the Progress `color` prop (Mantine forwards any
+  // string it doesn't recognize as a theme color name verbatim), so there's
+  // no shared var to collide with something else that also reads it.
+  { key: 'progressBackground', cssVar: '--theme-progress-bg', kind: 'color', label: 'Word-count progress bar track (unfilled portion)' },
+  { key: 'progressFill', cssVar: '--theme-progress-fill', kind: 'color', label: 'Word-count progress bar fill' },
 ];
 
 const TOKEN_BY_KEY = new Map(THEME_TOKENS.map((t) => [t.key, t]));
@@ -143,5 +170,60 @@ export function themeVars(definition: WritingThemeDefinition | null | undefined)
       vars[textSpec.cssVar] = isLight(bg) ? '#111111' : '#ffffff';
     }
   }
+  // Reach every default-colored/"dimmed" Text or Title that doesn't have its
+  // own explicit theme var (board/group/list titles, file-tree + sidebar
+  // labels, tab labels) by overriding the actual Mantine vars they read.
+  // Scoped to this subtree only (set on BoardView's wrapper, not :root), so
+  // portaled UI (modals/menus/drawers) is untouched.
+  if (definition.headingColor) vars['--mantine-color-text'] = definition.headingColor;
+  if (definition.mutedText) vars['--mantine-color-dimmed'] = definition.mutedText;
+  // Mantine's light-variant hover state reads a separate `-hover` var we don't
+  // expose as its own token — pin it to the same flat color so hovering a
+  // themed button doesn't flash back to Mantine's default gray hover tint.
+  if (definition.buttonBackground) vars['--mantine-color-gray-light-hover'] = definition.buttonBackground;
   return vars;
+}
+
+// Styles-API fragment for @mantine/tiptap's <RichTextEditor styles={...}>,
+// shared by every Tiptap render site in the Writing Desk (card modal, card
+// section editor, file-browser detail/compile views). Each site spreads
+// `.content`/`.toolbar` into its own `styles` prop alongside any
+// site-specific overrides (e.g. a fixed maxHeight).
+export function writingEditorStyles(): { content: CSSProperties; toolbar: CSSProperties; control: CSSProperties } {
+  return {
+    content: {
+      backgroundColor: 'var(--theme-editor-bg, var(--mantine-color-body))',
+      color: 'var(--theme-editor-text, inherit)',
+    },
+    // Each toolbar button (H1, Bold, ...) otherwise sits in its own bordered
+    // white/dark-7 chip — a boxed look that clashes with the toolbar's own
+    // deliberately flat, unboxed bar. Universal (not theme-conditional): this
+    // is a layout choice, not a color one, so it applies whether or not a
+    // theme is active. Active/hover feedback (Mantine's own primary-color
+    // highlight) is untouched.
+    control: {
+      background: 'transparent',
+      border: 'none',
+    },
+    toolbar: {
+      backgroundColor: 'var(--theme-editor-header-bg, var(--mantine-color-body))',
+      color: 'var(--theme-editor-header-text, inherit)',
+      // Without each Control's own border, the default inter-group gap reads
+      // as loose floating icons rather than one continuous bar — tighten it.
+      gap: '4px',
+      // The toolbar's own border-bottom (@mantine/tiptap's default separator)
+      // isn't a whitelisted token — blend it into the toolbar's own fill so
+      // it reads as a flat bar instead of an unthemed gray seam. Unthemed:
+      // same default border color as before (no visible change).
+      borderColor: 'var(--theme-editor-header-bg, var(--mantine-color-default-border))',
+      // RichTextEditor.Control (every toolbar button — H1, Bold, etc.)
+      // explicitly reads --mantine-color-text for its icon color, so it
+      // inherits BoardView's headingColor override along with everything
+      // else. Buttons are meant to stay their normal Mantine look regardless
+      // of theme — reset the var back to Mantine's own light/dark default,
+      // scoped to just this toolbar.
+      '--mantine-color-text': 'light-dark(#000, var(--mantine-color-dark-0))',
+      '--mantine-color-dimmed': 'light-dark(var(--mantine-color-gray-6), var(--mantine-color-dark-2))',
+    } as CSSProperties,
+  };
 }

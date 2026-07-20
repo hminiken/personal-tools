@@ -21,10 +21,10 @@ export const stickyPaneStyle: React.CSSProperties = {
 // A frosted panel behind each pane's content when the board has a background
 // photo — same frosted-glass recipe as the board tabs' `.tabGlass` variant
 // (BoardTabs.module.css), so the tabs and these panes read as one style.
-// Text inside is white: Mantine's Text/Title read the --mantine-color-text /
-// --mantine-color-dimmed CSS variables rather than an inherited `color`, so
-// overriding those two vars on the wrapper turns every default-colored and
-// "dimmed" label inside white without touching each child component.
+// glassTextStyle sets a literal `color: white`, which plain default Text/Title
+// (they set no `color` of their own) inherit normally; the --mantine-color-text/
+// --mantine-color-dimmed overrides below additionally cover anything that
+// reads those vars directly (`c="dimmed"`, the board-tabs CSS module).
 export default function Pane({
   hasBg,
   solid = false,
@@ -44,6 +44,30 @@ export default function Pane({
   children: React.ReactNode;
 }) {
   const useGlass = hasBg && !solid;
+  // Solid panes are the editor's own sheet — theme their background to match
+  // the RichTextEditor content sitting inside so the two read as one surface.
+  // Chrome panes (tree/sidebar) aren't glass and aren't the editor either —
+  // theme them as list/panel chrome, same as a Kanban list column.
+  const chrome: React.CSSProperties = useGlass
+    ? {
+        ...glassStyle,
+        ...glassTextStyle,
+        '--mantine-color-text': 'rgba(255,255,255,0.92)',
+        '--mantine-color-dimmed': 'rgba(255,255,255,0.65)',
+      } as React.CSSProperties
+    : solid
+      ? {
+          background: 'var(--theme-editor-bg, var(--mantine-color-body))',
+          // Blend the outer border into the same fill instead of leaving it
+          // on Mantine's default gray — otherwise it reads as a mismatched
+          // frame around an otherwise fully themed panel.
+          borderColor: 'var(--theme-editor-bg, var(--mantine-color-default-border))',
+        }
+      : {
+          background: 'var(--theme-list-bg, var(--mantine-color-body))',
+          borderColor: 'var(--theme-list-border, var(--mantine-color-default-border))',
+          color: 'var(--theme-list-text, inherit)',
+        };
   return (
     <Paper
       radius="md"
@@ -51,17 +75,7 @@ export default function Pane({
       // Solid panes keep a normal border; glass panes rely on their own
       // translucent border from glassStyle instead.
       withBorder={!useGlass}
-      style={{
-        ...(useGlass
-          ? ({
-              ...glassStyle,
-              ...glassTextStyle,
-              '--mantine-color-text': 'rgba(255,255,255,0.92)',
-              '--mantine-color-dimmed': 'rgba(255,255,255,0.65)',
-            } as React.CSSProperties)
-          : {}),
-        ...style,
-      }}
+      style={{ ...chrome, ...style }}
     >
       {children}
     </Paper>

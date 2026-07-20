@@ -16,6 +16,7 @@ import { useStackCardSidebar } from './useStackCardSidebar';
 import Pane, { stickyPaneStyle } from './Pane';
 import type { BoardCard, LabelCatalog } from '../../types';
 import { editorTextResetStyle } from './types';
+import { writingEditorStyles } from '@/utils/writingTheme';
 import classes from './StackCompileView.module.css';
 
 export type CompileSection = { card: BoardCard; label: string };
@@ -31,7 +32,7 @@ function SelectModeDoc({ mergedHtml }: { mergedHtml: string }) {
   const editor = useWritingEditor(mergedHtml, false);
   return (
     <div className={classes.selectDoc}>
-      <RichTextEditor editor={editor} style={{ border: 'none' }}>
+      <RichTextEditor editor={editor} style={{ border: 'none' }} styles={{ content: writingEditorStyles().content }}>
         <RichTextEditor.Content />
       </RichTextEditor>
     </div>
@@ -139,11 +140,16 @@ export default function StackCompileView({
           <div
             className={classes.stickyToolbar}
             style={{
-              background: 'var(--mantine-color-body)',
+              background: 'var(--theme-editor-header-bg, var(--mantine-color-body))',
+              color: 'var(--theme-editor-header-text, inherit)',
               // borderBottom: '1px solid var(--mantine-color-default-border)',
             }}
           >
-            <RichTextEditor editor={toolbarEditor} style={{ border: 'none', background: 'none' }}>
+            <RichTextEditor
+              editor={toolbarEditor}
+              style={{ border: 'none', background: 'none' }}
+              styles={{ toolbar: writingEditorStyles().toolbar, control: writingEditorStyles().control }}
+            >
               <WritingEditorToolbar />
             </RichTextEditor>
           </div>

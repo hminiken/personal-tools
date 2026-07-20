@@ -9,22 +9,25 @@ import { IconArrowLeft, IconLayoutBoard, IconSettings, IconFolders } from '@tabl
 import Link from 'next/link';
 import UnsplashPicker from '@components/UnsplashPicker';
 import { useRouter } from 'next/navigation';
-import { DndContext, MeasuringStrategy } from '@dnd-kit/core';
+import { DndContext, MeasuringStrategy, MeasuringFrequency } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import GroupRow from './GroupRow';
 import BoardTabs from './BoardTabs';
 import CardEditorModal from './CardEditorModal';
 import ManageLabelsModal from './ManageLabelsModal';
+import ManageThemesModal from './ManageThemesModal';
+import ImportTrelloModal from '../../../_components/ImportTrelloModal';
 import InlineAdd from './InlineAdd';
 import FileBrowserView from './file-browser/FileBrowserView';
 import BoardSettingsDrawer from './BoardSettingsDrawer';
 import BoardDragOverlay from './BoardDragOverlay';
 import { useBoardDnd } from './useBoardDnd';
-import { glassStyle } from './glass';
+import { glassStyle, glassTextStyle } from './glass';
 import { type Spacing } from '@components/DocumentSpacing';
 import { WordCountDisplay, sumBoardWords, type WordCountSettings, type WordCountMode } from '@components/WordCountDisplay';
 import { confirmAction, promptText, promptWordGoal } from '@/utils/dialogs';
-import type { Board, BoardGroup, BoardCard, LabelCatalog } from '../types';
+import { themeVars, type WritingThemeDefinition } from '@/utils/writingTheme';
+import type { Board, BoardGroup, BoardCard, LabelCatalog, WritingTheme } from '../types';
 import {
   createBoard, renameBoard, deleteBoard,
   createGroup, renameGroup, deleteGroup,
@@ -44,6 +47,7 @@ export default function BoardView({
   initialGroups,
   catalog,
   wcSettings: initialWcSettings,
+  themes,
 }: {
   projectId: number;
   projectTitle: string;
@@ -55,6 +59,7 @@ export default function BoardView({
   initialGroups: BoardGroup[];
   catalog: LabelCatalog;
   wcSettings: WordCountSettings;
+  themes: WritingTheme[];
 }) {
   const router = useRouter();
   const [groups, setGroups] = useState<BoardGroup[]>(initialGroups);
@@ -78,9 +83,19 @@ export default function BoardView({
   // Card editor
   const [editingCard, setEditingCard] = useState<BoardCard | null>(null);
   const [editorOpened, { open: openEditor, close: closeEditor }] = useDisclosure(false);
+  // Lazy-mount the editor modal: CardEditorModal builds a live Tiptap/ProseMirror
+  // instance on mount (with update/blur listeners) regardless of `opened`, so
+  // mounting it up front kept a heavy editor alive for the whole session. Mount
+  // only on first open, then keep it mounted so Mantine's close animation still
+  // plays and reopening stays instant. Written in render (idempotent ref).
+  const editorMountedRef = useRef(false);
+  editorMountedRef.current = editorMountedRef.current || editorOpened;
 
   // Label manager
   const [labelsOpened, { open: openLabels, close: closeLabels }] = useDisclosure(false);
+
+  // Theme manager
+  const [themesOpened, { open: openThemes, close: closeThemes }] = useDisclosure(false);
 
   // Board background (Unsplash) picker.
   const [bgOpened, { open: openBg, close: closeBg }] = useDisclosure(false);
@@ -88,12 +103,29 @@ export default function BoardView({
   // Settings drawer (slides in from the right) holding the board-level controls.
   const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
 
+  // Import-a-new-board-from-Trello modal, opened from the board-options menu.
+  const [importOpened, { open: openImport, close: closeImport }] = useDisclosure(false);
+
   // Document-wide prose spacing (stored on the active board).
   const activeBoard = boards.find((b) => b.id === activeBoardId);
   const boardBg = activeBoard?.backgroundImage ?? null;
   const boardCredit = activeBoard?.backgroundCredit
     ? (JSON.parse(activeBoard.backgroundCredit) as { name: string; link: string })
     : null;
+
+  // The board's active theme (if any), turned into --theme-* CSS custom
+  // properties applied on the outer wrapper below. Everything downstream
+  // (glass, groups, cards, editors) reads these with its current hardcoded
+  // look as the var() fallback, so no theme selected = unchanged.
+  const activeTheme = themes.find((t) => t.id === activeBoard?.themeId) ?? null;
+  const themeStyle = useMemo(() => {
+    if (!activeTheme) return {};
+    try {
+      return themeVars(JSON.parse(activeTheme.definition) as WritingThemeDefinition);
+    } catch {
+      return {};
+    }
+  }, [activeTheme]);
   const [spacing, setSpacing] = useState<Spacing>({
     lineHeight: activeBoard?.lineHeight ?? null,
     spaceBefore: activeBoard?.spaceBefore ?? null,
@@ -191,40 +223,94 @@ export default function BoardView({
     else router.push(`/writing/${projectId}`);
   };
 
-  const groupIds = groups.map((g) => `group:${g.id}`);
+  // dnd-kit's SortableContext compares `items` BY REFERENCE and broadcasts a
+  // new context value whenever that reference changes — re-rendering every
+  // sortable/droppable descendant regardless of React.memo. `groups` gets a
+  // fresh reference on every optimistic drag-over tick, so rebuilding this
+  // inline re-rendered the ENTIRE board (every group/list/card) each tick.
+  // Key the memo on the id sequence so the array stays referentially stable
+  // unless groups are actually added/removed/reordered.
+  const groupIdKey = groups.map((g) => g.id).join(',');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const groupIds = useMemo(() => groups.map((g) => `group:${g.id}`), [groupIdKey]);
+
+  // A theme-set solid color needs the exact same full-bleed treatment as a
+  // photo background — otherwise it's only as wide/tall as the shrink-wrapped
+  // content column instead of the whole page.
+  const hasThemeBoardBg = !!themeStyle['--theme-board-bg'];
+  const bleed = !!boardBg || hasThemeBoardBg;
 
   return (
     <Box
-      mx={boardBg ? { base: '-xs', sm: '-xl' } : undefined}
-      mt={boardBg ? '-md' : undefined}
-      px={boardBg ? { base: 'xs', sm: 'xl' } : undefined}
-      py={boardBg ? 'md' : undefined}
+      // The full-bleed background must cancel the Writing route's AppShell
+      // padding EXACTLY (NavigationShell: base 'xs', sm 'sm') — overshooting it
+      // (the old '-xl') pushed the box wider than the viewport on both sides
+      // and made the whole page scroll horizontally. Groups still scroll
+      // internally via each GroupRow's ScrollArea.
+      mx={bleed ? { base: '-xs', sm: '-sm' } : undefined}
+      mt={bleed ? '-md' : undefined}
+      px={bleed ? { base: 'xs', sm: 'sm' } : undefined}
+      py={bleed ? 'md' : undefined}
       style={
         boardBg
           ? {
               // flow-root: contain child margins (e.g. the header's mt) so they
               // don't collapse out to <body> and add stray scroll height.
               display: 'flow-root',
-              backgroundImage: `linear-gradient(rgba(0,0,0,0.18), rgba(0,0,0,0.18)), url(${boardBg})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundAttachment: 'fixed',
+              // The photo lives in a position:fixed layer below (not
+              // background-attachment:fixed, which forced a full-viewport
+              // repaint on every scroll frame — the board's main scroll jank).
+              // isolation:isolate contains that layer's zInd:-1 so it sits
+              // behind this box's content but above the AppShell background.
+              position: 'relative',
+              isolation: 'isolate',
               minHeight: '100vh',
+              // Mantine's Text/Title set no `color` of their own — they rely
+              // on plain CSS inheritance, so this is what actually reaches
+              // otherwise-untouched titles/labels (board/group/list titles,
+              // file-tree + sidebar labels). Explicitly-colored descendants
+              // (cards, the editor, glass panels) already set their own
+              // `color` and are unaffected.
+              color: 'var(--theme-heading, inherit)',
+              ...themeStyle,
             }
-          : { display: 'flow-root' }
+          : {
+              display: 'flow-root',
+              background: 'var(--theme-board-bg, transparent)',
+              minHeight: hasThemeBoardBg ? '100vh' : undefined,
+              color: 'var(--theme-heading, inherit)',
+              ...themeStyle,
+            }
       }
     >
+      {/* Board photo background — a viewport-fixed layer (zIndex -1, behind
+          content) instead of background-attachment:fixed, which repainted the
+          whole image every scroll frame. Same look, no per-frame repaint. */}
+      {boardBg && (
+        <Box
+          aria-hidden
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: -1,
+            pointerEvents: 'none',
+            backgroundImage: `linear-gradient(rgba(0,0,0,0.18), rgba(0,0,0,0.18)), url(${boardBg})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        />
+      )}
       {/* Header */}
       <Group justify="space-between" mb="sm" mt={'10px'} wrap="nowrap">
         <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
           <Button
             component={Link}
             href={backUrl}
-            variant="subtle"
+            variant="light"
             color="gray"
             size="compact-sm"
             leftSection={<IconArrowLeft size={16} />}
-            style={boardBg ? { color: 'rgba(255,255,255,0.9)', textShadow: '0 1px 2px rgba(0,0,0,0.4)' } : undefined}
+            style={boardBg ? { ...glassStyle, ...glassTextStyle } : undefined}
           >
             Projects
           </Button>
@@ -284,6 +370,7 @@ export default function BoardView({
         hasBg={!!boardBg}
         onSetBackground={openBg}
         onRemoveBackground={onRemoveBackground}
+        onImportBoard={openImport}
       />
 
       {/* Board body: groups + drag context (Kanban view) */}
@@ -292,7 +379,18 @@ export default function BoardView({
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetection}
-        measuring={{ droppable: { strategy: MeasuringStrategy.Always, frequency: 100 } }}
+        // WhileDragging (NOT Always): Always keeps dnd-kit re-measuring every
+        // droppable continuously even when idle. WhileDragging disables
+        // measuring entirely when not dragging, so idle cost is already zero.
+        //
+        // frequency MUST be Optimized (the default), NOT a number. A numeric
+        // frequency arms a setTimeout that re-measures every N ms for the WHOLE
+        // drag — and each re-measure builds a fresh droppableRects Map, which is
+        // a dependency of every SortableContext's context value, so it re-renders
+        // EVERY sortable item on the board ~10x/second (the core drag jank).
+        // Optimized re-measures only on real events (drag start, a card actually
+        // changing lists), which is all the pointer-first collision needs.
+        measuring={{ droppable: { strategy: MeasuringStrategy.WhileDragging, frequency: MeasuringFrequency.Optimized } }}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
@@ -320,7 +418,7 @@ export default function BoardView({
           </Stack>
         </SortableContext>
 
-        <BoardDragOverlay activeDrag={activeDrag} categories={catalog.categories} />
+        <BoardDragOverlay activeDrag={activeDrag} categories={catalog.categories} themeVars={themeStyle} />
       </DndContext>
 
       {/* Add group */}
@@ -365,6 +463,15 @@ export default function BoardView({
         onManageLabels={openLabels}
         projectId={projectId}
         activeBoardId={activeBoardId}
+        themes={themes}
+        activeThemeId={activeBoard?.themeId ?? null}
+        onManageThemes={openThemes}
+      />
+
+      <ManageThemesModal
+        themes={themes}
+        opened={themesOpened}
+        onClose={closeThemes}
       />
 
       <UnsplashPicker
@@ -376,22 +483,34 @@ export default function BoardView({
         }}
       />
 
-      <CardEditorModal
-        card={editingCard}
-        catalog={catalog}
-        opened={editorOpened}
-        onClose={closeEditor}
-        onManageLabels={openLabels}
-        spacing={spacing}
-        projectId={projectId}
-        wcSettings={wcSettings}
-      />
+      {editorMountedRef.current && (
+        <CardEditorModal
+          card={editingCard}
+          catalog={catalog}
+          opened={editorOpened}
+          onClose={closeEditor}
+          onManageLabels={openLabels}
+          spacing={spacing}
+          projectId={projectId}
+          wcSettings={wcSettings}
+          themeVars={themeStyle}
+        />
+      )}
 
       <ManageLabelsModal
         projectId={projectId}
         catalog={catalog}
         opened={labelsOpened}
         onClose={closeLabels}
+      />
+
+      {/* Import a NEW board into this (existing) project. Defaults its target to
+          the current project; the modal still allows switching to a new project. */}
+      <ImportTrelloModal
+        opened={importOpened}
+        onClose={closeImport}
+        projects={[{ id: projectId, title: projectTitle }]}
+        defaultProjectId={projectId}
       />
     </Box>
   );

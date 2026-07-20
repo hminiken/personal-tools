@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Group, ActionIcon, Menu, ScrollArea, Tooltip } from '@mantine/core';
-import { IconPlus, IconDots, IconPencil, IconTrash, IconPhoto, IconPhotoOff, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
+import { IconPlus, IconDots, IconPencil, IconTrash, IconPhoto, IconPhotoOff, IconChevronLeft, IconChevronRight, IconBrandTrello } from '@tabler/icons-react';
 import Link from 'next/link';
 import {
   DndContext, PointerSensor, useSensor, useSensors, closestCenter,
@@ -93,6 +93,7 @@ export default function BoardTabs({
   onSetBackground,
   onRemoveBackground,
   onSetWordGoal,
+  onImportBoard,
 }: {
   projectId: number;
   boards: Board[];
@@ -104,6 +105,7 @@ export default function BoardTabs({
   onSetBackground: () => void;
   onRemoveBackground: () => void;
   onSetWordGoal: () => void;
+  onImportBoard: () => void;
 }) {
   const [order, setOrder] = useState<Board[]>(boards);
   useEffect(() => { setOrder(boards); }, [boards]);
@@ -316,7 +318,13 @@ export default function BoardTabs({
           size="lg"
           onClick={onAddBoard}
           aria-label="Add board"
-          style={hasBg ? { color: '#fff', background: 'rgba(109, 109, 109, 0.22)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)' } : undefined}
+          style={hasBg ? {
+            color: 'var(--theme-glass-text, #fff)',
+            background: 'var(--theme-glass-bg, rgba(109, 109, 109, 0.22))',
+            backdropFilter: 'blur(var(--theme-glass-blur, 10px))',
+            WebkitBackdropFilter: 'blur(var(--theme-glass-blur, 10px))',
+            border: '1px solid var(--theme-glass-border, rgba(255,255,255,0.18))',
+          } : undefined}
         >
           <IconPlus size={18} />
         </ActionIcon>
@@ -324,7 +332,7 @@ export default function BoardTabs({
       <Menu position="bottom-end" withinPortal>
         <Menu.Target>
           <ActionIcon
-            variant="subtle"
+            variant="light"
             color="gray"
             size="lg"
             aria-label="Board options"
@@ -348,6 +356,10 @@ export default function BoardTabs({
               Remove background
             </Menu.Item>
           )}
+          <Menu.Divider />
+          <Menu.Item leftSection={<IconBrandTrello size={14} />} onClick={onImportBoard}>
+            Import board from Trello…
+          </Menu.Item>
         </Menu.Dropdown>
       </Menu>
     </Group>

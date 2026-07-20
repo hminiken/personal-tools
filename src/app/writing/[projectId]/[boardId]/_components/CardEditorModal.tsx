@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 import { useWritingEditor } from '@hooks/useWritingEditor';
 import { WritingEditorToolbar } from '@components/WritingEditorToolbar';
 import { docSpacingClass, spacingVars, type Spacing } from '@components/DocumentSpacing';
+import { writingEditorStyles } from '@/utils/writingTheme';
 import { UploadModal } from '@components/UploadModal';
 import { WordCountDisplay, type WordCountSettings } from '@components/WordCountDisplay';
 import { confirmAction, promptWordGoal } from '@/utils/dialogs';
@@ -50,6 +51,7 @@ export default function CardEditorModal({
   spacing,
   projectId,
   wcSettings,
+  themeVars = {},
 }: {
   card: BoardCard | null;
   catalog: LabelCatalog;
@@ -59,6 +61,12 @@ export default function CardEditorModal({
   spacing: Spacing;
   projectId: number;
   wcSettings: WordCountSettings;
+  // The active board theme's --theme-* CSS custom properties. The modal is
+  // portaled to <body>, outside BoardView's themed wrapper, so without these
+  // the editor/toolbar/etc. would fall back to their unthemed defaults. Set on
+  // the modal content (ancestor of header + body) so every var(--theme-*)
+  // reference inside resolves. Empty {} when no theme is active → unchanged.
+  themeVars?: Record<string, string>;
 }) {
   const router = useRouter();
 
@@ -415,7 +423,22 @@ export default function CardEditorModal({
       size="xl"
       centered
       title={titleNode}
-      styles={{ title: { flex: 1, marginRight: 'var(--mantine-spacing-sm)' } }}
+      styles={{
+        title: { flex: 1, marginRight: 'var(--mantine-spacing-sm)' },
+        // Theme vars live here (content is the ancestor of header + body), so
+        // the embedded editor + all var(--theme-*) refs inside resolve. The
+        // shell itself borrows the group surface — the same group-bg + heading
+        // pairing the board already uses for group titles, so contrast holds.
+        content: {
+          ...themeVars,
+          backgroundColor: 'var(--theme-group-bg, var(--theme-list-bg, var(--mantine-color-body)))',
+          color: 'var(--theme-heading, inherit)',
+        },
+        header: {
+          backgroundColor: 'var(--theme-group-bg, var(--theme-list-bg, var(--mantine-color-body)))',
+          color: 'var(--theme-heading, inherit)',
+        },
+      }}
     >
       <Stack gap="sm">
         {viewingCard && (
@@ -607,7 +630,13 @@ export default function CardEditorModal({
 
         {/* Editor + bubble menu */}
         <div className={docSpacingClass} style={spacingVars(spacing)}>
-          <RichTextEditor editor={editor} styles={{ content: { maxHeight: 380, overflowY: 'auto' } }}>
+          <RichTextEditor
+            editor={editor}
+            styles={{
+              ...writingEditorStyles(),
+              content: { ...writingEditorStyles().content, maxHeight: 380, overflowY: 'auto' },
+            }}
+          >
             <WritingEditorToolbar />
 
             {editor && (
@@ -694,7 +723,7 @@ export default function CardEditorModal({
                     style={{ cursor: 'pointer' }} onClick={() => jumpToComment(id)}>
                     <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xs">
                       <Box style={{ flex: 1, minWidth: 0 }}>
-                        <Text size="sm">{text}</Text>
+                        <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{text}</Text>
                         <Text size="10px" c="dimmed" mt={2}>
                           {new Date(createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </Text>

@@ -83,7 +83,7 @@ export function WordCountDisplay({
     const fill = goal ? Math.min(100, Math.round((count / goal) * 100)) : 0;
     return withTooltip(
       <Group gap="xs" wrap="nowrap" style={{ minWidth: 120 }}>
-        <Progress value={fill} size="sm" color={reached ? 'dark' : 'gray'} style={{ flex: 1 }} />
+        <Progress value={fill} size="sm" color={progressColor(reached)} style={{ flex: 1, ...progressTrackStyle }} />
         <Text
           size={size}
           c={light ? 'gray.3' : 'dimmed'}
@@ -101,6 +101,18 @@ export function WordCountDisplay({
   // the two modes look identical whenever no goal was set.
   const fill = goal ? Math.min(100, Math.round((count / goal) * 100)) : 0;
   return withTooltip(
-    <Progress value={fill} size="sm" color={reached ? 'dark' : 'gray'} style={{ minWidth: 60 }} />,
+    <Progress value={fill} size="sm" color={progressColor(reached)} style={{ minWidth: 60, ...progressTrackStyle }} />,
   );
 }
+
+// Passed straight through as Progress's `color` prop — Mantine only resolves
+// recognized theme color names (e.g. "gray"), so an unrecognized var()
+// string like this is forwarded to the fill verbatim, with the exact
+// default gray/dark distinction as the fallback when no theme is set.
+function progressColor(reached: boolean): string {
+  return `var(--theme-progress-fill, var(--mantine-color-${reached ? 'dark' : 'gray'}-filled))`;
+}
+
+const progressTrackStyle = {
+  backgroundColor: 'var(--theme-progress-bg, light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4)))',
+};

@@ -6,7 +6,7 @@ import { IconGripVertical, IconDots, IconPencil, IconTrash, IconBook2 } from '@t
 import { useParams, useRouter } from 'next/navigation';
 import { useSortable } from '@dnd-kit/sortable';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { useDroppable } from '@dnd-kit/core';
+import { useDroppable, type DraggableSyntheticListeners } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { animateLayoutChanges, sortableTransition } from './sortableConfig';
 import CardItem, { CardFace } from './CardItem';
@@ -17,13 +17,31 @@ import { setListWordGoal } from '../../../_actions/writing_actions';
 import { useInlineRename } from './useInlineRename';
 import type { BoardList, BoardCard, LabelCategory } from '../types';
 
-// Memoized: see GroupRow — lists that didn't change keep their identity
-// through drag updates, so only the affected list re-renders mid-drag.
-function ListColumn({
+type ListCallbacks = {
+  onOpenCard: (card: BoardCard) => void;
+  onOpenCardById: (cardId: number) => void;
+  onAddCard: (listId: number, title: string) => void;
+  onRename: (listId: number, title: string) => void;
+  onDelete: (listId: number) => void;
+};
+
+// All of the list's visible chrome (header/menu/word-count, the card stack, the
+// add-card row). Split out and MEMOIZED for the same reason as CardFace: dnd-kit
+// re-renders the sortable wrapper (ListColumn) on every genuine re-measure
+// during a drag, but this body only depends on data that's referentially stable
+// then (list identity, callbacks, the stable drag-handle refs/listeners). So on
+// those churn re-renders React bails out of re-rendering this whole subtree —
+// EXCEPT the card SortableContext deep inside, which is a dnd context consumer
+// and re-renders directly (memo bailouts don't block context propagation). Net:
+// the expensive Menu/Progress/ScrollArea header stays put; only the cards move.
+const ListColumnInner = memo(function ListColumnInner({
   list,
   categories,
   wcSettings,
   originDrag,
+  setDropRef,
+  setActivatorNodeRef,
+  listeners,
   onOpenCard,
   onOpenCardById,
   onAddCard,
@@ -34,18 +52,10 @@ function ListColumn({
   categories: LabelCategory[];
   wcSettings: WordCountSettings;
   originDrag: { card: BoardCard; listId: number; index: number } | null;
-  onOpenCard: (card: BoardCard) => void;
-  onOpenCardById: (cardId: number) => void;
-  onAddCard: (listId: number, title: string) => void;
-  onRename: (listId: number, title: string) => void;
-  onDelete: (listId: number) => void;
-}) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
-    useSortable({ id: `list:${list.id}`, data: { type: 'list', list }, animateLayoutChanges, transition: sortableTransition });
-
-  // Droppable zone so cards can be dropped onto this list (even when empty).
-  const { setNodeRef: setDropRef } = useDroppable({ id: `listzone:${list.id}`, data: { type: 'listzone', listId: list.id } });
-
+  setDropRef: (el: HTMLElement | null) => void;
+  setActivatorNodeRef: (el: HTMLElement | null) => void;
+  listeners: DraggableSyntheticListeners;
+} & ListCallbacks) {
   const { editing, setEditing, inputProps: titleInputProps } = useInlineRename({
     value: list.title,
     onCommit: (next) => onRename(list.id, next),
@@ -53,12 +63,12 @@ function ListColumn({
   const params = useParams();
   const router = useRouter();
 
-  const style: React.CSSProperties = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-  };
-
-  const cardIds = list.cards.map((c) => `card:${c.id}`);
+  // Referentially stable across drag-over ticks (see BoardView's groupIds):
+  // a new array ref here would make this list's card SortableContext broadcast
+  // and re-render every CardItem in the list even when nothing reordered.
+  const cardIdKey = list.cards.map((c) => c.id).join(',');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const cardIds = useMemo(() => list.cards.map((c) => `card:${c.id}`), [cardIdKey]);
 
   // Word-count sum only needs to be recomputed when the list's cards change.
   const listWordCount = useMemo(() => sumListWords(list), [list]);
@@ -76,44 +86,8 @@ function ListColumn({
     displayItems.splice(insertAt, 0, { kind: 'ghost' });
   }
 
-  // Ghost placeholder — dashed outline the same size as the real list.
-  if (isDragging) {
-    return (
-      <Paper
-        ref={setNodeRef}
-        style={{ ...style, borderStyle: 'dashed' }}
-        withBorder
-        radius="md"
-        bg="light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5))"
-        w={272}
-        miw={272}
-        p="xs"
-        {...attributes}
-      >
-        <Box style={{ opacity: 0 }}>
-          <Group justify="space-between" wrap="nowrap" mb="xs" gap={4}>
-            <Text fw={600} size="sm">{list.title}</Text>
-          </Group>
-          {list.cards.slice(0, 3).map((c) => (
-            <Box key={c.id} style={{ height: 36, marginBottom: 4 }} />
-          ))}
-        </Box>
-      </Paper>
-    );
-  }
-
   return (
-    <Paper
-      ref={setNodeRef}
-      style={style}
-      withBorder
-      radius="md"
-      bg="light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6))"
-      w={272}
-      miw={272}
-      p="xs"
-      {...attributes}
-    >
+    <>
       {/* Header */}
       <Group justify="space-between" wrap="nowrap" mb="xs" gap={4}>
         <ActionIcon
@@ -221,6 +195,98 @@ function ListColumn({
           onAdd={(v) => onAddCard(list.id, v)}
         />
       </div>
+    </>
+  );
+});
+
+// Thin sortable wrapper: holds the dnd-kit hooks and the outer Paper (the node
+// that gets the drag transform + attributes). dnd-kit re-renders this on every
+// re-measure mid-drag, but the heavy body lives in the memoized ListColumnInner
+// above, so those re-renders are cheap. See GroupRow — lists that didn't change
+// keep their identity through drag updates, so only the affected list re-renders.
+function ListColumn({
+  list,
+  categories,
+  wcSettings,
+  originDrag,
+  onOpenCard,
+  onOpenCardById,
+  onAddCard,
+  onRename,
+  onDelete,
+}: {
+  list: BoardList;
+  categories: LabelCategory[];
+  wcSettings: WordCountSettings;
+  originDrag: { card: BoardCard; listId: number; index: number } | null;
+} & ListCallbacks) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id: `list:${list.id}`, data: { type: 'list', list }, animateLayoutChanges, transition: sortableTransition });
+
+  // Droppable zone so cards can be dropped onto this list (even when empty).
+  const { setNodeRef: setDropRef } = useDroppable({ id: `listzone:${list.id}`, data: { type: 'listzone', listId: list.id } });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+  };
+
+  // Ghost placeholder — dashed outline the same size as the real list.
+  if (isDragging) {
+    return (
+      <Paper
+        ref={setNodeRef}
+        style={{ ...style, borderStyle: 'dashed' }}
+        withBorder
+        radius="md"
+        bg="var(--theme-list-bg, light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5)))"
+        w={272}
+        miw={272}
+        p="xs"
+        {...attributes}
+      >
+        <Box style={{ opacity: 0 }}>
+          <Group justify="space-between" wrap="nowrap" mb="xs" gap={4}>
+            <Text fw={600} size="sm">{list.title}</Text>
+          </Group>
+          {list.cards.slice(0, 3).map((c) => (
+            <Box key={c.id} style={{ height: 36, marginBottom: 4 }} />
+          ))}
+        </Box>
+      </Paper>
+    );
+  }
+
+  return (
+    <Paper
+      ref={setNodeRef}
+      style={{
+        ...style,
+        borderColor: 'var(--theme-list-border, var(--mantine-color-default-border))',
+        color: 'var(--theme-list-text, inherit)',
+      }}
+      withBorder
+      radius="md"
+      bg="var(--theme-list-bg, light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6)))"
+      w={272}
+      miw={272}
+      p="xs"
+      {...attributes}
+    >
+      <ListColumnInner
+        list={list}
+        categories={categories}
+        wcSettings={wcSettings}
+        originDrag={originDrag}
+        setDropRef={setDropRef}
+        setActivatorNodeRef={setActivatorNodeRef}
+        listeners={listeners}
+        onOpenCard={onOpenCard}
+        onOpenCardById={onOpenCardById}
+        onAddCard={onAddCard}
+        onRename={onRename}
+        onDelete={onDelete}
+      />
     </Paper>
   );
 }

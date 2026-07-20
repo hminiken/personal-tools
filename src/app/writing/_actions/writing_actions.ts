@@ -10,6 +10,7 @@ import path from 'path';
 import { compressImage } from '@/utils/compressImage';
 import { countWords } from '@/utils/writingWordCount';
 import { parseThemeDefinition } from '@/utils/writingTheme';
+import { serializeComments, type CommentRecord } from '@/utils/writingComments';
 
 // Revalidate every board page (covers all dynamic [projectId]/[boardId] instances).
 function revalidateBoards() {
@@ -742,6 +743,135 @@ export async function getCardById(cardId: number) {
     .filter(Boolean) as import('@/app/writing/[projectId]/[boardId]/types').LinkedCardRef[];
 
   return { ...card, labels: cardLabelRows, images, links };
+}
+
+// ==========================================
+// TRELLO IMPORT
+// ==========================================
+// Bulk-creates a project (or a board within an existing project) plus one
+// group, its lists, and their cards from an already-parsed Trello export
+// (see src/utils/trelloImport.ts for the parsing/validation step). Everything
+// happens in a single transaction with a single revalidate at the end, since
+// a board can carry hundreds of cards and we don't want per-card round-trips
+// or per-card page invalidations.
+export async function importTrelloBoard(input: {
+  target: { mode: 'existing'; projectId: number } | { mode: 'new'; title: string };
+  boardName: string;
+  labels?: { key: string; name: string; color: string }[];
+  groups: {
+    name: string;
+    lists: {
+      name: string;
+      cards: {
+        title: string;
+        contentHtml: string;
+        labelKeys?: string[];
+        comments?: { key: string; text: string; createdAt: string }[];
+      }[];
+    }[];
+  }[];
+}): Promise<{ projectId: number; boardId: number }> {
+  if (!input.target) throw new Error('No import target specified.');
+
+  const result = await writingDb.transaction(async (tx) => {
+    let projectId: number;
+    if (input.target.mode === 'new') {
+      const title = input.target.title.trim();
+      if (!title) throw new Error('New project needs a name.');
+      const insertedProject = await tx.insert(writingProjects).values({ title }).returning({ id: writingProjects.id }).get();
+      if (!insertedProject) throw new Error('Failed to create project.');
+      projectId = insertedProject.id;
+    } else {
+      projectId = input.target.projectId;
+    }
+
+    // Create the label catalog once up front, keyed by the Trello label id so
+    // per-card joins below can resolve their new integer labelId.
+    const labelIdByKey = new Map<string, number>();
+    const inputLabels = input.labels ?? [];
+    for (let labelIndex = 0; labelIndex < inputLabels.length; labelIndex++) {
+      const label = inputLabels[labelIndex];
+      const insertedLabel = await tx
+        .insert(labels)
+        .values({ projectId, categoryId: null, name: label.name, color: label.color, position: labelIndex + 1 })
+        .returning({ id: labels.id })
+        .get();
+      if (insertedLabel) labelIdByKey.set(label.key, insertedLabel.id);
+    }
+
+    const boardPositionRow = await tx
+      .select({ m: max(boards.position) })
+      .from(boards)
+      .where(eq(boards.projectId, projectId))
+      .get();
+    const boardPosition = (boardPositionRow?.m ?? 0) + 1;
+
+    const insertedBoard = await tx
+      .insert(boards)
+      .values({ projectId, title: input.boardName, position: boardPosition })
+      .returning({ id: boards.id })
+      .get();
+    if (!insertedBoard) throw new Error('Failed to create board.');
+    const boardId = insertedBoard.id;
+
+    for (let groupIndex = 0; groupIndex < input.groups.length; groupIndex++) {
+      const group = input.groups[groupIndex];
+      const insertedGroup = await tx
+        .insert(groups)
+        .values({ boardId, title: group.name, position: groupIndex + 1 })
+        .returning({ id: groups.id })
+        .get();
+      if (!insertedGroup) throw new Error('Failed to create group.');
+      const groupId = insertedGroup.id;
+
+      for (let listIndex = 0; listIndex < group.lists.length; listIndex++) {
+        const list = group.lists[listIndex];
+        const insertedList = await tx
+          .insert(lists)
+          .values({ groupId, title: list.name, position: listIndex + 1 })
+          .returning({ id: lists.id })
+          .get();
+        if (!insertedList) throw new Error('Failed to create list.');
+        const listId = insertedList.id;
+
+        for (let cardIndex = 0; cardIndex < list.cards.length; cardIndex++) {
+          const card = list.cards[cardIndex];
+          const content = card.contentHtml || '';
+
+          const commentRecord: CommentRecord = {};
+          for (const comment of card.comments ?? []) {
+            commentRecord[comment.key] = { text: comment.text, createdAt: comment.createdAt, anchored: false };
+          }
+
+          const insertedCard = await tx
+            .insert(cards)
+            .values({
+              listId,
+              title: card.title,
+              content: content || null,
+              position: cardIndex + 1,
+              wordCount: countWords(content),
+              comments: serializeComments(commentRecord),
+            })
+            .returning({ id: cards.id })
+            .get();
+          if (!insertedCard) throw new Error('Failed to create card.');
+
+          for (const labelKey of card.labelKeys ?? []) {
+            const labelId = labelIdByKey.get(labelKey);
+            if (labelId == null) continue;
+            await tx.insert(cardLabels).values({ cardId: insertedCard.id, labelId }).onConflictDoNothing();
+          }
+        }
+      }
+    }
+
+    return { projectId, boardId };
+  });
+
+  revalidateGallery();
+  revalidatePath(`/writing/${result.projectId}`);
+  return result;
 }
 
 // Lightweight list of all cards in a project for the link picker.

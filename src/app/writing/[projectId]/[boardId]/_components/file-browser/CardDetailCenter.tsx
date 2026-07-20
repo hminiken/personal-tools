@@ -13,6 +13,7 @@ import { RichTextEditor } from '@mantine/tiptap';
 import '@mantine/tiptap/styles.css';
 import { WritingEditorToolbar } from '@components/WritingEditorToolbar';
 import { docSpacingClass, spacingVars, type Spacing } from '@components/DocumentSpacing';
+import { writingEditorStyles } from '@/utils/writingTheme';
 import type { CardDetailState } from './useCardDetail';
 import { editorTextResetStyle } from './types';
 
@@ -79,7 +80,7 @@ export default function CardDetailCenter({
       {/* Editor + comment bubble menu — kept at standard light/dark text
           colors regardless of the glass pane's forced-white chrome text. */}
       <div className={docSpacingClass} style={{ ...spacingVars(spacing), ...editorTextResetStyle }}>
-        <RichTextEditor editor={detail.editor}>
+        <RichTextEditor editor={detail.editor} styles={writingEditorStyles()}>
           <WritingEditorToolbar />
 
           {detail.editor && (

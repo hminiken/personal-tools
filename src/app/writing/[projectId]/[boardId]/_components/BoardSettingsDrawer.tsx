@@ -1,13 +1,18 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import {
-  ActionIcon, Button, Divider, Drawer, Group, NumberInput, SegmentedControl, Stack, Text,
+  ActionIcon, Button, Divider, Drawer, Group, NumberInput, SegmentedControl, Select, Stack, Text,
   useMantineColorScheme, useComputedColorScheme,
 } from '@mantine/core';
-import { IconBook2, IconFileExport, IconMoon, IconSun, IconTags } from '@tabler/icons-react';
+import { IconBook2, IconFileExport, IconMoon, IconSun, IconTags, IconPalette } from '@tabler/icons-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { DocumentSpacingMenu, type Spacing } from '@components/DocumentSpacing';
 import type { WordCountSettings, WordCountMode } from '@components/WordCountDisplay';
+import { confirmAction } from '@/utils/dialogs';
+import { setBoardTheme, setThemeForAllBoards } from '../../../_actions/writing_actions';
+import type { WritingTheme } from '../types';
 
 // Settings drawer: slides in from the right with the board-level controls —
 // dark mode (the Writing Desk hides the site's top bar, so the toggle lives
@@ -23,6 +28,9 @@ export default function BoardSettingsDrawer({
   onManageLabels,
   projectId,
   activeBoardId,
+  themes,
+  activeThemeId,
+  onManageThemes,
 }: {
   opened: boolean;
   onClose: () => void;
@@ -38,9 +46,18 @@ export default function BoardSettingsDrawer({
   onManageLabels: () => void;
   projectId: number;
   activeBoardId: number;
+  themes: WritingTheme[];
+  activeThemeId: number | null;
+  onManageThemes: () => void;
 }) {
   const { setColorScheme } = useMantineColorScheme();
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
+  const router = useRouter();
+
+  // Selection is local — "Apply" is an explicit action, not live-on-change,
+  // so browsing themes in the dropdown doesn't repaint the board until asked.
+  const [selectedThemeId, setSelectedThemeId] = useState<string | null>(activeThemeId ? String(activeThemeId) : null);
+  useEffect(() => setSelectedThemeId(activeThemeId ? String(activeThemeId) : null), [activeThemeId]);
 
   return (
     <Drawer
@@ -111,6 +128,63 @@ export default function BoardSettingsDrawer({
               onChange={(v) => onWcSettings({ defaultGroupWordGoal: v === '' ? null : Number(v) })}
             />
           </Stack>
+        </div>
+
+        <Divider />
+
+        {/* Theme */}
+        <div>
+          <Text size="sm" fw={600} mb="xs">Theme</Text>
+          <Select
+            placeholder="Default look"
+            clearable
+            data={themes.map((t) => ({ value: String(t.id), label: t.name }))}
+            value={selectedThemeId}
+            onChange={setSelectedThemeId}
+            comboboxProps={{ withinPortal: true }}
+          />
+          <Group grow mt="xs">
+            <Button
+              size="xs"
+              variant="light"
+              color="gray"
+              onClick={async () => {
+                await setBoardTheme(activeBoardId, selectedThemeId ? Number(selectedThemeId) : null);
+                router.refresh();
+              }}
+            >
+              Apply to this board
+            </Button>
+            <Button
+              size="xs"
+              variant="light"
+              color="gray"
+              onClick={async () => {
+                if (await confirmAction({
+                  title: 'Apply theme to all boards',
+                  message: 'Apply this theme to every board in this project? This replaces each board’s current theme.',
+                  danger: false,
+                  confirmLabel: 'Apply',
+                })) {
+                  await setThemeForAllBoards(projectId, selectedThemeId ? Number(selectedThemeId) : null);
+                  router.refresh();
+                }
+              }}
+            >
+              Apply to all boards
+            </Button>
+          </Group>
+          <Button
+            mt="xs"
+            size="xs"
+            variant="subtle"
+            color="gray"
+            fullWidth
+            leftSection={<IconPalette size={14} />}
+            onClick={() => { onClose(); onManageThemes(); }}
+          >
+            Manage themes…
+          </Button>
         </div>
 
         <Divider />
