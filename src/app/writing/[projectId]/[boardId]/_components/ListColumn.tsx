@@ -164,7 +164,7 @@ function ListColumn({
                 router.refresh();
               }}
             >
-              Set word goal…
+              {list.wordCountGoal ? 'Update word goal…' : 'Set word goal…'}
             </Menu.Item>
             <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => onDelete(list.id)}>
               Delete list

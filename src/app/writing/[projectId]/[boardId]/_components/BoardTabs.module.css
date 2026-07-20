@@ -3,63 +3,74 @@
   align-items: center;
   white-space: nowrap;
   padding: 8px 16px;
-  border-radius: 8px 8px 0 0;
+  /* Flat, no rounded corners: these are underline tabs, not chips — nothing
+     is meant to read as a filled box sitting on the bar. */
+  border-radius: 0;
   font-size: var(--mantine-font-size-sm);
   font-weight: 600;
   text-decoration: none;
   cursor: grab;
-  color: light-dark(var(--mantine-color-gray-7), var(--mantine-color-gray-4));
-  background-color: light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5));
-  border: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
-  border-bottom: none;
-  /* overlap the 2px strip line so the active tab connects to the content */
+  /* Underline-style tabs: inactive tabs are just dimmed text over a continuous
+     divider (the line lives on the parent strip). The active tab turns its own
+     transparent underline into a solid accent rule; the negative margin pulls
+     that 2px underline down so it sits exactly over — and replaces — the gray
+     divider segment beneath the tab. No box, no fill, no break in the line. */
+  color: var(--mantine-color-dimmed);
+  background-color: transparent;
+  border-bottom: 2px solid transparent;
   margin-bottom: -2px;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
   user-select: none;
 }
 
 .tab:hover {
-  background-color: light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4));
-  color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
+  /* No fill — a background box would overlap and break the divider line under
+     the hovered tab. Just darken the text and hint with a dimmed underline,
+     clearly lighter than the active tab's solid accent underline. */
+  color: var(--mantine-color-text);
+  border-bottom-color: var(--mantine-color-dimmed);
 }
 
 .tab[data-active] {
-  background-color: light-dark(var(--mantine-color-dark-7), var(--mantine-color-gray-2));
-  border-color: light-dark(var(--mantine-color-dark-7), var(--mantine-color-gray-2));
-  color: light-dark(var(--mantine-color-white), var(--mantine-color-dark-9));
+  color: var(--mantine-color-text);
+  font-weight: 700;
+  border-bottom-color: var(--mantine-color-text);
 }
 
 .tab[data-active]:hover {
-  background-color: light-dark(var(--mantine-color-dark-8), var(--mantine-color-gray-3));
-  color: light-dark(var(--mantine-color-white), var(--mantine-color-dark-9));
+  color: var(--mantine-color-text);
+  border-bottom-color: var(--mantine-color-text);
 }
 
 .tab:active {
   cursor: grabbing;
 }
 
-/* Frosted glass variant — added alongside .tab when the board has a background photo */
+/* Over-photo variant — added alongside .tab when the board has a background
+   photo. No chip fill, no blur, no box: just legible white text sitting
+   directly on the photo, with the same underline mechanic as the plain tabs
+   (a soft shadow keeps the text readable over any background). The active tab
+   turns its underline solid white in place of the strip's translucent divider. */
 .tabGlass {
-  background: rgba(0, 0, 0, 0.20);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: rgba(255, 255, 255, 0.92);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .tabGlass:hover {
-  background: rgba(0, 0, 0, 0.32);
+  background: transparent;
   color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.6);
 }
 
 .tabGlass[data-active] {
-  background: rgba(0, 0, 0, 0.42);
-  border-color: rgba(255, 255, 255, 0.28);
+  background: transparent;
+  border-bottom-color: #fff;
   color: #fff;
 }
 
 .tabGlass[data-active]:hover {
-  background: rgba(0, 0, 0, 0.52);
+  background: transparent;
+  border-bottom-color: #fff;
   color: #fff;
 }

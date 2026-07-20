@@ -10,7 +10,7 @@ import { useDisclosure } from '@mantine/hooks';
 import {
   IconPhotoPlus, IconPencil, IconTrash, IconPhotoStar,
   IconMessage, IconCheck, IconX, IconMessageOff, IconChevronDown, IconChevronUp,
-  IconLink, IconArrowLeft, IconPlus,
+  IconLink, IconArrowLeft, IconPlus, IconPalette,
 } from '@tabler/icons-react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import { RichTextEditor } from '@mantine/tiptap';
@@ -27,6 +27,7 @@ import {
   addCardLink, removeCardLink, getCardById, getProjectCards, setCardWordGoal,
 } from '../../../_actions/writing_actions';
 import LabelPicker from './LabelPicker';
+import ColorPicker from './ColorPicker';
 import ImageViewerModal, { useImageViewer } from './ImageViewerModal';
 import {
   type CommentRecord,
@@ -91,6 +92,8 @@ export default function CardEditorModal({
   const [editingTitle, setEditingTitle] = useState(false);
   const [includeInCompile, setIncludeInCompile] = useState(true);
   const [isImageCard, setIsImageCard] = useState(false);
+  const [hideWordCount, setHideWordCount] = useState(false);
+  const [color, setColor] = useState<string | null>(null);
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -136,6 +139,8 @@ export default function CardEditorModal({
     setLiveWordCount(viewingCard?.wordCount ?? 0);
     setIncludeInCompile(viewingCard?.includeInCompile ?? true);
     setIsImageCard(viewingCard?.isImageCard ?? false);
+    setHideWordCount(viewingCard?.hideWordCount ?? false);
+    setColor(viewingCard?.color ?? null);
     setCoverImage(viewingCard?.coverImage ?? null);
     setImages((viewingCard?.images ?? []).map((i) => ({ id: i.id, path: i.path })));
     const cardId = viewingCard?.id;
@@ -201,6 +206,8 @@ export default function CardEditorModal({
       content: editor?.getHTML() || '',
       includeInCompile,
       isImageCard,
+      hideWordCount,
+      color,
       coverImage,
       comments: serializeComments(comments),
     });
@@ -248,6 +255,16 @@ export default function CardEditorModal({
   const handleToggleCompile = async (value: boolean) => {
     setIncludeInCompile(value);
     if (viewingCard) await updateCard(viewingCard.id, { includeInCompile: value });
+  };
+
+  const handleToggleHideWordCount = async (value: boolean) => {
+    setHideWordCount(value);
+    if (viewingCard) await updateCard(viewingCard.id, { hideWordCount: value });
+  };
+
+  const handleColorChange = async (next: string | null) => {
+    setColor(next);
+    if (viewingCard) await updateCard(viewingCard.id, { color: next });
   };
 
   // --- Link picker ---
@@ -343,6 +360,13 @@ export default function CardEditorModal({
     if (editor) jumpToCommentInEditor(editor, commentId);
   };
 
+  // Card color can derive from an applied label flagged to drive card color
+  // (lowest position wins). An explicit `color` on the card overrides it.
+  const drivingLabel = viewingCard?.labels
+    .filter((l) => l.drivesCardColor)
+    .sort((a, b) => a.position - b.position || a.id - b.id)[0] ?? null;
+  const labelColor = drivingLabel?.color ?? null;
+
   // --- Title node (shown in Modal title slot) ---
   const titleNode = (
     <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
@@ -402,7 +426,28 @@ export default function CardEditorModal({
             <Tooltip label="Show an image on the board instead of the title and text." withinPortal multiline w={260} position="top-start">
               <Switch label="Image card" checked={isImageCard} onChange={(e) => handleToggleImageCard(e.currentTarget.checked)} color="dark" w="fit-content" />
             </Tooltip>
+            <Tooltip label="Leave this card out of word tracking: it won't show a count anywhere, and its words won't count toward any list, group, board, or project total." withinPortal multiline w={260} position="top-start">
+              <Switch label="Hide word count" checked={hideWordCount} onChange={(e) => handleToggleHideWordCount(e.currentTarget.checked)} color="dark" w="fit-content" />
+            </Tooltip>
           </LabelPicker>
+        )}
+
+        {/* Card color — explicit color overrides any label-driven color */}
+        {viewingCard && (
+          <Group gap="xs" align="center">
+            <IconPalette size={16} color="var(--mantine-color-dimmed)" />
+            <Text size="sm">Card color</Text>
+            <ColorPicker value={(color ?? labelColor) ?? 'transparent'} onChange={handleColorChange} size={22} />
+            {color ? (
+              <Button variant="subtle" size="compact-xs" color="gray" onClick={() => handleColorChange(null)}>
+                {labelColor ? 'Use label color' : 'Clear'}
+              </Button>
+            ) : labelColor ? (
+              <Text size="xs" c="dimmed">
+                From label{drivingLabel ? ` “${drivingLabel.name}”` : ''}
+              </Text>
+            ) : null}
+          </Group>
         )}
 
         {/* Linked cards */}
@@ -534,7 +579,7 @@ export default function CardEditorModal({
           )}
         </Box>
 
-        {wcSettings.mode !== 'off' && (
+        {wcSettings.mode !== 'off' && !hideWordCount && (
           <Group justify="space-between" gap="xs">
             <WordCountDisplay
               count={liveWordCount}
@@ -555,7 +600,7 @@ export default function CardEditorModal({
                 router.refresh();
               }}
             >
-              Set goal…
+              {viewingCard?.wordCountGoal ? 'Update goal…' : 'Set goal…'}
             </Button>
           </Group>
         )}

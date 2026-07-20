@@ -42,12 +42,28 @@ export const writingFolders = sqliteTable('writing_folders', {
 export const writingSettings = sqliteTable('writing_settings', {
   id: integer('id').primaryKey().default(1),
   // How word counts are displayed everywhere.
-  wordCountDisplayMode: text('word_count_display_mode', { enum: ['off', 'bar', 'text'] }).notNull().default('off'),
+  wordCountDisplayMode: text('word_count_display_mode', { enum: ['off', 'bar', 'text', 'combo'] }).notNull().default('off'),
   // Fallback goals used when a card/list/group has no explicit wordCountGoal
   // of its own. Boards and projects have no default — always explicit or null.
   defaultCardWordGoal: integer('default_card_word_goal'),
   defaultListWordGoal: integer('default_list_word_goal'),
   defaultGroupWordGoal: integer('default_group_word_goal'),
+
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
+});
+
+// ==========================================
+// 0c. THEMES  (uploaded visual themes — selectable per board)
+// ==========================================
+// Not scoped to any project/board — this is the generic "account-level" store
+// since there's no user/account table yet. `definition` is a JSON object of
+// optional CSS color/shadow tokens (see the whitelist in utils/writingTheme.ts);
+// any token a theme omits falls back to the Writing Desk's built-in look.
+export const writingThemes = sqliteTable('writing_themes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  definition: text('definition').notNull().default('{}'),
 
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
@@ -88,6 +104,10 @@ export const boards = sqliteTable('boards', {
   backgroundImage: text('background_image'),
   backgroundCredit: text('background_credit'),
 
+  // Optional theme applied to this board (see writingThemes above). Null =
+  // the built-in default look.
+  themeId: integer('theme_id').references(() => writingThemes.id, { onDelete: 'set null' }),
+
   // Document-wide prose spacing for this board, applied as CSS to every card
   // editor (compiled view + card modal). Null = use the editor default.
   lineHeight: text('line_height'),
@@ -99,7 +119,7 @@ export const boards = sqliteTable('boards', {
   wordCountGoal: integer('word_count_goal'),
   // Per-board override of the global word-count display mode. Null = inherit
   // writingSettings.wordCountDisplayMode.
-  wordCountDisplayMode: text('word_count_display_mode', { enum: ['off', 'bar', 'text'] }),
+  wordCountDisplayMode: text('word_count_display_mode', { enum: ['off', 'bar', 'text', 'combo'] }),
 
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
@@ -165,6 +185,10 @@ export const cards = sqliteTable('cards', {
   // images (see cardImages); null means no cover chosen.
   coverImage: text('cover_image'),
 
+  // Optional background color for the whole card on the board (CSS hex, see
+  // LABEL_COLORS). Applied as a soft tint behind the card. Null = default.
+  color: text('color'),
+
   // When false, this card is skipped in the compiled chapter/board view.
   includeInCompile: integer('include_in_compile', { mode: 'boolean' }).notNull().default(true),
 
@@ -179,6 +203,10 @@ export const cards = sqliteTable('cards', {
   // Optional word-count goal for this card. Null = fall back to the global
   // default card goal (writingSettings.defaultCardWordGoal).
   wordCountGoal: integer('word_count_goal'),
+  // Per-card opt-out: when true, this card never shows a word count anywhere,
+  // regardless of the board-wide display mode. For cards where a count is
+  // meaningless (image cards, dividers, notes, etc.).
+  hideWordCount: integer('hide_word_count', { mode: 'boolean' }).notNull().default(false),
 
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
@@ -228,6 +256,10 @@ export const labels = sqliteTable('labels', {
   categoryId: integer('category_id').references(() => labelCategories.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   color: text('color').notNull().default('gray'),
+  // When true, applying this label to a card sets the card's accent color to
+  // this label's color (live-derived — see effectiveCardColor). An explicit
+  // color on the card itself overrides it.
+  drivesCardColor: integer('drives_card_color', { mode: 'boolean' }).notNull().default(false),
   position: real('position').notNull().default(0),
 
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
@@ -278,6 +310,11 @@ export const writingProjectsRelations = relations(writingProjects, ({ one, many 
 export const boardsRelations = relations(boards, ({ one, many }) => ({
   project: one(writingProjects, { fields: [boards.projectId], references: [writingProjects.id] }),
   groups: many(groups),
+  theme: one(writingThemes, { fields: [boards.themeId], references: [writingThemes.id] }),
+}));
+
+export const writingThemesRelations = relations(writingThemes, ({ many }) => ({
+  boards: many(boards),
 }));
 
 export const groupsRelations = relations(groups, ({ one, many }) => ({

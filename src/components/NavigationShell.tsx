@@ -21,6 +21,7 @@ import { useWakeLock } from '@hooks/useWakeLock';
 import { useEffect } from 'react';
 import { useMediaQuery } from '@mantine/hooks';
 import { usePageTitleSuffix } from '@/components/PageTitleContext';
+import { NavShellProvider } from '@/components/NavShellContext';
 
 export default function NavigationShell({ children }: { children: React.ReactNode }) {
   // Start the sidebar closed by default
@@ -63,6 +64,7 @@ useEffect(() => {
   const isWriting = pathname.startsWith('/writing');
 
   return (
+    <NavShellProvider value={{ opened, toggle }}>
     <AppShell
       header={{ height: isWriting ? 0 : 60 }}
       navbar={{
@@ -204,5 +206,6 @@ useEffect(() => {
         {children}
       </AppShell.Main>
     </AppShell>
+    </NavShellProvider>
   );
 }

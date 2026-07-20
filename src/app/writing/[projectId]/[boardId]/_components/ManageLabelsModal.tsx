@@ -5,7 +5,7 @@ import {
   Modal, Stack, Group, Text, TextInput, Button, ActionIcon, Switch,
   Divider, Paper, ScrollArea, Tooltip, Select,
 } from '@mantine/core';
-import { IconPlus, IconTrash, IconHelpCircle } from '@tabler/icons-react';
+import { IconPlus, IconTrash, IconHelpCircle, IconBorderTop } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import ColorPicker from './ColorPicker';
 import { DEFAULT_LABEL_COLOR } from '@/utils/writingLabels';
@@ -46,6 +46,22 @@ function LabelRow({ label, onChanged }: { label: Label; onChanged: () => void })
         onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
         style={{ flex: 1 }}
       />
+      <Tooltip
+        label={label.drivesCardColor
+          ? 'Coloring cards with this label. Click to stop.'
+          : "Use this label's color as the card's accent strip when applied"}
+        withinPortal multiline w={230}
+      >
+        <ActionIcon
+          variant={label.drivesCardColor ? 'filled' : 'subtle'}
+          color={label.drivesCardColor ? label.color : 'gray'}
+          autoContrast
+          onClick={() => { updateLabel(label.id, { drivesCardColor: !label.drivesCardColor }); onChanged(); }}
+          aria-label="Toggle whether this label colors the card"
+        >
+          <IconBorderTop size={16} />
+        </ActionIcon>
+      </Tooltip>
       <Tooltip label="Delete label" withinPortal>
         <ActionIcon variant="subtle" color="red" onClick={() => { deleteLabel(label.id); onChanged(); }} aria-label="Delete label">
           <IconTrash size={16} />

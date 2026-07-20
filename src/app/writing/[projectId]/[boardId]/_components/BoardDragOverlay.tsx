@@ -2,7 +2,7 @@
 
 import { Group, Paper, Text } from '@mantine/core';
 import { DragOverlay } from '@dnd-kit/core';
-import { CardFace } from './CardItem';
+import { CardFace, cardAccentBorder, effectiveCardColor } from './CardItem';
 import type { ActiveDrag } from './useBoardDnd';
 import type { LabelCatalog } from '../types';
 
@@ -30,6 +30,7 @@ export default function BoardDragOverlay({
             transform: 'rotate(2deg)',
             cursor: 'grabbing',
             overflow: activeDrag.card.isImageCard ? 'hidden' : undefined,
+            borderTop: cardAccentBorder(effectiveCardColor(activeDrag.card)),
           }}
         >
           <CardFace card={activeDrag.card} categories={categories} />

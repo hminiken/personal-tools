@@ -42,6 +42,7 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
   const [editingTitle, setEditingTitle] = useState(false);
   const [includeInCompile, setIncludeInCompile] = useState(true);
   const [isImageCard, setIsImageCard] = useState(false);
+  const [hideWordCount, setHideWordCount] = useState(false);
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [liveWordCount, setLiveWordCount] = useState(0);
@@ -76,6 +77,7 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
     setLiveWordCount(viewingCard?.wordCount ?? 0);
     setIncludeInCompile(viewingCard?.includeInCompile ?? true);
     setIsImageCard(viewingCard?.isImageCard ?? false);
+    setHideWordCount(viewingCard?.hideWordCount ?? false);
     setCoverImage(viewingCard?.coverImage ?? null);
     setImages((viewingCard?.images ?? []).map((i) => ({ id: i.id, path: i.path })));
     const cardId = viewingCard?.id;
@@ -180,6 +182,11 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
   const handleToggleImageCard = async (value: boolean) => {
     setIsImageCard(value);
     if (viewingCard) await updateCard(viewingCard.id, { isImageCard: value });
+  };
+
+  const handleToggleHideWordCount = async (value: boolean) => {
+    setHideWordCount(value);
+    if (viewingCard) await updateCard(viewingCard.id, { hideWordCount: value });
   };
 
   const handleSetCover = async (path: string) => {
@@ -316,8 +323,8 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
     title, editingTitle,
     setTitle, setEditingTitle, commitTitle,
 
-    includeInCompile, isImageCard,
-    handleToggleCompile, handleToggleImageCard,
+    includeInCompile, isImageCard, hideWordCount,
+    handleToggleCompile, handleToggleImageCard, handleToggleHideWordCount,
 
     coverImage, images,
     handleSetCover, handleDeleteImage, handleImageUploaded,

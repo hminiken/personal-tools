@@ -5,6 +5,7 @@ import { ActionIcon, Box, Group, Text, Tooltip } from '@mantine/core';
 import {
   IconBan, IconChevronDown, IconChevronRight, IconFileText, IconFolder, IconFolderOpen,
 } from '@tabler/icons-react';
+import { effectiveCardColor } from '../CardItem';
 import type { BoardCard, BoardGroup, BoardList } from '../../types';
 import type { FileBrowserSelection } from './types';
 
@@ -145,7 +146,7 @@ export default function FileTree({
                         onClick={() => onSelectCard(card)}
                         icon={
                           card.includeInCompile ? (
-                            <IconFileText size={15} />
+                            <IconFileText size={15} color={effectiveCardColor(card) ?? undefined} />
                           ) : (
                             <Tooltip label="Excluded from compile" withinPortal>
                               <span style={{ display: 'flex' }}>

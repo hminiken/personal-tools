@@ -129,18 +129,18 @@ export default function StackCompileView({
 
   return (
     <>
-      <Pane hasBg={hasBg}>
+      <Pane hasBg={hasBg} solid>
         {/* Sticky toolbar sits first, above the title — it's the first thing
             in the pane so nothing scrolls past above it once it locks in
-            place. A flat, opaque bar rather than a boxed/padded panel. */}
+            place. A flat, fully opaque bar (matching the solid editor sheet)
+            so scrolled prose never shows through and no translucent layers
+            stack over the board photo behind it. */}
         {sections.length > 0 && mode === 'edit' && (
           <div
             className={classes.stickyToolbar}
             style={{
-              background: hasBg ? 'rgba(20,20,20,0.1)' : 'var(--mantine-color-body)',
-              backdropFilter: hasBg ? 'blur(10px)' : undefined,
-              WebkitBackdropFilter: hasBg ? 'blur(10px)' : undefined,
-              borderBottom: `1px solid ${hasBg ? 'rgba(255,255,255,0.18)' : 'var(--mantine-color-default-border)'}`,
+              background: 'var(--mantine-color-body)',
+              // borderBottom: '1px solid var(--mantine-color-default-border)',
             }}
           >
             <RichTextEditor editor={toolbarEditor} style={{ border: 'none', background: 'none' }}>

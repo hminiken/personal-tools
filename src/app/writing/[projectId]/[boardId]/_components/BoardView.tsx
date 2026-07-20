@@ -202,13 +202,16 @@ export default function BoardView({
       style={
         boardBg
           ? {
+              // flow-root: contain child margins (e.g. the header's mt) so they
+              // don't collapse out to <body> and add stray scroll height.
+              display: 'flow-root',
               backgroundImage: `linear-gradient(rgba(0,0,0,0.18), rgba(0,0,0,0.18)), url(${boardBg})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundAttachment: 'fixed',
               minHeight: '100vh',
             }
-          : undefined
+          : { display: 'flow-root' }
       }
     >
       {/* Header */}

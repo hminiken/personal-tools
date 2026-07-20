@@ -2,7 +2,7 @@
 
 import { Popover, ColorSwatch, SimpleGrid, useMantineTheme } from '@mantine/core';
 import { IconCheck } from '@tabler/icons-react';
-import { LABEL_COLORS } from '@/utils/writingLabels';
+import { LABEL_COLORS, onSwatchColor } from '@/utils/writingLabels';
 
 // Resolve a stored color value to a hex for the swatch preview. Hex values pass
 // through; legacy Mantine color NAMES (e.g. 'rust') resolve via the theme.
@@ -47,7 +47,7 @@ export default function ColorPicker({
               type="button"
               color={hex}
               size={24}
-              style={{ cursor: 'pointer', color: '#fff' }}
+              style={{ cursor: 'pointer', color: onSwatchColor(hex) }}
               onClick={() => onChange(hex)}
               aria-label={hex}
             >

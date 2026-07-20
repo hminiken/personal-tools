@@ -7,8 +7,9 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
-  IconHome, IconDots, IconArrowRight, IconPhoto, IconPhotoUp, IconPhotoOff, IconSortAscending,
+  IconHome, IconDots, IconArrowRight, IconPhoto, IconPhotoUp, IconPhotoOff, IconSortAscending, IconMenu2,
 } from '@tabler/icons-react';
+import { useNavShell } from '@/components/NavShellContext';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ItemGallery from '@/components/ItemGallery';
@@ -64,6 +65,7 @@ export default function WritingGalleryView({
   wcSettings: WordCountSettings;
 }) {
   const router = useRouter();
+  const { toggle: toggleNavShell } = useNavShell();
   const [newFolderOpened, { open: openNewFolder, close: closeNewFolder }] = useDisclosure(false);
   const [renameTarget, setRenameTarget] = useState<FolderRow | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -146,7 +148,13 @@ export default function WritingGalleryView({
   return (
     <Box mt={'10px'}>
       {/* Breadcrumbs (top level shows just Home) */}
-      <Breadcrumbs mb="lg">
+      <Group gap="xs" mb="lg" wrap="nowrap">
+        {currentFolderId === null && (
+          <ActionIcon variant="subtle" color="gray" onClick={toggleNavShell} aria-label="Toggle menu">
+            <IconMenu2 size={18} stroke={1.5} />
+          </ActionIcon>
+        )}
+        <Breadcrumbs mb={0}>
         <Anchor component={Link} href="/writing" c="dimmed">
           <Group gap={4} wrap="nowrap"><IconHome size={16} /> Writing</Group>
         </Anchor>
@@ -158,6 +166,7 @@ export default function WritingGalleryView({
           )
         )}
       </Breadcrumbs>
+      </Group>
 
       {/* New Folder button, stacked above ItemGallery's New Project button */}
       <FloatingAddButton onClick={openNewFolder} text="New Folder" color="dark.4" botOffset={56} />
@@ -240,7 +249,7 @@ export default function WritingGalleryView({
                   setProjectWordGoal(project.id, goal);
                 }}
               >
-                Set word goal…
+                {project.wordCountGoal ? 'Update word goal…' : 'Set word goal…'}
               </Menu.Item>
               <Menu.Divider />
               <Menu.Label>Cover image</Menu.Label>

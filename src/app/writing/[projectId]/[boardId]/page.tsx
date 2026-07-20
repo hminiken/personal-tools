@@ -1,7 +1,7 @@
 // src/app/writing/[projectId]/[boardId]/page.tsx
 import { writingDb } from '@/db/writing';
 import { writingProjects, boards, groups, lists, cards, cardImages, labels, labelCategories, cardLabels, cardLinks } from '@/db/writing/schema';
-import { eq, desc, inArray, or, sql } from 'drizzle-orm';
+import { eq, desc, inArray, or, and, sql } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import BoardView from './_components/BoardView';
 import { getWritingSettings } from '../../_actions/writing_actions';
@@ -78,7 +78,9 @@ export default async function BoardPage({ params }: PageProps) {
     .innerJoin(lists, eq(cards.listId, lists.id))
     .innerJoin(groups, eq(lists.groupId, groups.id))
     .innerJoin(boards, eq(groups.boardId, boards.id))
-    .where(eq(boards.projectId, projectId))
+    // Cards excluded from compile or with word count switched off don't count
+    // toward the goal — mirror of countsTowardTotal() in WordCountDisplay.tsx.
+    .where(and(eq(boards.projectId, projectId), eq(cards.includeInCompile, true), eq(cards.hideWordCount, false)))
     .get();
   const projectWordCount = Number(projectWordTotal?.total ?? 0);
 

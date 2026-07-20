@@ -235,7 +235,7 @@ function GroupRow({
                 router.refresh();
               }}
             >
-              Set word goal…
+              {group.wordCountGoal ? 'Update word goal…' : 'Set word goal…'}
             </Menu.Item>
             <Menu.Item leftSection={<IconPhoto size={14} />} onClick={openBg}>
               {hasBg ? 'Change background' : 'Set background'}

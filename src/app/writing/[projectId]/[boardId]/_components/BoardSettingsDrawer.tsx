@@ -81,6 +81,7 @@ export default function BoardSettingsDrawer({
               { label: 'Off', value: 'off' },
               { label: 'Progress bar', value: 'bar' },
               { label: 'Text', value: 'text' },
+              { label: 'Combo', value: 'combo' },
             ]}
           />
           <Text size="xs" c="dimmed" mt="md" mb={4}>Default goals (cards/lists/groups can override)</Text>

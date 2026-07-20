@@ -2,13 +2,14 @@
 'use server';
 
 import { writingDb } from '@/db/writing';
-import { writingProjects, writingFolders, boards, groups, lists, cards, cardImages, labels, labelCategories, cardLabels, cardLinks, writingSettings } from '@/db/writing/schema';
+import { writingProjects, writingFolders, boards, groups, lists, cards, cardImages, labels, labelCategories, cardLabels, cardLinks, writingSettings, writingThemes } from '@/db/writing/schema';
 import { eq, and, max, inArray, isNull, or } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { writeFile } from 'fs/promises';
 import path from 'path';
 import { compressImage } from '@/utils/compressImage';
 import { countWords } from '@/utils/writingWordCount';
+import { parseThemeDefinition } from '@/utils/writingTheme';
 
 // Revalidate every board page (covers all dynamic [projectId]/[boardId] instances).
 function revalidateBoards() {
@@ -343,16 +344,18 @@ export async function createCard(listId: number, title: string) {
 
 export async function updateCard(
   cardId: number,
-  data: { title?: string; content?: string; includeInCompile?: boolean; isImageCard?: boolean; imagePath?: string | null; coverImage?: string | null; comments?: string | null }
+  data: { title?: string; content?: string; includeInCompile?: boolean; isImageCard?: boolean; imagePath?: string | null; coverImage?: string | null; comments?: string | null; hideWordCount?: boolean; color?: string | null }
 ) {
   const patch: Partial<typeof cards.$inferInsert> = {};
   if (data.title !== undefined) patch.title = data.title;
   if (data.content !== undefined) { patch.content = data.content; patch.wordCount = countWords(data.content); }
   if (data.includeInCompile !== undefined) patch.includeInCompile = data.includeInCompile;
   if (data.isImageCard !== undefined) patch.isImageCard = data.isImageCard;
+  if (data.hideWordCount !== undefined) patch.hideWordCount = data.hideWordCount;
   if (data.imagePath !== undefined) patch.imagePath = data.imagePath;
   if (data.coverImage !== undefined) patch.coverImage = data.coverImage;
   if (data.comments !== undefined) patch.comments = data.comments;
+  if (data.color !== undefined) patch.color = data.color;
   if (Object.keys(patch).length > 0) {
     await writingDb.update(cards).set(patch).where(eq(cards.id, cardId));
   }
@@ -443,7 +446,7 @@ export async function setCardWordGoal(cardId: number, goal: number | null) {
 // ==========================================
 // GLOBAL WRITING DESK SETTINGS  (singleton row, id = 1)
 // ==========================================
-export type WordCountDisplayMode = 'off' | 'bar' | 'text';
+export type WordCountDisplayMode = 'off' | 'bar' | 'text' | 'combo';
 
 export async function getWritingSettings() {
   const row = await writingDb.select().from(writingSettings).where(eq(writingSettings.id, 1)).get();
@@ -539,12 +542,13 @@ export async function createLabel(
 
 export async function updateLabel(
   labelId: number,
-  data: { name?: string; color?: string; categoryId?: number | null }
+  data: { name?: string; color?: string; categoryId?: number | null; drivesCardColor?: boolean }
 ) {
   const patch: Partial<typeof labels.$inferInsert> = {};
   if (data.name !== undefined) patch.name = data.name.trim();
   if (data.color !== undefined) patch.color = data.color;
   if (data.categoryId !== undefined) patch.categoryId = data.categoryId;
+  if (data.drivesCardColor !== undefined) patch.drivesCardColor = data.drivesCardColor;
   if (Object.keys(patch).length > 0) {
     await writingDb.update(labels).set(patch).where(eq(labels.id, labelId));
   }
@@ -632,6 +636,61 @@ export async function addCardLink(cardIdA: number, cardIdB: number) {
 export async function removeCardLink(linkId: number) {
   if (!linkId) return;
   await writingDb.delete(cardLinks).where(eq(cardLinks.id, linkId));
+  revalidateBoards();
+}
+
+// ==========================================
+// THEMES  (uploaded, selectable per board — not scoped to any project)
+// ==========================================
+export async function listThemes() {
+  return writingDb.select().from(writingThemes).orderBy(writingThemes.name).all();
+}
+
+// Validates + stores an uploaded theme file. Throws (with a message safe to
+// show the user) if the JSON is malformed or uses an unknown token/bad value —
+// see parseThemeDefinition for the exact rules.
+export async function createTheme(name: string, definitionJson: string) {
+  const t = name?.trim();
+  if (!t) throw new Error('Theme needs a name.');
+  const definition = parseThemeDefinition(definitionJson); // throws on invalid input
+  const inserted = await writingDb
+    .insert(writingThemes)
+    .values({ name: t, definition: JSON.stringify(definition) })
+    .returning({ id: writingThemes.id })
+    .get();
+  revalidateBoards();
+  return inserted?.id;
+}
+
+export async function renameTheme(themeId: number, name: string) {
+  const t = name?.trim();
+  if (!t) return;
+  await writingDb.update(writingThemes).set({ name: t }).where(eq(writingThemes.id, themeId));
+  revalidateBoards();
+}
+
+// Replaces a theme's definition in place (re-uploading the same theme rather
+// than creating a new one). Same validation as createTheme.
+export async function updateThemeDefinition(themeId: number, definitionJson: string) {
+  const definition = parseThemeDefinition(definitionJson); // throws on invalid input
+  await writingDb.update(writingThemes).set({ definition: JSON.stringify(definition) }).where(eq(writingThemes.id, themeId));
+  revalidateBoards();
+}
+
+// Any board still pointing at this theme falls back to the default look
+// (themeId set null via the FK's onDelete rule).
+export async function deleteTheme(themeId: number) {
+  await writingDb.delete(writingThemes).where(eq(writingThemes.id, themeId));
+  revalidateBoards();
+}
+
+export async function setBoardTheme(boardId: number, themeId: number | null) {
+  await writingDb.update(boards).set({ themeId }).where(eq(boards.id, boardId));
+  revalidateBoards();
+}
+
+export async function setThemeForAllBoards(projectId: number, themeId: number | null) {
+  await writingDb.update(boards).set({ themeId }).where(eq(boards.projectId, projectId));
   revalidateBoards();
 }
 

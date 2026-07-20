@@ -27,23 +27,32 @@ export const stickyPaneStyle: React.CSSProperties = {
 // "dimmed" label inside white without touching each child component.
 export default function Pane({
   hasBg,
+  solid = false,
   style,
   noPadding = false,
   children,
 }: {
   hasBg: boolean;
+  // Force a single opaque surface even over a board photo. The editor column
+  // uses this: its prose must sit on a solid sheet, so a translucent glass
+  // frame would only stack another semi-transparent layer over the photo
+  // behind the already-opaque editor. Chrome panes (tree/sidebar) stay glass.
+  solid?: boolean;
   style?: React.CSSProperties;
   // For the collapsed-tree rail: just a slim button strip, not a padded panel.
   noPadding?: boolean;
   children: React.ReactNode;
 }) {
+  const useGlass = hasBg && !solid;
   return (
     <Paper
       radius="md"
       p={noPadding ? 4 : 'sm'}
-      withBorder={!hasBg}
+      // Solid panes keep a normal border; glass panes rely on their own
+      // translucent border from glassStyle instead.
+      withBorder={!useGlass}
       style={{
-        ...(hasBg
+        ...(useGlass
           ? ({
               ...glassStyle,
               ...glassTextStyle,

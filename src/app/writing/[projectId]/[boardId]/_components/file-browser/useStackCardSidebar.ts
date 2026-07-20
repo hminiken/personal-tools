@@ -43,6 +43,7 @@ export function useStackCardSidebar({
 
   const [includeInCompile, setIncludeInCompile] = useState(true);
   const [isImageCard, setIsImageCard] = useState(false);
+  const [hideWordCount, setHideWordCount] = useState(false);
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [links, setLinks] = useState<LinkedCardRef[]>([]);
@@ -58,6 +59,7 @@ export function useStackCardSidebar({
   useEffect(() => {
     setIncludeInCompile(card?.includeInCompile ?? true);
     setIsImageCard(card?.isImageCard ?? false);
+    setHideWordCount(card?.hideWordCount ?? false);
     setCoverImage(card?.coverImage ?? null);
     setImages((card?.images ?? []).map((i) => ({ id: i.id, path: i.path })));
     const overrideLinks = card ? linksOverrideRef.current.get(card.id) : undefined;
@@ -84,6 +86,11 @@ export function useStackCardSidebar({
   const handleToggleImageCard = (value: boolean) => {
     setIsImageCard(value);
     if (card) updateCard(card.id, { isImageCard: value });
+  };
+
+  const handleToggleHideWordCount = (value: boolean) => {
+    setHideWordCount(value);
+    if (card) updateCard(card.id, { hideWordCount: value });
   };
 
   const handleSetCover = (path: string) => {
@@ -176,8 +183,10 @@ export function useStackCardSidebar({
     viewingCard: card,
     includeInCompile,
     isImageCard,
+    hideWordCount,
     handleToggleCompile,
     handleToggleImageCard,
+    handleToggleHideWordCount,
     coverImage,
     images,
     handleSetCover,

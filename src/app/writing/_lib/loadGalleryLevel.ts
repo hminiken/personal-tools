@@ -6,7 +6,7 @@
 // every folder (to power the "Move to…" picker). Pass null for the top level.
 import { writingDb } from '@/db/writing';
 import { writingFolders, writingProjects, boards, groups, lists, cards } from '@/db/writing/schema';
-import { eq, isNull, desc, sql } from 'drizzle-orm';
+import { eq, isNull, desc, and, sql } from 'drizzle-orm';
 
 export interface FolderRow {
   id: number;
@@ -53,6 +53,9 @@ export async function loadGalleryLevel(parentFolderId: number | null) {
     .innerJoin(lists, eq(cards.listId, lists.id))
     .innerJoin(groups, eq(lists.groupId, groups.id))
     .innerJoin(boards, eq(groups.boardId, boards.id))
+    // Same exclusions as the project header total (countsTowardTotal): cards
+    // out of the compile or with word count off aren't part of the goal.
+    .where(and(eq(cards.includeInCompile, true), eq(cards.hideWordCount, false)))
     .groupBy(boards.projectId)
     .all();
   const wordCountByProject = new Map(wordTotals.map((r) => [r.projectId, Number(r.total)]));

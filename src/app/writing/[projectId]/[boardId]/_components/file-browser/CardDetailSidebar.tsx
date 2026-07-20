@@ -4,6 +4,7 @@ import { useState } from 'react';
 import {
   ActionIcon, Badge, Box, Button, Collapse, Combobox, Group, HoverCard, Image, Paper,
   ScrollArea, SimpleGrid, Stack, Switch, Text, Textarea, Tooltip, useCombobox,
+  useComputedColorScheme,
 } from '@mantine/core';
 import {
   IconCheck, IconChevronDown, IconChevronUp, IconLink,
@@ -25,8 +26,10 @@ export type CardSidebarController = {
   viewingCard: BoardCard | null;
   includeInCompile: boolean;
   isImageCard: boolean;
+  hideWordCount: boolean;
   handleToggleCompile: (v: boolean) => void;
   handleToggleImageCard: (v: boolean) => void;
+  handleToggleHideWordCount: (v: boolean) => void;
   coverImage: string | null;
   images: GalleryImage[];
   handleSetCover: (path: string) => void;
@@ -81,6 +84,7 @@ export default function CardDetailSidebar({
   const viewer = useImageViewer(detail.images.length);
   const [addingNote, setAddingNote] = useState(false);
   const [noteText, setNoteText] = useState('');
+  const computedScheme = useComputedColorScheme('light');
 
   if (!viewingCard) return null;
 
@@ -105,6 +109,13 @@ export default function CardDetailSidebar({
 
   return (
     <Stack gap="md">
+      {/* Current-card header — the sidebar pops up on its own in the compile /
+          stack view, where nothing else names the focused card, so label it. */}
+      <Box>
+        <Text size="10px" c="dimmed" fw={700} tt="uppercase" style={{ letterSpacing: 0.5 }}>Selected card</Text>
+        <Text fw={700} lineClamp={2}>{viewingCard.title || 'Untitled'}</Text>
+      </Box>
+
       <LabelPicker key={viewingCard.id} card={viewingCard} catalog={catalog} onManage={onManageLabels} inline>
         <Stack gap={6} mt={6}>
           <Tooltip label="When off, this card is skipped in the compiled chapter/board view." withinPortal multiline w={220} position="top-start">
@@ -112,6 +123,9 @@ export default function CardDetailSidebar({
           </Tooltip>
           <Tooltip label="Show an image on the board instead of the title and text." withinPortal multiline w={220} position="top-start">
             <Switch label="Image card" checked={detail.isImageCard} onChange={(e) => detail.handleToggleImageCard(e.currentTarget.checked)} color="dark" w="fit-content" />
+          </Tooltip>
+          <Tooltip label="Leave this card out of word tracking: it won't show a count anywhere, and its words won't count toward any total." withinPortal multiline w={220} position="top-start">
+            <Switch label="Disable word count" checked={detail.hideWordCount} onChange={(e) => detail.handleToggleHideWordCount(e.currentTarget.checked)} color="dark" w="fit-content" />
           </Tooltip>
         </Stack>
       </LabelPicker>
@@ -222,7 +236,7 @@ export default function CardDetailSidebar({
         </Group>
       </Box>
 
-      {wcSettings.mode !== 'off' && (
+      {wcSettings.mode !== 'off' && !detail.hideWordCount && (
         <Box>
           <WordCountDisplay
             count={detail.liveWordCount}
@@ -230,8 +244,13 @@ export default function CardDetailSidebar({
             mode={wcSettings.mode}
             size="sm"
           />
-          <Button variant="subtle" size="compact-xs" color="gray" px={0} style={{ color: 'var(--mantine-color-dimmed)' }} onClick={detail.handleSetWordGoal}>
-            Set goal…
+          {/* px+negative-ml: keep the label left-aligned under the bar while
+              giving the subtle hover pill room so it doesn't clip the text. */}
+          <Button variant="subtle" size="compact-xs"  mt={6} px={6} ml={-6} 
+            style={{ color: 'var(--mantine-color-dimmed)' }} 
+            // color="gray"
+            onClick={detail.handleSetWordGoal}>
+            {viewingCard.wordCountGoal ? 'Update goal…' : 'Set goal…'}
           </Button>
         </Box>
       )}
@@ -265,6 +284,7 @@ export default function CardDetailSidebar({
                 <Textarea
                   size="xs"
                   placeholder="Note about this card…"
+                  styles={{ input: { color: computedScheme === 'dark' ? '#F1F3F5' : '#1A1B1E' } }}
                   value={noteText}
                   onChange={(e) => setNoteText(e.currentTarget.value)}
                   onKeyDown={(e) => {
@@ -275,12 +295,12 @@ export default function CardDetailSidebar({
                   minRows={1}
                   maxRows={5}
                   autoFocus
-                  style={{ flex: 1 }}
+                  style={{ flex: 1}}
                 />
                 <ActionIcon size="sm" color="dark.6" variant="filled" onClick={submitNote} disabled={!noteText.trim()}>
                   <IconCheck size={13} />
                 </ActionIcon>
-                <ActionIcon size="sm" variant="subtle" onClick={() => { setAddingNote(false); setNoteText(''); }}>
+                <ActionIcon size="sm" color="dark.6" variant="filled" onClick={() => { setAddingNote(false); setNoteText(''); }}>
                   <IconX size={13} />
                 </ActionIcon>
               </Group>
@@ -296,18 +316,25 @@ export default function CardDetailSidebar({
                   withBorder
                   radius="sm"
                   bg={anchored === false
-                    ? 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-5))'
-                    : 'light-dark(var(--mantine-color-yellow-0), var(--mantine-color-dark-6))'}
-                  style={{ cursor: anchored === false ? 'default' : 'pointer' }}
+                    ? 'light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5))'
+                    : 'light-dark(var(--mantine-color-yellow-1), var(--mantine-color-dark-6))'}
+                  style={{
+                    cursor: anchored === false ? 'default' : 'pointer',
+                    // Drop the frosted Pane's inherited white text-shadow so the
+                    // dark comment text below stays crisp. Text colors are set
+                    // explicitly per-Text (an inherited white `color` from the
+                    // glass chrome beats any --mantine-color-text override here).
+                    textShadow: 'none',
+                  }}
                   onClick={anchored === false ? undefined : () => detail.jumpToComment(id)}
                 >
                   <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xs">
                     <Box style={{ flex: 1, minWidth: 0 }}>
                       {anchored === false && (
-                        <Text size="9px" c="dimmed" fw={700} tt="uppercase" style={{ letterSpacing: 0.5 }}>Note</Text>
+                        <Text size="9px" c="light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-1))" fw={700} tt="uppercase" style={{ letterSpacing: 0.5 }}>Note</Text>
                       )}
-                      <Text size="sm">{text}</Text>
-                      <Text size="10px" c="dimmed" mt={2}>
+                      <Text size="sm" c="light-dark(var(--mantine-color-black), var(--mantine-color-gray-0))">{text}</Text>
+                      <Text size="10px" c="light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-1))" mt={2}>
                         {new Date(createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </Text>
                     </Box>

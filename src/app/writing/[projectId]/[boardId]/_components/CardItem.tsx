@@ -16,6 +16,27 @@ function preview(html: string | null | undefined): string {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+// A card's color shows as an accent strip along the card's top edge (a thick
+// colored top border) — enough to flag the color at a glance without tinting
+// the whole card, so the title/preview stay clean. Returns undefined for
+// uncolored cards, leaving the default 1px border in place.
+const ACCENT_STRIP = 8;
+export function cardAccentBorder(color: string | null | undefined): string | undefined {
+  return color ? `${ACCENT_STRIP}px solid ${color}` : undefined;
+}
+
+// Resolves the color a card actually displays: an explicit color on the card
+// always wins (a manual override); otherwise it derives — live — from the
+// applied label flagged to drive card color (lowest position wins if a card
+// carries several such labels). null = no color.
+export function effectiveCardColor(card: Pick<BoardCard, 'color' | 'labels'>): string | null {
+  if (card.color) return card.color;
+  const driver = card.labels
+    .filter((l) => l.drivesCardColor)
+    .sort((a, b) => a.position - b.position || a.id - b.id)[0];
+  return driver?.color ?? null;
+}
+
 function LinkChip({ link, onOpenLinked }: { link: LinkedCardRef; onOpenLinked: (cardId: number) => void }) {
   return (
     <HoverCard width={260} shadow="md" withinPortal openDelay={300} closeDelay={100}>
@@ -141,7 +162,7 @@ export function CardFace({
             {text && (
               <Text size="xs" c="dimmed" lineClamp={3} mt={2}>{text}</Text>
             )}
-            {wcSettings && wcSettings.mode !== 'off' && (
+            {wcSettings && wcSettings.mode !== 'off' && !card.hideWordCount && (
               <Box mt={6}>
                 <WordCountDisplay count={card.wordCount} goal={card.wordCountGoal ?? wcSettings.defaultCardGoal} mode={wcSettings.mode} />
               </Box>
@@ -175,7 +196,7 @@ export function CardFace({
       {text && (
         <Text size="xs" c="dimmed" lineClamp={2} mt={2}>{text}</Text>
       )}
-      {wcSettings && wcSettings.mode !== 'off' && (
+      {wcSettings && wcSettings.mode !== 'off' && !card.hideWordCount && (
         <Box mt={6}>
           <WordCountDisplay count={card.wordCount} goal={card.wordCountGoal ?? wcSettings.defaultCardGoal} mode={wcSettings.mode} />
         </Box>
@@ -220,7 +241,7 @@ function CardItem({
     return (
       <Paper
         ref={setNodeRef}
-        style={{ ...style, cursor: 'grab', overflow: isImage ? 'hidden' : undefined, opacity: 0.35 }}
+        style={{ ...style, cursor: 'grab', overflow: isImage ? 'hidden' : undefined, opacity: 0.35, borderTop: cardAccentBorder(effectiveCardColor(card)) }}
         withBorder
         radius="sm"
         p={isImage ? 0 : 'xs'}
@@ -236,7 +257,7 @@ function CardItem({
   return (
     <Paper
       ref={setNodeRef}
-      style={{ ...style, cursor: 'grab', overflow: isImage ? 'hidden' : undefined }}
+      style={{ ...style, cursor: 'grab', overflow: isImage ? 'hidden' : undefined, borderTop: cardAccentBorder(effectiveCardColor(card)) }}
       withBorder
       shadow="xs"
       radius="sm"

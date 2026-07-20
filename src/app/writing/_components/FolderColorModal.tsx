@@ -2,7 +2,7 @@
 
 import { Modal, SimpleGrid, ColorSwatch, Button, Group, Text, Stack } from '@mantine/core';
 import { IconCheck, IconX } from '@tabler/icons-react';
-import { LABEL_COLORS } from '@/utils/writingLabels';
+import { LABEL_COLORS, onSwatchColor } from '@/utils/writingLabels';
 
 // Pick (or clear) a folder's accent color. Reuses the same swatch palette as the
 // label/group color pickers so folder colors stay on-theme. `value` is the
@@ -34,7 +34,7 @@ export function FolderColorModal({
               type="button"
               color={hex}
               size={26}
-              style={{ cursor: 'pointer', color: '#fff' }}
+              style={{ cursor: 'pointer', color: onSwatchColor(hex) }}
               onClick={() => { onPick(hex); onClose(); }}
               aria-label={hex}
             >

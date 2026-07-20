@@ -98,7 +98,17 @@ export default function FileBrowserView({
       <Pane hasBg={hasBg} style={stickyPaneStyle} noPadding={treeCollapsed}>
         {treeCollapsed ? (
           <Tooltip label="Show file tree" withinPortal position="right">
-            <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => setTreeCollapsed(false)} aria-label="Expand file tree" style={{ width: '100%' }}>
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              radius="sm"
+              onClick={() => setTreeCollapsed(false)}
+              aria-label="Expand file tree"
+              // Fill the slim rail evenly: full width, a matching square-ish
+              // height, so the hover fill is a tidy rounded block instead of a
+              // lopsided box from size="lg"'s fixed square.
+              style={{ width: '100%', height: 32 }}
+            >
               <IconChevronRight size={16} />
             </ActionIcon>
           </Tooltip>
@@ -131,7 +141,7 @@ export default function FileBrowserView({
 
       {showCard ? (
         <>
-          <Pane hasBg={hasBg}>
+          <Pane hasBg={hasBg} solid>
             <CardDetailCenter detail={detail} spacing={spacing} />
           </Pane>
           <Pane hasBg={hasBg} style={stickyPaneStyle}>
