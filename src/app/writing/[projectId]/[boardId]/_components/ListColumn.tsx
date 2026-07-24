@@ -20,6 +20,7 @@ import type { BoardList, BoardCard, LabelCategory } from '../types';
 type ListCallbacks = {
   onOpenCard: (card: BoardCard) => void;
   onOpenCardById: (cardId: number) => void;
+  onPeekCard?: (cardId: number) => void;
   onAddCard: (listId: number, title: string) => void;
   onRename: (listId: number, title: string) => void;
   onDelete: (listId: number) => void;
@@ -44,6 +45,7 @@ const ListColumnInner = memo(function ListColumnInner({
   listeners,
   onOpenCard,
   onOpenCardById,
+  onPeekCard,
   onAddCard,
   onRename,
   onDelete,
@@ -178,7 +180,7 @@ const ListColumnInner = memo(function ListColumnInner({
                     <CardFace card={originDrag!.card} categories={categories} />
                   </Paper>
                 ) : (
-                  <CardItem key={item.card.id} card={item.card} categories={categories} wcSettings={wcSettings} onOpen={onOpenCard} onOpenLinked={onOpenCardById} />
+                  <CardItem key={item.card.id} card={item.card} categories={categories} wcSettings={wcSettings} onOpen={onOpenCard} onOpenLinked={onOpenCardById} onPeekLinked={onPeekCard} />
                 )
               )}
             </Stack>
@@ -211,6 +213,7 @@ function ListColumn({
   originDrag,
   onOpenCard,
   onOpenCardById,
+  onPeekCard,
   onAddCard,
   onRename,
   onDelete,
@@ -283,6 +286,7 @@ function ListColumn({
         listeners={listeners}
         onOpenCard={onOpenCard}
         onOpenCardById={onOpenCardById}
+        onPeekCard={onPeekCard}
         onAddCard={onAddCard}
         onRename={onRename}
         onDelete={onDelete}

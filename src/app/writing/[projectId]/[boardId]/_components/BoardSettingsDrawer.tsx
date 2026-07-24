@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import {
-  ActionIcon, Button, Divider, Drawer, Group, NumberInput, SegmentedControl, Select, Stack, Text,
+  Accordion, ActionIcon, Button, Divider, Drawer, Group, NumberInput, SegmentedControl, Select, Stack, Text,
   useMantineColorScheme, useComputedColorScheme,
 } from '@mantine/core';
 import { IconBook2, IconFileExport, IconMoon, IconSun, IconTags, IconPalette } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { DocumentSpacingMenu, type Spacing } from '@components/DocumentSpacing';
+import { DocumentFormattingControls, type Spacing } from '@components/DocumentSpacing';
 import type { WordCountSettings, WordCountMode } from '@components/WordCountDisplay';
 import { confirmAction } from '@/utils/dialogs';
 import { setBoardTheme, setThemeForAllBoards } from '../../../_actions/writing_actions';
@@ -54,10 +54,17 @@ export default function BoardSettingsDrawer({
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const router = useRouter();
 
-  // Selection is local — "Apply" is an explicit action, not live-on-change,
-  // so browsing themes in the dropdown doesn't repaint the board until asked.
+  // Selecting a theme applies it to this board immediately; "Apply to all
+  // boards" is the only action still requiring an explicit click (it's
+  // destructive to every other board's current theme, so it stays gated).
   const [selectedThemeId, setSelectedThemeId] = useState<string | null>(activeThemeId ? String(activeThemeId) : null);
   useEffect(() => setSelectedThemeId(activeThemeId ? String(activeThemeId) : null), [activeThemeId]);
+
+  const handleSelectTheme = async (value: string | null) => {
+    setSelectedThemeId(value);
+    await setBoardTheme(activeBoardId, value ? Number(value) : null);
+    router.refresh();
+  };
 
   return (
     <Drawer
@@ -69,131 +76,146 @@ export default function BoardSettingsDrawer({
       padding="md"
     >
       <Stack gap="lg">
-        {/* Appearance — the top bar's toggle lives here since it's hidden in the Writing Desk. */}
-        <Group justify="space-between">
-          <Text size="sm" fw={600}>Dark mode</Text>
-          <ActionIcon
-            onClick={() => setColorScheme(computedColorScheme === 'light' ? 'dark' : 'light')}
-            variant="default"
-            size="lg"
-            aria-label="Toggle color scheme"
-          >
-            <IconSun stroke={1.5} className="mantine-light-hidden" />
-            <IconMoon stroke={1.5} className="mantine-dark-hidden" />
-          </ActionIcon>
-        </Group>
+        {/* Collapsible settings sections — all open by default so nothing is
+            hidden on first open, but each can be folded away to reduce clutter. */}
+        <Accordion
+          multiple
+          defaultValue={['appearance', 'theme', 'wordcount', 'formatting']}
+          variant="default"
+          chevronPosition="right"
+          styles={{
+            item: { border: 0, borderBottom: '1px solid var(--mantine-color-default-border)' },
+            control: { paddingLeft: 0, paddingRight: 0 },
+            content: { paddingLeft: 0, paddingRight: 0 },
+            label: { fontSize: 'var(--mantine-font-size-sm)', fontWeight: 600, paddingTop: 8, paddingBottom: 8 },
+          }}
+        >
+          {/* Appearance — the top bar's dark-mode toggle lives here since it's
+              hidden in the Writing Desk. */}
+          <Accordion.Item value="appearance">
+            <Accordion.Control>Appearance</Accordion.Control>
+            <Accordion.Panel>
+              <Group justify="space-between">
+                <Text size="sm">Dark mode</Text>
+                <ActionIcon
+                  onClick={() => setColorScheme(computedColorScheme === 'light' ? 'dark' : 'light')}
+                  variant="default"
+                  size="lg"
+                  aria-label="Toggle color scheme"
+                >
+                  <IconSun stroke={1.5} className="mantine-light-hidden" />
+                  <IconMoon stroke={1.5} className="mantine-dark-hidden" />
+                </ActionIcon>
+              </Group>
+            </Accordion.Panel>
+          </Accordion.Item>
 
-        <Divider />
+          {/* Theme */}
+          <Accordion.Item value="theme">
+            <Accordion.Control>Theme</Accordion.Control>
+            <Accordion.Panel>
+              <Select
+                placeholder="Default look"
+                clearable
+                data={[
+                  { group: 'Built-in', items: themes.filter((t) => t.isBuiltin).map((t) => ({ value: String(t.id), label: t.name })) },
+                  { group: 'Custom', items: themes.filter((t) => !t.isBuiltin).map((t) => ({ value: String(t.id), label: t.name })) },
+                ].filter((g) => g.items.length > 0)}
+                value={selectedThemeId}
+                onChange={handleSelectTheme}
+                comboboxProps={{ withinPortal: true }}
+              />
+              <Button
+                mt="xs"
+                size="xs"
+                variant="light"
+                color="gray"
+                fullWidth
+                onClick={async () => {
+                  if (await confirmAction({
+                    title: 'Apply theme to all boards',
+                    message: 'Apply this theme to every board in this project? This replaces each board’s current theme.',
+                    danger: false,
+                    confirmLabel: 'Apply',
+                  })) {
+                    await setThemeForAllBoards(projectId, selectedThemeId ? Number(selectedThemeId) : null);
+                    router.refresh();
+                  }
+                }}
+              >
+                Apply to all boards
+              </Button>
+              <Button
+                mt="xs"
+                size="xs"
+                variant="subtle"
+                color="gray"
+                fullWidth
+                leftSection={<IconPalette size={14} />}
+                onClick={() => { onClose(); onManageThemes(); }}
+              >
+                Manage themes…
+              </Button>
+            </Accordion.Panel>
+          </Accordion.Item>
 
-        {/* Word count (applies to every project/board in the Writing Desk) */}
-        <div>
-          <Text size="sm" fw={600} mb="xs">Word count display</Text>
-          <SegmentedControl
-            fullWidth
-            size="xs"
-            style={{m: '3px'}}
-            value={wcSettings.mode}
-            onChange={(v) => onWcSettings({ wordCountDisplayMode: v as WordCountMode })}
-            data={[
-              { label: 'Off', value: 'off' },
-              { label: 'Progress bar', value: 'bar' },
-              { label: 'Text', value: 'text' },
-              { label: 'Combo', value: 'combo' },
-            ]}
-          />
-          <Text size="xs" c="dimmed" mt="md" mb={4}>Default goals (cards/lists/groups can override)</Text>
-          <Stack gap="xs">
-            <NumberInput
-              label="Card"
-              placeholder="No default"
-              size="xs"
-              min={0}
-              value={wcSettings.defaultCardGoal ?? ''}
-              onChange={(v) => onWcSettings({ defaultCardWordGoal: v === '' ? null : Number(v) })}
-            />
-            <NumberInput
-              label="List"
-              placeholder="No default"
-              size="xs"
-              min={0}
-              value={wcSettings.defaultListGoal ?? ''}
-              onChange={(v) => onWcSettings({ defaultListWordGoal: v === '' ? null : Number(v) })}
-            />
-            <NumberInput
-              label="Group"
-              placeholder="No default"
-              size="xs"
-              min={0}
-              value={wcSettings.defaultGroupGoal ?? ''}
-              onChange={(v) => onWcSettings({ defaultGroupWordGoal: v === '' ? null : Number(v) })}
-            />
-          </Stack>
-        </div>
+          {/* Word count (applies to every project/board in the Writing Desk) */}
+          <Accordion.Item value="wordcount">
+            <Accordion.Control>Word count</Accordion.Control>
+            <Accordion.Panel>
+              <SegmentedControl
+                fullWidth
+                size="xs"
+                value={wcSettings.mode}
+                onChange={(v) => onWcSettings({ wordCountDisplayMode: v as WordCountMode })}
+                data={[
+                  { label: 'Off', value: 'off' },
+                  { label: 'Progress bar', value: 'bar' },
+                  { label: 'Text', value: 'text' },
+                  { label: 'Combo', value: 'combo' },
+                ]}
+              />
+              <Text size="xs" c="dimmed" mt="sm" mb={4}>Default goals (cards/lists/groups can override)</Text>
+              <Group gap="xs" grow wrap="nowrap">
+                <NumberInput
+                  label="Card"
+                  placeholder="—"
+                  size="xs"
+                  min={0}
+                  hideControls
+                  value={wcSettings.defaultCardGoal ?? ''}
+                  onChange={(v) => onWcSettings({ defaultCardWordGoal: v === '' ? null : Number(v) })}
+                />
+                <NumberInput
+                  label="List"
+                  placeholder="—"
+                  size="xs"
+                  min={0}
+                  hideControls
+                  value={wcSettings.defaultListGoal ?? ''}
+                  onChange={(v) => onWcSettings({ defaultListWordGoal: v === '' ? null : Number(v) })}
+                />
+                <NumberInput
+                  label="Group"
+                  placeholder="—"
+                  size="xs"
+                  min={0}
+                  hideControls
+                  value={wcSettings.defaultGroupGoal ?? ''}
+                  onChange={(v) => onWcSettings({ defaultGroupWordGoal: v === '' ? null : Number(v) })}
+                />
+              </Group>
+            </Accordion.Panel>
+          </Accordion.Item>
 
-        <Divider />
-
-        {/* Theme */}
-        <div>
-          <Text size="sm" fw={600} mb="xs">Theme</Text>
-          <Select
-            placeholder="Default look"
-            clearable
-            data={themes.map((t) => ({ value: String(t.id), label: t.name }))}
-            value={selectedThemeId}
-            onChange={setSelectedThemeId}
-            comboboxProps={{ withinPortal: true }}
-          />
-          <Group grow mt="xs">
-            <Button
-              size="xs"
-              variant="light"
-              color="gray"
-              onClick={async () => {
-                await setBoardTheme(activeBoardId, selectedThemeId ? Number(selectedThemeId) : null);
-                router.refresh();
-              }}
-            >
-              Apply to this board
-            </Button>
-            <Button
-              size="xs"
-              variant="light"
-              color="gray"
-              onClick={async () => {
-                if (await confirmAction({
-                  title: 'Apply theme to all boards',
-                  message: 'Apply this theme to every board in this project? This replaces each board’s current theme.',
-                  danger: false,
-                  confirmLabel: 'Apply',
-                })) {
-                  await setThemeForAllBoards(projectId, selectedThemeId ? Number(selectedThemeId) : null);
-                  router.refresh();
-                }
-              }}
-            >
-              Apply to all boards
-            </Button>
-          </Group>
-          <Button
-            mt="xs"
-            size="xs"
-            variant="subtle"
-            color="gray"
-            fullWidth
-            leftSection={<IconPalette size={14} />}
-            onClick={() => { onClose(); onManageThemes(); }}
-          >
-            Manage themes…
-          </Button>
-        </div>
-
-        <Divider />
-
-        {/* Prose spacing */}
-        <div>
-          <Text size="sm" fw={600} mb="xs">Spacing</Text>
-          <DocumentSpacingMenu value={spacing} onChange={onSpacing} />
-        </div>
+          {/* Prose formatting — inline controls (font, size, spacing, indent, quotes). */}
+          <Accordion.Item value="formatting">
+            <Accordion.Control>Formatting</Accordion.Control>
+            <Accordion.Panel>
+              <DocumentFormattingControls value={spacing} onChange={onSpacing} />
+            </Accordion.Panel>
+          </Accordion.Item>
+        </Accordion>
 
         <Divider />
 

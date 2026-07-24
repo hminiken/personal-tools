@@ -58,10 +58,6 @@ export default function Pane({
     : solid
       ? {
           background: 'var(--theme-editor-bg, var(--mantine-color-body))',
-          // Blend the outer border into the same fill instead of leaving it
-          // on Mantine's default gray — otherwise it reads as a mismatched
-          // frame around an otherwise fully themed panel.
-          borderColor: 'var(--theme-editor-bg, var(--mantine-color-default-border))',
         }
       : {
           background: 'var(--theme-list-bg, var(--mantine-color-body))',
@@ -72,9 +68,12 @@ export default function Pane({
     <Paper
       radius="md"
       p={noPadding ? 4 : 'sm'}
-      // Solid panes keep a normal border; glass panes rely on their own
-      // translucent border from glassStyle instead.
-      withBorder={!useGlass}
+      // Solid panes are the editor's own sheet (see chrome comment above) —
+      // a border there reads as a seam around the sticky toolbar, which
+      // bleeds to the pane's edge via its own negative margin and so butts
+      // directly against it. Glass panes rely on their own translucent
+      // border from glassStyle; list-chrome panes keep the normal border.
+      withBorder={!useGlass && !solid}
       style={{ ...chrome, ...style }}
     >
       {children}

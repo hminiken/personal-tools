@@ -5,6 +5,8 @@
 import { Extension, type Editor } from '@tiptap/react';
 import Typography from '@tiptap/extension-typography';
 import TextAlign from '@tiptap/extension-text-align';
+import { FontFamily } from '@tiptap/extension-text-style/font-family';
+import { FontSize } from '@tiptap/extension-text-style/font-size';
 import { craftingEditorExtensions } from './editorExtensions';
 import { CommentMark } from './commentMark';
 
@@ -64,14 +66,41 @@ const Indent = Extension.create<{ types: string[] }>({
   },
 });
 
-// NOTE: line spacing and space-before/after are NOT per-paragraph attributes.
-// They're document-wide settings stored on the board and applied as CSS to the
-// whole editor (see components/DocumentSpacing). Only indent (first-line) and
-// alignment are per-paragraph here.
-export const writingEditorExtensions = [
-  ...craftingEditorExtensions, // StarterKit (incl. Underline), TextStyle, Color, Highlight, ResizeImage
-  Typography, // smart quotes, em dashes, ellipses, fractions…
-  TextAlign.configure({ types: ['heading', 'paragraph'] }),
-  Indent,
-  CommentMark,
-];
+// NOTE: line spacing, space-before/after, document-wide font family/size, and
+// the first-line auto-indent are NOT per-paragraph attributes. They're
+// document-wide settings stored on the board and applied as CSS to the whole
+// editor (see components/DocumentSpacing). Per-paragraph here: alignment and a
+// manual Tab first-line indent. Per-selection (inline): FontFamily/FontSize
+// marks, driven from the toolbar.
+
+// Smart quotes come from the Typography extension, which also does em dashes,
+// ellipses, fractions, etc. When a board turns smart quotes off we keep those
+// other substitutions but disable just the four quote rules.
+function typographyFor(smartQuotes: boolean) {
+  return smartQuotes
+    ? Typography
+    : Typography.configure({
+        openDoubleQuote: false,
+        closeDoubleQuote: false,
+        openSingleQuote: false,
+        closeSingleQuote: false,
+      });
+}
+
+// Build the writing extension list for a given board configuration. `useEditor`
+// rebuilds when smartQuotes changes so the Typography rules re-register.
+export function buildWritingExtensions(opts?: { smartQuotes?: boolean | null }) {
+  const smartQuotes = opts?.smartQuotes !== false; // null/undefined = default on
+  return [
+    ...craftingEditorExtensions, // StarterKit (incl. Underline), TextStyle, Color, Highlight, ResizeImage
+    typographyFor(smartQuotes),
+    TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    FontFamily, // inline per-selection font family (rides on TextStyle)
+    FontSize, // inline per-selection font size
+    Indent,
+    CommentMark,
+  ];
+}
+
+// Default-on list, kept for any consumer that doesn't need the toggle.
+export const writingEditorExtensions = buildWritingExtensions();

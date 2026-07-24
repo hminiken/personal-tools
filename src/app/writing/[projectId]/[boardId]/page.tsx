@@ -5,6 +5,7 @@ import { eq, desc, inArray, or, and, sql } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import BoardView from './_components/BoardView';
 import { getWritingSettings, listThemes } from '../../_actions/writing_actions';
+import { decodeHtmlEntities } from '@/utils/htmlEntities';
 import type { BoardGroup, LabelCatalog } from './types';
 
 export const dynamic = 'force-dynamic';
@@ -140,7 +141,7 @@ export default async function BoardPage({ params }: PageProps) {
   // Fetch title/board info for external linked cards so we can build previews.
   const externalRows = externalLinkedIds.size
     ? await writingDb
-        .select({ id: cards.id, title: cards.title, content: cards.content, boardTitle: boards.title })
+        .select({ id: cards.id, title: cards.title, content: cards.content, boardTitle: boards.title, cardType: cards.cardType })
         .from(cards)
         .innerJoin(lists, eq(cards.listId, lists.id))
         .innerJoin(groups, eq(lists.groupId, groups.id))
@@ -152,19 +153,19 @@ export default async function BoardPage({ params }: PageProps) {
   // Build a unified info map: current-board cards + external linked cards.
   function stripHtml(html: string | null | undefined) {
     if (!html) return '';
-    return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+    return decodeHtmlEntities(html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 160);
   }
-  const cardInfoMap = new Map<number, { title: string; content: string | null; boardTitle: string }>();
-  for (const c of boardCards) cardInfoMap.set(c.id, { title: c.title, content: c.content, boardTitle: activeBoard.title });
-  for (const r of externalRows) cardInfoMap.set(r.id, { title: r.title, content: r.content, boardTitle: r.boardTitle });
+  const cardInfoMap = new Map<number, { title: string; content: string | null; boardTitle: string; cardType: 'standard' | 'character' }>();
+  for (const c of boardCards) cardInfoMap.set(c.id, { title: c.title, content: c.content, boardTitle: activeBoard.title, cardType: c.cardType as 'standard' | 'character' });
+  for (const r of externalRows) cardInfoMap.set(r.id, { title: r.title, content: r.content, boardTitle: r.boardTitle, cardType: r.cardType as 'standard' | 'character' });
 
   // Build linksByCard (bidirectional: each card gets refs for all its links).
-  const linksByCard = new Map<number, { linkId: number; cardId: number; title: string; contentPreview: string; boardTitle: string }[]>();
+  const linksByCard = new Map<number, { linkId: number; cardId: number; title: string; contentPreview: string; boardTitle: string; cardType: 'standard' | 'character' }[]>();
   const addRef = (forCardId: number, otherId: number, linkId: number) => {
     const info = cardInfoMap.get(otherId);
     if (!info) return;
     const arr = linksByCard.get(forCardId) ?? [];
-    arr.push({ linkId, cardId: otherId, title: info.title, contentPreview: stripHtml(info.content), boardTitle: info.boardTitle });
+    arr.push({ linkId, cardId: otherId, title: info.title, contentPreview: stripHtml(info.content), boardTitle: info.boardTitle, cardType: info.cardType });
     linksByCard.set(forCardId, arr);
   };
   for (const l of linkRows) {

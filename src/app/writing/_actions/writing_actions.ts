@@ -3,7 +3,7 @@
 
 import { writingDb } from '@/db/writing';
 import { writingProjects, writingFolders, boards, groups, lists, cards, cardImages, labels, labelCategories, cardLabels, cardLinks, writingSettings, writingThemes } from '@/db/writing/schema';
-import { eq, and, max, inArray, isNull, or } from 'drizzle-orm';
+import { eq, and, max, inArray, isNull, or, desc } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { writeFile } from 'fs/promises';
 import path from 'path';
@@ -11,6 +11,7 @@ import { compressImage } from '@/utils/compressImage';
 import { countWords } from '@/utils/writingWordCount';
 import { parseThemeDefinition } from '@/utils/writingTheme';
 import { serializeComments, type CommentRecord } from '@/utils/writingComments';
+import { decodeHtmlEntities } from '@/utils/htmlEntities';
 
 // Revalidate every board page (covers all dynamic [projectId]/[boardId] instances).
 function revalidateBoards() {
@@ -244,11 +245,56 @@ export async function moveBoard(boardId: number, position: number) {
   await writingDb.update(boards).set({ position }).where(eq(boards.id, boardId));
 }
 
-// Document-wide prose spacing for a board. Applied client-side as CSS, persisted
-// here. No revalidate: the client updates its CSS optimistically.
+// Cheap "did anything change?" check for a board, backing client-side polling
+// that catches up a stale tab/computer after a change made elsewhere (see
+// BoardView's poll effect). Returns the latest updatedAt across the board row
+// itself and everything nested under it (groups/lists/cards all bump
+// updatedAt on any .update(), including reorders) as an epoch ms number the
+// client can compare against what it last saw — a plain select+orderBy+limit
+// per level rather than an aggregate, so there's no column-mapping ambiguity
+// around max() over a timestamp column.
+export async function getBoardActivityStamp(boardId: number): Promise<number> {
+  const [board, group, list, card] = await Promise.all([
+    writingDb.select({ updatedAt: boards.updatedAt }).from(boards).where(eq(boards.id, boardId)).get(),
+    writingDb.select({ updatedAt: groups.updatedAt }).from(groups).where(eq(groups.boardId, boardId)).orderBy(desc(groups.updatedAt)).limit(1).get(),
+    writingDb
+      .select({ updatedAt: lists.updatedAt })
+      .from(lists)
+      .innerJoin(groups, eq(lists.groupId, groups.id))
+      .where(eq(groups.boardId, boardId))
+      .orderBy(desc(lists.updatedAt))
+      .limit(1)
+      .get(),
+    writingDb
+      .select({ updatedAt: cards.updatedAt })
+      .from(cards)
+      .innerJoin(lists, eq(cards.listId, lists.id))
+      .innerJoin(groups, eq(lists.groupId, groups.id))
+      .where(eq(groups.boardId, boardId))
+      .orderBy(desc(cards.updatedAt))
+      .limit(1)
+      .get(),
+  ]);
+  const stamps = [board?.updatedAt, group?.updatedAt, list?.updatedAt, card?.updatedAt]
+    .filter((d): d is Date => d != null)
+    .map((d) => d.getTime());
+  return stamps.length ? Math.max(...stamps) : 0;
+}
+
+// Document-wide prose formatting for a board (spacing + typography). Applied
+// client-side as CSS / editor config, persisted here. No revalidate: the client
+// updates optimistically.
 export async function setBoardSpacing(
   boardId: number,
-  spacing: { lineHeight?: string | null; spaceBefore?: string | null; spaceAfter?: string | null }
+  spacing: {
+    lineHeight?: string | null;
+    spaceBefore?: string | null;
+    spaceAfter?: string | null;
+    fontFamily?: string | null;
+    fontSize?: string | null;
+    paragraphIndent?: string | null;
+    smartQuotes?: boolean | null;
+  }
 ) {
   await writingDb.update(boards).set(spacing).where(eq(boards.id, boardId));
 }
@@ -345,7 +391,11 @@ export async function createCard(listId: number, title: string) {
 
 export async function updateCard(
   cardId: number,
-  data: { title?: string; content?: string; includeInCompile?: boolean; isImageCard?: boolean; imagePath?: string | null; coverImage?: string | null; comments?: string | null; hideWordCount?: boolean; color?: string | null }
+  data: {
+    title?: string; content?: string; includeInCompile?: boolean; isImageCard?: boolean; imagePath?: string | null;
+    coverImage?: string | null; comments?: string | null; hideWordCount?: boolean; color?: string | null;
+    cardType?: 'standard' | 'character'; characterFields?: string | null;
+  }
 ) {
   const patch: Partial<typeof cards.$inferInsert> = {};
   if (data.title !== undefined) patch.title = data.title;
@@ -357,6 +407,8 @@ export async function updateCard(
   if (data.coverImage !== undefined) patch.coverImage = data.coverImage;
   if (data.comments !== undefined) patch.comments = data.comments;
   if (data.color !== undefined) patch.color = data.color;
+  if (data.cardType !== undefined) patch.cardType = data.cardType;
+  if (data.characterFields !== undefined) patch.characterFields = data.characterFields;
   if (Object.keys(patch).length > 0) {
     await writingDb.update(cards).set(patch).where(eq(cards.id, cardId));
   }
@@ -621,7 +673,7 @@ export async function removeCardLabel(cardId: number, labelId: number) {
 
 function stripHtml(html: string | null | undefined): string {
   if (!html) return '';
-  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+  return decodeHtmlEntities(html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 160);
 }
 
 export async function addCardLink(cardIdA: number, cardIdB: number) {
@@ -644,7 +696,9 @@ export async function removeCardLink(linkId: number) {
 // THEMES  (uploaded, selectable per board — not scoped to any project)
 // ==========================================
 export async function listThemes() {
-  return writingDb.select().from(writingThemes).orderBy(writingThemes.name).all();
+  // Built-ins first (alphabetically), then custom uploads — mirrors the
+  // grouping shown in the theme picker/manage-themes modal.
+  return writingDb.select().from(writingThemes).orderBy(desc(writingThemes.isBuiltin), writingThemes.name).all();
 }
 
 // Validates + stores an uploaded theme file. Throws (with a message safe to
@@ -663,7 +717,13 @@ export async function createTheme(name: string, definitionJson: string) {
   return inserted?.id;
 }
 
+async function assertNotBuiltin(themeId: number, action: string) {
+  const theme = await writingDb.select({ isBuiltin: writingThemes.isBuiltin }).from(writingThemes).where(eq(writingThemes.id, themeId)).get();
+  if (theme?.isBuiltin) throw new Error(`Built-in themes can't be ${action}. Duplicate it to make an editable copy.`);
+}
+
 export async function renameTheme(themeId: number, name: string) {
+  await assertNotBuiltin(themeId, 'renamed');
   const t = name?.trim();
   if (!t) return;
   await writingDb.update(writingThemes).set({ name: t }).where(eq(writingThemes.id, themeId));
@@ -673,6 +733,7 @@ export async function renameTheme(themeId: number, name: string) {
 // Replaces a theme's definition in place (re-uploading the same theme rather
 // than creating a new one). Same validation as createTheme.
 export async function updateThemeDefinition(themeId: number, definitionJson: string) {
+  await assertNotBuiltin(themeId, 'replaced');
   const definition = parseThemeDefinition(definitionJson); // throws on invalid input
   await writingDb.update(writingThemes).set({ definition: JSON.stringify(definition) }).where(eq(writingThemes.id, themeId));
   revalidateBoards();
@@ -681,8 +742,26 @@ export async function updateThemeDefinition(themeId: number, definitionJson: str
 // Any board still pointing at this theme falls back to the default look
 // (themeId set null via the FK's onDelete rule).
 export async function deleteTheme(themeId: number) {
+  await assertNotBuiltin(themeId, 'deleted');
   await writingDb.delete(writingThemes).where(eq(writingThemes.id, themeId));
   revalidateBoards();
+}
+
+// Copies a built-in (or any) theme's current definition into a new,
+// ordinary editable theme — the intended path for customizing a built-in
+// without touching the shipped preset.
+export async function duplicateTheme(themeId: number, name: string) {
+  const t = name?.trim();
+  if (!t) throw new Error('Theme needs a name.');
+  const source = await writingDb.select({ definition: writingThemes.definition }).from(writingThemes).where(eq(writingThemes.id, themeId)).get();
+  if (!source) throw new Error('Theme not found.');
+  const inserted = await writingDb
+    .insert(writingThemes)
+    .values({ name: t, definition: source.definition })
+    .returning({ id: writingThemes.id })
+    .get();
+  revalidateBoards();
+  return inserted?.id;
 }
 
 export async function setBoardTheme(boardId: number, themeId: number | null) {
@@ -723,7 +802,7 @@ export async function getCardById(cardId: number) {
   const otherIds = linkRows.map((l) => (l.sourceCardId === cardId ? l.targetCardId : l.sourceCardId));
   const linkedInfoRows = otherIds.length
     ? await writingDb
-        .select({ id: cards.id, title: cards.title, content: cards.content, boardTitle: boards.title })
+        .select({ id: cards.id, title: cards.title, content: cards.content, boardTitle: boards.title, cardType: cards.cardType })
         .from(cards)
         .innerJoin(lists, eq(cards.listId, lists.id))
         .innerJoin(groups, eq(lists.groupId, groups.id))
@@ -738,7 +817,7 @@ export async function getCardById(cardId: number) {
       const otherId = l.sourceCardId === cardId ? l.targetCardId : l.sourceCardId;
       const info = linkedMap.get(otherId);
       if (!info) return null;
-      return { linkId: l.id, cardId: otherId, title: info.title, contentPreview: stripHtml(info.content), boardTitle: info.boardTitle };
+      return { linkId: l.id, cardId: otherId, title: info.title, contentPreview: stripHtml(info.content), boardTitle: info.boardTitle, cardType: info.cardType };
     })
     .filter(Boolean) as import('@/app/writing/[projectId]/[boardId]/types').LinkedCardRef[];
 
@@ -883,6 +962,7 @@ export async function getProjectCards(projectId: number) {
       boardId: boards.id,
       boardTitle: boards.title,
       listTitle: lists.title,
+      cardType: cards.cardType,
     })
     .from(cards)
     .innerJoin(lists, eq(cards.listId, lists.id))

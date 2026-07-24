@@ -3,11 +3,12 @@
 // "Compiled chapter" view. Renders every card in a list / group / board as one
 // continuous, editable document (segmented: one TipTap editor per card).
 import { writingDb } from '@/db/writing';
-import { boards, groups, lists, cards } from '@/db/writing/schema';
+import { boards, groups, lists, cards, writingThemes } from '@/db/writing/schema';
 import { eq, inArray, and } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import CompiledView from './_components/CompiledView';
 import type { CompiledData, CompiledList } from './types';
+import { themeVars, type WritingThemeDefinition } from '@/utils/writingTheme';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,9 +101,18 @@ export default async function CompilePage({ params }: PageProps) {
 
   if (!data) notFound();
 
-  // Document-wide spacing is stored on the parent board.
+  // Document-wide formatting is stored on the parent board.
   const boardRow = await writingDb
-    .select({ lineHeight: boards.lineHeight, spaceBefore: boards.spaceBefore, spaceAfter: boards.spaceAfter })
+    .select({
+      lineHeight: boards.lineHeight,
+      spaceBefore: boards.spaceBefore,
+      spaceAfter: boards.spaceAfter,
+      fontFamily: boards.fontFamily,
+      fontSize: boards.fontSize,
+      paragraphIndent: boards.paragraphIndent,
+      smartQuotes: boards.smartQuotes,
+      themeId: boards.themeId,
+    })
     .from(boards)
     .where(eq(boards.id, boardId))
     .get();
@@ -110,7 +120,19 @@ export default async function CompilePage({ params }: PageProps) {
     lineHeight: boardRow?.lineHeight ?? null,
     spaceBefore: boardRow?.spaceBefore ?? null,
     spaceAfter: boardRow?.spaceAfter ?? null,
+    fontFamily: boardRow?.fontFamily ?? null,
+    fontSize: boardRow?.fontSize ?? null,
+    paragraphIndent: boardRow?.paragraphIndent ?? null,
+    smartQuotes: boardRow?.smartQuotes ?? null,
   };
+
+  // The board's active theme (if any) — same --theme-* vars BoardView applies,
+  // so this standalone compiled page matches the board it was compiled from
+  // instead of always rendering the plain default look.
+  const themeRow = boardRow?.themeId
+    ? await writingDb.select({ definition: writingThemes.definition }).from(writingThemes).where(eq(writingThemes.id, boardRow.themeId)).get()
+    : null;
+  const themeStyle = themeRow ? themeVars(JSON.parse(themeRow.definition) as WritingThemeDefinition) : {};
 
   return (
     <CompiledView
@@ -118,6 +140,7 @@ export default async function CompilePage({ params }: PageProps) {
       backHref={`/writing/${projectId}/${boardId}`}
       boardId={boardId}
       initialSpacing={initialSpacing}
+      themeVars={themeStyle}
     />
   );
 }

@@ -42,7 +42,7 @@ function CardDivider() {
   return (
     <div
       aria-hidden
-      style={{ borderTop: '2px dotted var(--mantine-color-gray-4)', margin: '20px 0' }}
+      style={{ borderTop: '2px dotted var(--theme-card-border, var(--mantine-color-gray-4))', margin: '20px 0' }}
     />
   );
 }
@@ -51,10 +51,12 @@ function CardList({
   cards,
   cardComments,
   onCommentsChange,
+  smartQuotes,
 }: {
   cards: Card[];
   cardComments: Record<number, CommentRecord>;
   onCommentsChange: (cardId: number, next: CommentRecord) => void;
+  smartQuotes?: boolean | null;
 }) {
   if (cards.length === 0) {
     return <Text c="dimmed" size="sm" fs="italic">No cards yet.</Text>;
@@ -68,6 +70,7 @@ function CardList({
             card={card}
             heading={card.title ?? 'Untitled'}
             withToolbar
+            smartQuotes={smartQuotes}
             comments={cardComments[card.id] ?? {}}
             onCommentsChange={(next) => onCommentsChange(card.id, next)}
           />
@@ -81,15 +84,17 @@ function ListBlock({
   list,
   cardComments,
   onCommentsChange,
+  smartQuotes,
 }: {
   list: CompiledList;
   cardComments: Record<number, CommentRecord>;
   onCommentsChange: (cardId: number, next: CommentRecord) => void;
+  smartQuotes?: boolean | null;
 }) {
   return (
     <Box mb="xl">
-      <Title order={3} c="dark.6" mb="sm">{list.title}</Title>
-      <CardList cards={list.cards} cardComments={cardComments} onCommentsChange={onCommentsChange} />
+      <Title order={3} c="var(--theme-heading, var(--mantine-color-dark-6))" mb="sm">{list.title}</Title>
+      <CardList cards={list.cards} cardComments={cardComments} onCommentsChange={onCommentsChange} smartQuotes={smartQuotes} />
     </Box>
   );
 }
@@ -99,11 +104,18 @@ export default function CompiledView({
   backHref,
   boardId,
   initialSpacing,
+  themeVars = {},
 }: {
   data: CompiledData;
   backHref: string;
   boardId: number;
   initialSpacing: Spacing;
+  // The board's active theme's --theme-* CSS custom properties (see
+  // BoardView/CardEditorModal for the same pattern) — this page renders
+  // standalone, outside BoardView's themed wrapper, so without these the
+  // editor/cards/dividers would fall back to their unthemed defaults. Empty
+  // {} when no theme is active → unchanged.
+  themeVars?: Record<string, string>;
 }) {
   const scopeLabel = data.scope === 'list' ? 'chapter' : data.scope;
   const [spacing, setSpacing] = useState<Spacing>(initialSpacing);
@@ -178,7 +190,11 @@ export default function CompiledView({
   const resolvedPositions = positioned ? resolveCollisions(allComments, commentPositions) : {};
 
   return (
-    <Paper pl={{ base: 0, sm: 'xl' }} pr={{ base: 'xs', sm: 'xl' }}>
+    <Paper
+      pl={{ base: 0, sm: 'xl' }}
+      pr={{ base: 'xs', sm: 'xl' }}
+      style={{ ...themeVars, color: 'var(--theme-heading, inherit)' }}
+    >
       <Button
         component={Link}
         href={backHref}
@@ -212,7 +228,7 @@ export default function CompiledView({
           className={docSpacingClass}
         >
           {data.scope === 'list' && (
-            <CardList cards={data.lists[0].cards} cardComments={cardComments} onCommentsChange={handleCommentsChange} />
+            <CardList cards={data.lists[0].cards} cardComments={cardComments} onCommentsChange={handleCommentsChange} smartQuotes={spacing.smartQuotes} />
           )}
 
           {data.scope === 'group' &&
@@ -220,7 +236,7 @@ export default function CompiledView({
               <Text c="dimmed" size="sm" fs="italic">No lists in this group.</Text>
             ) : (
               data.groups[0].lists.map((list) => (
-                <ListBlock key={list.id} list={list} cardComments={cardComments} onCommentsChange={handleCommentsChange} />
+                <ListBlock key={list.id} list={list} cardComments={cardComments} onCommentsChange={handleCommentsChange} smartQuotes={spacing.smartQuotes} />
               ))
             ))}
 
@@ -232,7 +248,7 @@ export default function CompiledView({
                   <Text c="dimmed" size="sm" fs="italic">No lists in this group.</Text>
                 ) : (
                   g.lists.map((list) => (
-                    <ListBlock key={list.id} list={list} cardComments={cardComments} onCommentsChange={handleCommentsChange} />
+                    <ListBlock key={list.id} list={list} cardComments={cardComments} onCommentsChange={handleCommentsChange} smartQuotes={spacing.smartQuotes} />
                   ))
                 )}
               </Box>
@@ -250,7 +266,6 @@ export default function CompiledView({
                   p="xs"
                   withBorder
                   radius="sm"
-                  bg="light-dark(var(--mantine-color-yellow-0), var(--mantine-color-dark-6))"
                   style={{
                     position: 'absolute',
                     top,
@@ -259,12 +274,19 @@ export default function CompiledView({
                     cursor: 'pointer',
                     opacity: positioned ? 1 : 0,
                     transition: 'top 0.2s ease, opacity 0.15s ease',
+                    // Match the card modal/folder-view comment cards: themed
+                    // card surface with an accent stripe (every comment here
+                    // is anchored — this view has no unbound "note" concept).
+                    backgroundColor: 'var(--theme-card-bg, light-dark(var(--mantine-color-yellow-0), var(--mantine-color-dark-6)))',
+                    color: 'var(--theme-card-text, inherit)',
+                    borderColor: 'var(--theme-card-border, var(--mantine-color-default-border))',
+                    borderLeft: '3px solid var(--theme-accent, var(--mantine-color-yellow-6))',
                   }}
                   onClick={() => jumpToComment(cardId, commentId)}
                 >
-                  <Text size="xs" fw={500} c="dark.4" lineClamp={1}>{cardTitle}</Text>
-                  <Text size="xs" mt={2}>{text}</Text>
-                  <Text size="10px" c="dimmed" mt={2}>
+                  <Text size="xs" fw={500} c="var(--theme-card-muted-text, var(--mantine-color-dark-4))" lineClamp={1}>{cardTitle}</Text>
+                  <Text size="xs" mt={2} c="var(--theme-card-text, inherit)">{text}</Text>
+                  <Text size="10px" c="var(--theme-card-muted-text, var(--mantine-color-dimmed))" mt={2}>
                     {new Date(createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </Text>
                 </Paper>

@@ -14,6 +14,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import GroupRow from './GroupRow';
 import BoardTabs from './BoardTabs';
 import CardEditorModal from './CardEditorModal';
+import CharacterPeekDock, { type PeekWindowState } from './CharacterPeekDock';
 import ManageLabelsModal from './ManageLabelsModal';
 import ManageThemesModal from './ManageThemesModal';
 import ImportTrelloModal from '../../../_components/ImportTrelloModal';
@@ -32,9 +33,35 @@ import {
   createBoard, renameBoard, deleteBoard,
   createGroup, renameGroup, deleteGroup,
   createList, renameList, deleteList,
-  createCard, setBoardSpacing, setBoardBackground, getCardById,
-  updateWritingSettings, setBoardWordGoal,
+  createCard, updateCard, deleteCard, setBoardSpacing, setBoardBackground, getCardById,
+  updateWritingSettings, setBoardWordGoal, getBoardActivityStamp,
 } from '../../../_actions/writing_actions';
+
+// Reads the latest updatedAt across a board's own row plus everything nested
+// under it — the client-side counterpart to getBoardActivityStamp's server
+// query, computed for free from data BoardView already has in memory instead
+// of a round-trip.
+function latestActivityStamp(board: Board | undefined, groups: BoardGroup[]): number {
+  let max = board?.updatedAt ? new Date(board.updatedAt).getTime() : 0;
+  for (const g of groups) {
+    if (g.updatedAt) max = Math.max(max, new Date(g.updatedAt).getTime());
+    for (const l of g.lists) {
+      if (l.updatedAt) max = Math.max(max, new Date(l.updatedAt).getTime());
+      for (const c of l.cards) {
+        if (c.updatedAt) max = Math.max(max, new Date(c.updatedAt).getTime());
+      }
+    }
+  }
+  return max;
+}
+
+// True while the user has a text field/editor focused — polling skips a tick
+// in this case so a background refresh can't land mid-keystroke.
+function userIsTyping(): boolean {
+  const el = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+  if (!el) return false;
+  return el.isContentEditable || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA';
+}
 
 export default function BoardView({
   projectId,
@@ -63,7 +90,7 @@ export default function BoardView({
 }) {
   const router = useRouter();
   const [groups, setGroups] = useState<BoardGroup[]>(initialGroups);
-  const { sensors, collisionDetection, activeDrag, originDrag, handleDragStart, handleDragOver, handleDragEnd } =
+  const { sensors, collisionDetection, activeDrag, originDrag, handleDragStart, handleDragOver, handleDragEnd, canAutoRefresh } =
     useBoardDnd(groups, setGroups);
 
   // Kanban board vs. file-browser view — remembered per board, so switching
@@ -130,6 +157,10 @@ export default function BoardView({
     lineHeight: activeBoard?.lineHeight ?? null,
     spaceBefore: activeBoard?.spaceBefore ?? null,
     spaceAfter: activeBoard?.spaceAfter ?? null,
+    fontFamily: activeBoard?.fontFamily ?? null,
+    fontSize: activeBoard?.fontSize ?? null,
+    paragraphIndent: activeBoard?.paragraphIndent ?? null,
+    smartQuotes: activeBoard?.smartQuotes ?? null,
   });
   const handleSpacing = (next: Spacing) => {
     setSpacing(next);
@@ -168,6 +199,37 @@ export default function BoardView({
   // Adopt fresh server data whenever the route re-renders (after an action).
   useEffect(() => { setGroups(initialGroups); }, [initialGroups]);
 
+  // Staleness poll: if this board is open elsewhere (another tab/computer)
+  // and gets edited there, pick up the change here within roughly a minute.
+  // Kept lightweight — one small timestamp query, not a full board refetch —
+  // and only actually calls router.refresh() when something changed. Skips a
+  // tick during/just after a drag (see useBoardDnd's canAutoRefresh) and
+  // while the user has a text field focused, so a background refresh can't
+  // clobber an in-progress drag or keystroke.
+  const localStampRef = useRef(0);
+  useEffect(() => { localStampRef.current = latestActivityStamp(activeBoard, groups); }, [activeBoard, groups]);
+  useEffect(() => {
+    const POLL_MS = 60_000;
+    let cancelled = false;
+    const tick = async () => {
+      if (document.hidden || !canAutoRefresh() || userIsTyping()) return;
+      try {
+        const serverStamp = await getBoardActivityStamp(activeBoardId);
+        if (!cancelled && serverStamp > localStampRef.current) router.refresh();
+      } catch {
+        // Transient failure — next tick retries.
+      }
+    };
+    const id = setInterval(tick, POLL_MS);
+    const onVisible = () => { if (!document.hidden) tick(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [activeBoardId, canAutoRefresh, router]);
+
   // ---------- mutation handlers (server actions + refresh) ----------
   // All useCallback-stable: GroupRow/ListColumn/CardItem are memoized, so a
   // fresh callback identity each render would defeat the memo and re-render
@@ -179,6 +241,8 @@ export default function BoardView({
   const onDeleteGroup = useCallback(async (groupId: number) => { if (await confirmAction({ title: 'Delete group', message: 'Delete this group and everything in it?' })) { await deleteGroup(groupId); router.refresh(); } }, [router]);
   const onRenameList = useCallback(async (listId: number, title: string) => { await renameList(listId, title); router.refresh(); }, [router]);
   const onDeleteList = useCallback(async (listId: number) => { if (await confirmAction({ title: 'Delete list', message: 'Delete this list and its cards?' })) { await deleteList(listId); router.refresh(); } }, [router]);
+  const onRenameCard = useCallback(async (cardId: number, title: string) => { await updateCard(cardId, { title }); router.refresh(); }, [router]);
+  const onDeleteCard = useCallback(async (cardId: number) => { if (await confirmAction({ title: 'Delete card', message: 'Delete this card?' })) { await deleteCard(cardId); router.refresh(); } }, [router]);
 
   const onOpenCard = useCallback((card: BoardCard) => { setEditingCard(card); openEditor(); }, [openEditor]);
 
@@ -197,6 +261,34 @@ export default function BoardView({
     const fetched = await getCardById(cardId);
     if (fetched) { setEditingCard(fetched as BoardCard); openEditor(); }
   }, [onOpenCard, openEditor]);
+
+  // Any card can pop open as a floating, non-modal reference window docked
+  // to a corner (see CharacterPeekDock) instead of navigating away from
+  // whatever card/view is currently open — ctrl/cmd-click or right-click a
+  // card (on the board, in a link badge, or in the file tree) to peek it;
+  // a plain click keeps doing the normal open/navigate. Several can be
+  // open at once, each independently minimized/expanded/resized.
+  const [peekCards, setPeekCards] = useState<PeekWindowState[]>([]);
+  const onPeekCard = useCallback((cardId: number) => {
+    setPeekCards((prev) => {
+      if (prev.some((w) => w.cardId === cardId)) {
+        return prev.map((w) => (w.cardId === cardId ? { ...w, minimized: false } : w));
+      }
+      return [...prev, { cardId, minimized: false }];
+    });
+  }, []);
+  const onClosePeekCard = useCallback((cardId: number) => {
+    setPeekCards((prev) => prev.filter((w) => w.cardId !== cardId));
+  }, []);
+  const onToggleMinimizePeekCard = useCallback((cardId: number) => {
+    setPeekCards((prev) => prev.map((w) => (w.cardId === cardId ? { ...w, minimized: !w.minimized } : w)));
+  }, []);
+  const onReorderPeekCards = useCallback((next: PeekWindowState[]) => setPeekCards(next), []);
+  const onPeekOpenFull = useCallback((card: BoardCard) => {
+    setPeekCards((prev) => prev.filter((w) => w.cardId !== card.id));
+    setEditingCard(card);
+    openEditor();
+  }, [openEditor]);
 
   // ---------- board (tab) handlers ----------
   const onAddBoard = async () => {
@@ -407,6 +499,7 @@ export default function BoardView({
                 originDrag={originDrag}
                 onOpenCard={onOpenCard}
                 onOpenCardById={onOpenCardById}
+                onPeekCard={onPeekCard}
                 onAddCard={onAddCard}
                 onAddList={onAddList}
                 onRenameList={onRenameList}
@@ -450,6 +543,17 @@ export default function BoardView({
           spacing={spacing}
           hasBg={!!boardBg}
           onManageLabels={openLabels}
+          onAddGroup={onAddGroup}
+          onAddList={onAddList}
+          onAddCard={onAddCard}
+          onRenameGroup={onRenameGroup}
+          onDeleteGroup={onDeleteGroup}
+          onRenameList={onRenameList}
+          onDeleteList={onDeleteList}
+          onRenameCard={onRenameCard}
+          onDeleteCard={onDeleteCard}
+          onPeekCard={onPeekCard}
+          dnd={{ sensors, collisionDetection, activeDrag, onDragStart: handleDragStart, onDragOver: handleDragOver, onDragEnd: handleDragEnd }}
         />
       )}
 
@@ -494,8 +598,18 @@ export default function BoardView({
           projectId={projectId}
           wcSettings={wcSettings}
           themeVars={themeStyle}
+          onPeekCard={onPeekCard}
         />
       )}
+
+      <CharacterPeekDock
+        cards={peekCards}
+        onClose={onClosePeekCard}
+        onToggleMinimize={onToggleMinimizePeekCard}
+        onOpenFull={onPeekOpenFull}
+        onReorder={onReorderPeekCards}
+        spacing={spacing}
+      />
 
       <ManageLabelsModal
         projectId={projectId}

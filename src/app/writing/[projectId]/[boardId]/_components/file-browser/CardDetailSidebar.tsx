@@ -8,16 +8,20 @@ import {
 } from '@mantine/core';
 import {
   IconCheck, IconChevronDown, IconChevronUp, IconLink,
-  IconMessage, IconPhotoPlus, IconPhotoStar, IconPlus, IconTrash, IconX,
+  IconMessage, IconPalette, IconPhotoPlus, IconPhotoStar, IconPlus, IconTrash, IconX,
 } from '@tabler/icons-react';
 import { WordCountDisplay, type WordCountSettings } from '@components/WordCountDisplay';
+import type { Spacing } from '@components/DocumentSpacing';
 import { UploadModal } from '@components/UploadModal';
 import { addCardImage } from '../../../../_actions/writing_actions';
 import LabelPicker from '../LabelPicker';
+import ColorPicker from '../ColorPicker';
 import ImageViewerModal, { useImageViewer } from '../ImageViewerModal';
-import type { BoardCard, LabelCatalog, LinkedCardRef } from '../../types';
+import type { BoardCard, LabelCatalog, LinkedCardRef, Label } from '../../types';
 import type { CommentRecord } from '@/utils/writingComments';
 import type { GalleryImage, ProjectCardOption } from './useCardDetail';
+import type { CharacterField } from '@/utils/characterFields';
+import CharacterFieldsPanel from '../CharacterFieldsPanel';
 
 // The slice of card state this sidebar needs. Satisfied by useCardDetail's
 // return value (single-card view) and by useStackCardSidebar (the compile
@@ -26,10 +30,19 @@ export type CardSidebarController = {
   viewingCard: BoardCard | null;
   includeInCompile: boolean;
   isImageCard: boolean;
+  isCharacterCard: boolean;
+  characterFields: CharacterField[];
   hideWordCount: boolean;
   handleToggleCompile: (v: boolean) => void;
   handleToggleImageCard: (v: boolean) => void;
+  handleToggleCharacterCard: (v: boolean) => void;
+  handleCharacterFieldsChange: (fields: CharacterField[]) => void;
   handleToggleHideWordCount: (v: boolean) => void;
+  // Explicit card color overrides any label-driven color (see drivingLabel).
+  color: string | null;
+  labelColor: string | null;
+  drivingLabel: Label | null;
+  handleColorChange: (next: string | null) => void;
   coverImage: string | null;
   images: GalleryImage[];
   handleSetCover: (path: string) => void;
@@ -68,11 +81,17 @@ export default function CardDetailSidebar({
   catalog,
   onManageLabels,
   wcSettings,
+  onPeekCard,
+  spacing,
 }: {
   detail: CardSidebarController;
   catalog: LabelCatalog;
   onManageLabels: () => void;
   wcSettings: WordCountSettings;
+  // Opens a linked character card as a docked reference panel instead of
+  // navigating this view away from what's currently open.
+  onPeekCard: (cardId: number) => void;
+  spacing: Spacing;
 }) {
   const { viewingCard } = detail;
 
@@ -124,11 +143,34 @@ export default function CardDetailSidebar({
           <Tooltip label="Show an image on the board instead of the title and text." withinPortal multiline w={220} position="top-start">
             <Switch label="Image card" checked={detail.isImageCard} onChange={(e) => detail.handleToggleImageCard(e.currentTarget.checked)} color="dark" w="fit-content" />
           </Tooltip>
+          <Tooltip label="A character sheet: image gallery plus a rail of named fields (background, appearance, etc). Excluded from compile by default." withinPortal multiline w={220} position="top-start">
+            <Switch label="Character card" checked={detail.isCharacterCard} onChange={(e) => detail.handleToggleCharacterCard(e.currentTarget.checked)} color="dark" w="fit-content" />
+          </Tooltip>
           <Tooltip label="Leave this card out of word tracking: it won't show a count anywhere, and its words won't count toward any total." withinPortal multiline w={220} position="top-start">
             <Switch label="Disable word count" checked={detail.hideWordCount} onChange={(e) => detail.handleToggleHideWordCount(e.currentTarget.checked)} color="dark" w="fit-content" />
           </Tooltip>
         </Stack>
       </LabelPicker>
+
+      {detail.isCharacterCard && (
+        <CharacterFieldsPanel key={viewingCard.id} fields={detail.characterFields} onChange={detail.handleCharacterFieldsChange} spacing={spacing} />
+      )}
+
+      {/* Card color — explicit color overrides any label-driven color */}
+      <Group gap="xs" align="center">
+        <IconPalette size={16} color="var(--mantine-color-dimmed)" />
+        <Text size="sm">Card color</Text>
+        <ColorPicker value={(detail.color ?? detail.labelColor) ?? 'transparent'} onChange={detail.handleColorChange} size={22} />
+        {detail.color ? (
+          <Button variant="subtle" size="compact-xs" color="gray" onClick={() => detail.handleColorChange(null)}>
+            {detail.labelColor ? 'Use label color' : 'Clear'}
+          </Button>
+        ) : detail.labelColor ? (
+          <Text size="xs" c="dimmed">
+            From label{detail.drivingLabel ? ` “${detail.drivingLabel.name}”` : ''}
+          </Text>
+        ) : null}
+      </Group>
 
       {/* Images */}
       <Box>
@@ -193,7 +235,11 @@ export default function CardDetailSidebar({
                     </ActionIcon>
                   }
                   style={{ ...dimmedGlassStyle, cursor: 'pointer', maxWidth: 180 }}
-                  onClick={() => detail.navigateToLinkedCard(link.cardId)}
+                  onClick={(e) => {
+                    if (e.ctrlKey || e.metaKey) detail.navigateToLinkedCard(link.cardId);
+                    else onPeekCard(link.cardId);
+                  }}
+                  onContextMenu={(e) => { e.preventDefault(); detail.navigateToLinkedCard(link.cardId); }}
                 >
                   {link.title}
                 </Badge>
@@ -202,7 +248,7 @@ export default function CardDetailSidebar({
                 <Text size="sm" fw={600} lineClamp={2}>{link.title}</Text>
                 {link.boardTitle && <Text size="xs" c="dimmed" mt={2}>{link.boardTitle}</Text>}
                 {link.contentPreview && <Text size="xs" mt={4} lineClamp={4} c="dimmed">{link.contentPreview}</Text>}
-                <Text size="xs" c="blue" mt={6}>Click to open</Text>
+                <Text size="xs" c="blue" mt={6}>Click to preview · ctrl/right-click to open</Text>
               </HoverCard.Dropdown>
             </HoverCard>
           ))}
@@ -315,15 +361,21 @@ export default function CardDetailSidebar({
                   p="xs"
                   withBorder
                   radius="sm"
-                  bg={anchored === false
-                    ? 'light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5))'
-                    : 'light-dark(var(--mantine-color-yellow-1), var(--mantine-color-dark-6))'}
+                  // Match the card modal: use the active board theme's card
+                  // surface. The fallbacks are the no-theme case — and on a glass
+                  // pane the Pane forces --mantine-color-text to white, so the
+                  // text fallbacks stay explicit light/dark (not --mantine-color-
+                  // text) to keep the solid card readable. An anchored comment
+                  // gets an accent left border to read as a highlight tied to
+                  // text; a note is a plain card.
                   style={{
                     cursor: anchored === false ? 'default' : 'pointer',
+                    backgroundColor: 'var(--theme-card-bg, light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6)))',
+                    color: 'var(--theme-card-text, light-dark(var(--mantine-color-black), var(--mantine-color-gray-0)))',
+                    borderColor: 'var(--theme-card-border, var(--mantine-color-default-border))',
+                    borderLeft: anchored === false ? undefined : '3px solid var(--theme-accent, var(--mantine-color-yellow-6))',
                     // Drop the frosted Pane's inherited white text-shadow so the
-                    // dark comment text below stays crisp. Text colors are set
-                    // explicitly per-Text (an inherited white `color` from the
-                    // glass chrome beats any --mantine-color-text override here).
+                    // themed comment text below stays crisp.
                     textShadow: 'none',
                   }}
                   onClick={anchored === false ? undefined : () => detail.jumpToComment(id)}
@@ -331,10 +383,10 @@ export default function CardDetailSidebar({
                   <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xs">
                     <Box style={{ flex: 1, minWidth: 0 }}>
                       {anchored === false && (
-                        <Text size="9px" c="light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-1))" fw={700} tt="uppercase" style={{ letterSpacing: 0.5 }}>Note</Text>
+                        <Text size="9px" c="var(--theme-card-muted-text, light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-1)))" fw={700} tt="uppercase" style={{ letterSpacing: 0.5 }}>Note</Text>
                       )}
-                      <Text size="sm" c="light-dark(var(--mantine-color-black), var(--mantine-color-gray-0))" style={{ whiteSpace: 'pre-wrap' }}>{text}</Text>
-                      <Text size="10px" c="light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-1))" mt={2}>
+                      <Text size="sm" c="var(--theme-card-text, light-dark(var(--mantine-color-black), var(--mantine-color-gray-0)))" style={{ whiteSpace: 'pre-wrap' }}>{text}</Text>
+                      <Text size="10px" c="var(--theme-card-muted-text, light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-1)))" mt={2}>
                         {new Date(createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </Text>
                     </Box>

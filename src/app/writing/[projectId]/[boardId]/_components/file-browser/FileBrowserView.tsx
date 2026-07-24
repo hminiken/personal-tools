@@ -9,7 +9,7 @@ import type { WordCountSettings } from '@components/WordCountDisplay';
 import type { BoardGroup, LabelCatalog } from '../../types';
 import { findCardInGroups, findGroupInGroups, findListInGroups, type FileBrowserSelection } from './types';
 import { useCardDetail } from './useCardDetail';
-import FileTree from './FileTree';
+import FileTree, { type TreeDnd } from './FileTree';
 import CardDetailCenter from './CardDetailCenter';
 import CardDetailSidebar from './CardDetailSidebar';
 import StackCompileView, { type CompileSection } from './StackCompileView';
@@ -33,6 +33,17 @@ export default function FileBrowserView({
   spacing,
   hasBg,
   onManageLabels,
+  onAddGroup,
+  onAddList,
+  onAddCard,
+  onRenameGroup,
+  onDeleteGroup,
+  onRenameList,
+  onDeleteList,
+  onRenameCard,
+  onDeleteCard,
+  onPeekCard,
+  dnd,
 }: {
   projectId: number;
   boardTitle: string;
@@ -42,6 +53,17 @@ export default function FileBrowserView({
   spacing: Spacing;
   hasBg: boolean;
   onManageLabels: () => void;
+  onAddGroup: (title: string) => void | Promise<void>;
+  onAddList: (groupId: number, title: string) => void | Promise<void>;
+  onAddCard: (listId: number, title: string) => void | Promise<void>;
+  onRenameGroup: (groupId: number, title: string) => void | Promise<void>;
+  onDeleteGroup: (groupId: number) => void | Promise<void>;
+  onRenameList: (listId: number, title: string) => void | Promise<void>;
+  onDeleteList: (listId: number) => void | Promise<void>;
+  onRenameCard: (cardId: number, title: string) => void | Promise<void>;
+  onDeleteCard: (cardId: number) => void | Promise<void>;
+  onPeekCard: (cardId: number) => void;
+  dnd: TreeDnd;
 }) {
   const router = useRouter();
   const [selection, setSelection] = useState<FileBrowserSelection>(null);
@@ -49,7 +71,7 @@ export default function FileBrowserView({
 
   const selectedCard = selection?.type === 'card' ? findCardInGroups(groups, selection.cardId) : null;
 
-  const detail = useCardDetail(selectedCard, projectId, () => setSelection(null));
+  const detail = useCardDetail(selectedCard, projectId, () => setSelection(null), { smartQuotes: spacing.smartQuotes });
 
   const select = (next: NonNullable<FileBrowserSelection>) => {
     detail.flushSave();
@@ -58,7 +80,9 @@ export default function FileBrowserView({
   };
 
   // Compile scope → flat card sections, labelled with enough ancestry to
-  // tell same-named cards apart at wider scopes.
+  // tell same-named cards apart at wider scopes. Cards excluded from compile
+  // (character cards, by default) are left out here too — this "folder view"
+  // reading flow is otherwise a second compile path with no way to opt out.
   let compileTitle = '';
   let compileKey = '';
   let sections: CompileSection[] | null = null;
@@ -66,21 +90,21 @@ export default function FileBrowserView({
     compileTitle = boardTitle;
     compileKey = 'board';
     sections = groups.flatMap((g) =>
-      g.lists.flatMap((l) => l.cards.map((card) => ({ card, label: `${g.title} · ${l.title} · ${card.title}` })))
+      g.lists.flatMap((l) => l.cards.filter((c) => c.includeInCompile).map((card) => ({ card, label: `${g.title} · ${l.title} · ${card.title}` })))
     );
   } else if (selection?.type === 'group') {
     const group = findGroupInGroups(groups, selection.groupId);
     if (group) {
       compileTitle = group.title;
       compileKey = `group:${group.id}`;
-      sections = group.lists.flatMap((l) => l.cards.map((card) => ({ card, label: `${l.title} · ${card.title}` })));
+      sections = group.lists.flatMap((l) => l.cards.filter((c) => c.includeInCompile).map((card) => ({ card, label: `${l.title} · ${card.title}` })));
     }
   } else if (selection?.type === 'list') {
     const list = findListInGroups(groups, selection.listId);
     if (list) {
       compileTitle = list.title;
       compileKey = `list:${list.id}`;
-      sections = list.cards.map((card) => ({ card, label: card.title }));
+      sections = list.cards.filter((c) => c.includeInCompile).map((card) => ({ card, label: card.title }));
     }
   }
 
@@ -134,6 +158,17 @@ export default function FileBrowserView({
               onSelectGroup={(group) => select({ type: 'group', groupId: group.id })}
               onSelectList={(list) => select({ type: 'list', listId: list.id })}
               onSelectCard={(card) => select({ type: 'card', cardId: card.id })}
+              onAddGroup={onAddGroup}
+              onAddList={onAddList}
+              onAddCard={onAddCard}
+              onRenameGroup={onRenameGroup}
+              onDeleteGroup={onDeleteGroup}
+              onRenameList={onRenameList}
+              onDeleteList={onDeleteList}
+              onRenameCard={onRenameCard}
+              onDeleteCard={onDeleteCard}
+              onPeekCard={onPeekCard}
+              dnd={dnd}
             />
           </>
         )}
@@ -145,7 +180,7 @@ export default function FileBrowserView({
             <CardDetailCenter detail={detail} spacing={spacing} />
           </Pane>
           <Pane hasBg={hasBg} style={stickyPaneStyle}>
-            <CardDetailSidebar detail={detail} catalog={catalog} onManageLabels={onManageLabels} wcSettings={wcSettings} />
+            <CardDetailSidebar detail={detail} catalog={catalog} onManageLabels={onManageLabels} wcSettings={wcSettings} onPeekCard={onPeekCard} spacing={spacing} />
           </Pane>
         </>
       ) : sections ? (
@@ -161,6 +196,7 @@ export default function FileBrowserView({
           wcSettings={wcSettings}
           onManageLabels={onManageLabels}
           onNavigateToCard={(cardId) => select({ type: 'card', cardId })}
+          onPeekCard={onPeekCard}
         />
       ) : (
         <>

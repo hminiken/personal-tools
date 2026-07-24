@@ -1,11 +1,32 @@
-/* Applies the board's document-wide prose spacing to every editor inside.
+/* Applies the board's document-wide prose formatting to every editor inside.
    The CSS variables are set inline on the wrapper; the fallbacks are the
-   default prose spacing used when the board hasn't customised a value. */
+   default prose formatting used when the board hasn't customised a value. */
 .doc :global(.ProseMirror) {
   line-height: var(--doc-line-height, 1.6);
+  font-family: var(--doc-font-family, inherit);
+  font-size: var(--doc-font-size, inherit);
 }
 
+/* Paragraph spacing uses PADDING, not margin, on purpose: adjacent vertical
+   margins collapse (the gap between two paragraphs would be max(after, before),
+   not their sum), which made "space after" appear ignored whenever it was set
+   below the default "space before". Padding never collapses, so before + after
+   add up the way they do in a word processor. First-line indent is applied to
+   paragraphs only; an explicit per-paragraph Tab indent (inline style) still
+   overrides this document default. */
 .doc :global(.ProseMirror p) {
-  margin-top: var(--doc-space-before, 0.75em);
-  margin-bottom: var(--doc-space-after, 0.75em);
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: var(--doc-space-before, 0.75em);
+  padding-bottom: var(--doc-space-after, 0.75em);
+  text-indent: var(--doc-indent, 0);
+}
+
+/* Paragraphs inside list items are tight, single-line entries — the document
+   paragraph spacing and first-line indent would blow them apart. Keep them
+   flush (matches the editor's default list rendering). */
+.doc :global(.ProseMirror li p) {
+  padding-top: 0;
+  padding-bottom: 0;
+  text-indent: 0;
 }

@@ -184,46 +184,70 @@ export function themeVars(definition: WritingThemeDefinition | null | undefined)
   return vars;
 }
 
+// The toolbar icon/text color: the theme's toolbar-text if it sets a distinct
+// band, else the editor text (the toolbar shares the editor surface), else
+// Mantine's own Control default (gray-7 light / dark-1 dark) so an unthemed
+// toolbar looks exactly as before. Shared with WritingEditorToolbar's plain
+// ActionIcon triggers (font/size) so the whole bar is one consistent color.
+export const TOOLBAR_ICON_COLOR =
+  'var(--theme-editor-header-text, var(--theme-editor-text, light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-1))))';
+
 // Styles-API fragment for @mantine/tiptap's <RichTextEditor styles={...}>,
 // shared by every Tiptap render site in the Writing Desk (card modal, card
 // section editor, file-browser detail/compile views). Each site spreads
 // `.content`/`.toolbar` into its own `styles` prop alongside any
 // site-specific overrides (e.g. a fixed maxHeight).
-export function writingEditorStyles(): { content: CSSProperties; toolbar: CSSProperties; control: CSSProperties } {
+export function writingEditorStyles(): { root: CSSProperties; content: CSSProperties; toolbar: CSSProperties; controlsGroup: CSSProperties; control: CSSProperties } {
   return {
+    // The RichTextEditor's outer frame. Dropped entirely (not just recolored)
+    // to match the other Tiptap render sites in the Writing Desk, which zero
+    // this border via an inline `style={{ border: 'none' }}` — a seam here
+    // reads as a mismatched box around an otherwise flat, themed editor.
+    root: {
+      border: 'none',
+      borderRadius: 0,
+    },
     content: {
       backgroundColor: 'var(--theme-editor-bg, var(--mantine-color-body))',
       color: 'var(--theme-editor-text, inherit)',
+      borderRadius: 0,
     },
-    // Each toolbar button (H1, Bold, ...) otherwise sits in its own bordered
-    // white/dark-7 chip — a boxed look that clashes with the toolbar's own
-    // deliberately flat, unboxed bar. Universal (not theme-conditional): this
-    // is a layout choice, not a color one, so it applies whether or not a
-    // theme is active. Active/hover feedback (Mantine's own primary-color
-    // highlight) is untouched.
-    control: {
+    // Each control group otherwise sits on Mantine's own white (light) /
+    // dark-7 (dark) surface with a border — the boxed "white chips" look that
+    // clashes with a themed (e.g. dark) toolbar. Flatten it so the buttons sit
+    // directly on the toolbar bar. Universal: matches the already-flat,
+    // borderless control styling below.
+    controlsGroup: {
       background: 'transparent',
       border: 'none',
     },
+    control: {
+      background: 'transparent',
+      border: 'none',
+      // @mantine/tiptap hardcodes each Control's icon color to gray-7 (light
+      // scheme) / dark-1 (dark scheme) — a dark gray that disappears on a
+      // themed (e.g. dark) surface. Point it at the toolbar text: the header
+      // text if the theme sets a distinct toolbar band, else the editor text
+      // (the toolbar shares the editor surface by default), else Mantine's own
+      // default so an unthemed toolbar is unchanged. (Inline color wins over
+      // the resting rule; hover/active background feedback still applies.)
+      color: TOOLBAR_ICON_COLOR,
+    },
     toolbar: {
-      backgroundColor: 'var(--theme-editor-header-bg, var(--mantine-color-body))',
-      color: 'var(--theme-editor-header-text, inherit)',
+      // The toolbar shares the editor's surface by default (flat, like the
+      // glass panes) rather than a separate coloured band — a theme can still
+      // opt into a distinct band via editorHeaderBackground. Falls back to the
+      // default body surface when no theme is set.
+      backgroundColor: 'var(--theme-editor-header-bg, var(--theme-editor-bg, var(--mantine-color-body)))',
+      color: TOOLBAR_ICON_COLOR,
       // Without each Control's own border, the default inter-group gap reads
       // as loose floating icons rather than one continuous bar — tighten it.
       gap: '4px',
-      // The toolbar's own border-bottom (@mantine/tiptap's default separator)
-      // isn't a whitelisted token — blend it into the toolbar's own fill so
-      // it reads as a flat bar instead of an unthemed gray seam. Unthemed:
-      // same default border color as before (no visible change).
-      borderColor: 'var(--theme-editor-header-bg, var(--mantine-color-default-border))',
-      // RichTextEditor.Control (every toolbar button — H1, Bold, etc.)
-      // explicitly reads --mantine-color-text for its icon color, so it
-      // inherits BoardView's headingColor override along with everything
-      // else. Buttons are meant to stay their normal Mantine look regardless
-      // of theme — reset the var back to Mantine's own light/dark default,
-      // scoped to just this toolbar.
-      '--mantine-color-text': 'light-dark(#000, var(--mantine-color-dark-0))',
-      '--mantine-color-dimmed': 'light-dark(var(--mantine-color-gray-6), var(--mantine-color-dark-2))',
+      // A single subtle divider between the toolbar and the content (no full
+      // frame), derived from the toolbar text so it reads on any surface.
+      border: 'none',
+      borderRadius: 0,
+      borderBottom: '1px solid color-mix(in srgb, var(--theme-editor-header-text, var(--theme-editor-text, light-dark(#868e96, #909296))) 22%, transparent)',
     } as CSSProperties,
   };
 }

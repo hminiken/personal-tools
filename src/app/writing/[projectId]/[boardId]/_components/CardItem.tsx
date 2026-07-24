@@ -2,18 +2,22 @@
 
 import { memo, useMemo } from 'react';
 import { Paper, Text, Group, Tooltip, Image, Box, HoverCard, Badge } from '@mantine/core';
-import { IconBan, IconLink } from '@tabler/icons-react';
+import { IconBan, IconLink, IconUserSquare } from '@tabler/icons-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { animateLayoutChanges, sortableTransition } from './sortableConfig';
 import LabelBadge from './LabelBadge';
 import { WordCountDisplay, type WordCountSettings } from '@components/WordCountDisplay';
+import { decodeHtmlEntities } from '@/utils/htmlEntities';
 import type { BoardCard, LabelCategory, LinkedCardRef } from '../types';
 
-// Strips HTML tags to show a short text preview of the card body.
+// Strips HTML tags to show a short text preview of the card body. Entities
+// are decoded after stripping — content run through marked (e.g. Trello
+// imports) legitimately encodes quotes/apostrophes as &quot;/&#39;, which
+// reads as literal entity text once tags are stripped instead of parsed.
 function preview(html: string | null | undefined): string {
   if (!html) return '';
-  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  return decodeHtmlEntities(html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim());
 }
 
 // A card's color shows as an accent strip along the card's top edge (a thick
@@ -37,7 +41,29 @@ export function effectiveCardColor(card: Pick<BoardCard, 'color' | 'labels'>): s
   return driver?.color ?? null;
 }
 
-function LinkChip({ link, onOpenLinked }: { link: LinkedCardRef; onOpenLinked: (cardId: number) => void }) {
+function LinkChip({
+  link,
+  onOpenLinked,
+  onPeekLinked,
+}: {
+  link: LinkedCardRef;
+  onOpenLinked: (cardId: number) => void;
+  onPeekLinked?: (cardId: number) => void;
+}) {
+  // Plain click pops the linked card up as a reference window (see
+  // BoardView's peek dock) instead of navigating away — ctrl/cmd-click or
+  // right-click navigates to it for real.
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (e.ctrlKey || e.metaKey) onOpenLinked(link.cardId);
+    else if (onPeekLinked) onPeekLinked(link.cardId);
+    else onOpenLinked(link.cardId);
+  };
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onOpenLinked(link.cardId);
+  };
   return (
     <HoverCard width={260} shadow="md" withinPortal openDelay={300} closeDelay={100}>
       <HoverCard.Target>
@@ -47,7 +73,8 @@ function LinkChip({ link, onOpenLinked }: { link: LinkedCardRef; onOpenLinked: (
           color="gray"
           leftSection={<IconLink size={9} style={{ display: 'block' }} />}
           style={{ cursor: 'pointer', maxWidth: 120, textOverflow: 'ellipsis' }}
-          onClick={(e) => { e.stopPropagation(); onOpenLinked(link.cardId); }}
+          onClick={handleClick}
+          onContextMenu={handleContextMenu}
         >
           {link.title}
         </Badge>
@@ -60,8 +87,19 @@ function LinkChip({ link, onOpenLinked }: { link: LinkedCardRef; onOpenLinked: (
         {link.contentPreview && (
           <Text size="xs" mt={4} lineClamp={4} c="dimmed">{link.contentPreview}</Text>
         )}
+        {onPeekLinked && (
+          <Text size="xs" c="blue" mt={6}>Click to preview · ctrl/right-click to open</Text>
+        )}
       </HoverCard.Dropdown>
     </HoverCard>
+  );
+}
+
+function CharacterBadge() {
+  return (
+    <Badge size="xs" variant="light" color="grape" leftSection={<IconUserSquare size={9} style={{ display: 'block' }} />}>
+      Character
+    </Badge>
   );
 }
 
@@ -82,12 +120,15 @@ export const CardFace = memo(function CardFace({
   categories,
   wcSettings,
   onOpenLinked,
+  onPeekLinked,
 }: {
   card: BoardCard;
   categories: LabelCategory[];
   wcSettings?: WordCountSettings;
   onOpenLinked?: (cardId: number) => void;
+  onPeekLinked?: (cardId: number) => void;
 }) {
+  const isCharacter = card.cardType === 'character';
   // Card content can be a whole scene — don't re-run the tag-stripping regex
   // over it on every render (cards re-render often during drags).
   const text = useMemo(() => preview(card.content), [card.content]);
@@ -108,7 +149,7 @@ export const CardFace = memo(function CardFace({
           style={{ maxHeight: '100cqw' }}
           fallbackSrc="https://placehold.co/240x160?text=Image"
         />
-        {(card.labels.length > 0 || card.links.length > 0 || !card.includeInCompile) && (
+        {(card.labels.length > 0 || card.links.length > 0 || !card.includeInCompile || isCharacter) && (
           <Box
             style={{
               position: 'absolute',
@@ -125,11 +166,12 @@ export const CardFace = memo(function CardFace({
                   <IconBan size={12} color="white" style={{ flexShrink: 0 }} />
                 </Tooltip>
               )}
+              {isCharacter && <CharacterBadge />}
               {card.labels.map((label) => (
                 <LabelBadge key={label.id} label={label} categories={categories} variant="filled" size="sm" />
               ))}
               {onOpenLinked && card.links.map((link) => (
-                <LinkChip key={link.linkId} link={link} onOpenLinked={onOpenLinked} />
+                <LinkChip key={link.linkId} link={link} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} />
               ))}
             </Group>
           </Box>
@@ -141,13 +183,14 @@ export const CardFace = memo(function CardFace({
   if (card.coverImage) {
     return (
       <>
-        {(card.labels.length > 0 || card.links.length > 0) && (
+        {(card.labels.length > 0 || card.links.length > 0 || isCharacter) && (
           <Group gap={4} mb={4}>
+            {isCharacter && <CharacterBadge />}
             {card.labels.map((label) => (
               <LabelBadge key={label.id} label={label} categories={categories} size="sm" />
             ))}
             {onOpenLinked && card.links.map((link) => (
-              <LinkChip key={link.linkId} link={link} onOpenLinked={onOpenLinked} />
+              <LinkChip key={link.linkId} link={link} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} />
             ))}
           </Group>
         )}
@@ -186,13 +229,14 @@ export const CardFace = memo(function CardFace({
 
   return (
     <>
-      {(card.labels.length > 0 || card.links.length > 0) && (
+      {(card.labels.length > 0 || card.links.length > 0 || isCharacter) && (
         <Group gap={4} mb={4}>
+          {isCharacter && <CharacterBadge />}
           {card.labels.map((label) => (
             <LabelBadge key={label.id} label={label} categories={categories} size="sm" />
           ))}
           {onOpenLinked && card.links.map((link) => (
-            <LinkChip key={link.linkId} link={link} onOpenLinked={onOpenLinked} />
+            <LinkChip key={link.linkId} link={link} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} />
           ))}
         </Group>
       )}
@@ -224,12 +268,14 @@ function CardItem({
   wcSettings,
   onOpen,
   onOpenLinked,
+  onPeekLinked,
 }: {
   card: BoardCard;
   categories: LabelCategory[];
   wcSettings: WordCountSettings;
   onOpen: (card: BoardCard) => void;
   onOpenLinked: (cardId: number) => void;
+  onPeekLinked?: (cardId: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `card:${card.id}`,
@@ -278,7 +324,7 @@ function CardItem({
         {...attributes}
         {...listeners}
       >
-        <CardFace card={card} categories={categories} wcSettings={wcSettings} onOpenLinked={onOpenLinked} />
+        <CardFace card={card} categories={categories} wcSettings={wcSettings} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} />
       </Paper>
     );
   }
@@ -292,11 +338,22 @@ function CardItem({
       radius="sm"
       data-no-drag-scroll
       p={isImage ? 0 : 'xs'}
-      onClick={() => onOpen(card)}
+      // Plain click opens the card as always — that's the board's primary
+      // interaction, not a "navigate away from something" moment. Ctrl/cmd-
+      // click or right-click pops it up as a reference window instead.
+      onClick={(e) => {
+        if ((e.ctrlKey || e.metaKey) && onPeekLinked) onPeekLinked(card.id);
+        else onOpen(card);
+      }}
+      onContextMenu={(e) => {
+        if (!onPeekLinked) return;
+        e.preventDefault();
+        onPeekLinked(card.id);
+      }}
       {...attributes}
       {...listeners}
     >
-      <CardFace card={card} categories={categories} wcSettings={wcSettings} onOpenLinked={onOpenLinked} />
+      <CardFace card={card} categories={categories} wcSettings={wcSettings} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} />
     </Paper>
   );
 }

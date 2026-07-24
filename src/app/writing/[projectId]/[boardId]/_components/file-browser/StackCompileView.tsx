@@ -18,18 +18,19 @@ import type { BoardCard, LabelCatalog } from '../../types';
 import { editorTextResetStyle } from './types';
 import { writingEditorStyles } from '@/utils/writingTheme';
 import classes from './StackCompileView.module.css';
+import toolbarClasses from './EditorToolbarBleed.module.css';
 
 export type CompileSection = { card: BoardCard; label: string };
 
 function CardDivider() {
-  return <div aria-hidden style={{ borderTop: '2px dashed var(--mantine-color-gray-4)', margin: '10px 0' }} />;
+  return <div aria-hidden style={{ borderTop: '2px dashed var(--theme-card-border, var(--mantine-color-gray-4))', margin: '10px 0' }} />;
 }
 
 // Renders the read-only merged document for select mode. A separate component
 // so the useWritingEditor hook only runs while this mode is active; content
 // is a snapshot merged from the live edit-mode editors at toggle time.
-function SelectModeDoc({ mergedHtml }: { mergedHtml: string }) {
-  const editor = useWritingEditor(mergedHtml, false);
+function SelectModeDoc({ mergedHtml, smartQuotes }: { mergedHtml: string; smartQuotes?: boolean | null }) {
+  const editor = useWritingEditor(mergedHtml, false, { smartQuotes });
   return (
     <div className={classes.selectDoc}>
       <RichTextEditor editor={editor} style={{ border: 'none' }} styles={{ content: writingEditorStyles().content }}>
@@ -60,6 +61,7 @@ export default function StackCompileView({
   wcSettings,
   onManageLabels,
   onNavigateToCard,
+  onPeekCard,
 }: {
   title: string;
   sections: CompileSection[];
@@ -70,6 +72,7 @@ export default function StackCompileView({
   wcSettings: WordCountSettings;
   onManageLabels: () => void;
   onNavigateToCard: (cardId: number) => void;
+  onPeekCard: (cardId: number) => void;
 }) {
   const [mode, setMode] = useState<'edit' | 'select'>('edit');
   const [active, setActive] = useState<{ cardId: number; editor: Editor } | null>(null);
@@ -138,9 +141,9 @@ export default function StackCompileView({
             stack over the board photo behind it. */}
         {sections.length > 0 && mode === 'edit' && (
           <div
-            className={classes.stickyToolbar}
+            className={toolbarClasses.stickyToolbar}
             style={{
-              background: 'var(--theme-editor-header-bg, var(--mantine-color-body))',
+              background: 'var(--theme-editor-header-bg, var(--theme-editor-bg, var(--mantine-color-body)))',
               color: 'var(--theme-editor-header-text, inherit)',
               // borderBottom: '1px solid var(--mantine-color-default-border)',
             }}
@@ -148,7 +151,7 @@ export default function StackCompileView({
             <RichTextEditor
               editor={toolbarEditor}
               style={{ border: 'none', background: 'none' }}
-              styles={{ toolbar: writingEditorStyles().toolbar, control: writingEditorStyles().control }}
+              styles={{ toolbar: writingEditorStyles().toolbar, controlsGroup: writingEditorStyles().controlsGroup, control: writingEditorStyles().control }}
             >
               <WritingEditorToolbar />
             </RichTextEditor>
@@ -186,6 +189,7 @@ export default function StackCompileView({
                       card={card}
                       heading={label}
                       comments={cardComments[card.id] ?? {}}
+                      smartQuotes={spacing.smartQuotes}
                       onCommentsChange={(next) => handleCommentsChange(card.id, next)}
                       onEditorReady={handleEditorReady}
                       onEditorFocus={(editor) => setActive({ cardId: card.id, editor })}
@@ -197,7 +201,7 @@ export default function StackCompileView({
 
             {mode === 'select' && (
               <Box className={docSpacingClass} style={{ ...spacingVars(spacing), ...editorTextResetStyle }} mt="sm">
-                <SelectModeDoc mergedHtml={mergedHtml} />
+                <SelectModeDoc mergedHtml={mergedHtml} smartQuotes={spacing.smartQuotes} />
               </Box>
             )}
           </>
@@ -206,7 +210,7 @@ export default function StackCompileView({
 
       {showSidebar ? (
         <Pane hasBg={hasBg} style={stickyPaneStyle}>
-          <CardDetailSidebar detail={sidebar} catalog={catalog} onManageLabels={onManageLabels} wcSettings={wcSettings} />
+          <CardDetailSidebar detail={sidebar} catalog={catalog} onManageLabels={onManageLabels} wcSettings={wcSettings} onPeekCard={onPeekCard} spacing={spacing} />
         </Pane>
       ) : (
         <div />

@@ -23,6 +23,7 @@ import type { BoardGroup, BoardCard, LabelCategory } from '../types';
 type GroupCallbacks = {
   onOpenCard: (card: BoardCard) => void;
   onOpenCardById: (cardId: number) => void;
+  onPeekCard?: (cardId: number) => void;
   onAddCard: (listId: number, title: string) => void;
   onAddList: (groupId: number, title: string) => void;
   onRenameList: (listId: number, title: string) => void;
@@ -50,6 +51,7 @@ const GroupRowInner = memo(function GroupRowInner({
   listeners,
   onOpenCard,
   onOpenCardById,
+  onPeekCard,
   onAddCard,
   onAddList,
   onRenameList,
@@ -235,6 +237,7 @@ const GroupRowInner = memo(function GroupRowInner({
                   originDrag={originDrag}
                   onOpenCard={onOpenCard}
                   onOpenCardById={onOpenCardById}
+                  onPeekCard={onPeekCard}
                   onAddCard={onAddCard}
                   onRename={onRenameList}
                   onDelete={onDeleteList}
@@ -307,6 +310,7 @@ function GroupRow({
   originDrag,
   onOpenCard,
   onOpenCardById,
+  onPeekCard,
   onAddCard,
   onAddList,
   onRenameList,
@@ -398,6 +402,7 @@ function GroupRow({
         listeners={listeners}
         onOpenCard={onOpenCard}
         onOpenCardById={onOpenCardById}
+        onPeekCard={onPeekCard}
         onAddCard={onAddCard}
         onAddList={onAddList}
         onRenameList={onRenameList}

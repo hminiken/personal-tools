@@ -61,6 +61,20 @@ export function useBoardDnd(
   // multiple onDragOver events for the same droppable without the cursor moving).
   const lastOverRef = useRef<string | number | null>(null);
 
+  // A ref (not state) so BoardView's poll-driven refresh can check it without
+  // waiting on a render — true for the whole drag gesture, plus however long
+  // the fire-and-forget move* action below is still in flight. Refreshing
+  // mid-drag would rip dnd-kit's sortable items out from under an active
+  // pointer sensor; refreshing in the drop/persist gap could race the
+  // just-committed position back to stale.
+  const dragActiveRef = useRef(false);
+  const pendingMoveCountRef = useRef(0);
+  const canAutoRefresh = useCallback(() => !dragActiveRef.current && pendingMoveCountRef.current === 0, []);
+  const trackMove = useCallback((promise: Promise<unknown>) => {
+    pendingMoveCountRef.current++;
+    promise.finally(() => { pendingMoveCountRef.current--; });
+  }, []);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
@@ -99,6 +113,7 @@ export function useBoardDnd(
   }, []);
 
   function handleDragStart(e: DragStartEvent) {
+    dragActiveRef.current = true;
     lastOverRef.current = null;
     const { type, num } = parseId(e.active.id);
     activeTypeRef.current = type;
@@ -222,6 +237,7 @@ export function useBoardDnd(
     setOriginDrag(null);
     activeTypeRef.current = null;
     lastOverRef.current = null;
+    dragActiveRef.current = false;
     if (!over) return;
     const a = parseId(active.id);
     const o = parseId(over.id);
@@ -236,7 +252,7 @@ export function useBoardDnd(
       const reordered = arrayMove(groups, oldIndex, newIndex);
       setGroups(reordered);
       const pos = midpoint(reordered[newIndex - 1]?.position, reordered[newIndex + 1]?.position);
-      moveGroup(a.num, pos);
+      trackMove(moveGroup(a.num, pos));
       return;
     }
 
@@ -257,7 +273,7 @@ export function useBoardDnd(
       const fg = finalGroups.find((g) => g.id === groupId)!;
       const idx = fg.lists.findIndex((l) => l.id === a.num);
       const pos = midpoint(fg.lists[idx - 1]?.position, fg.lists[idx + 1]?.position);
-      moveList(a.num, groupId, pos);
+      trackMove(moveList(a.num, groupId, pos));
       return;
     }
 
@@ -286,9 +302,9 @@ export function useBoardDnd(
       const fl = findList(finalGroups, listId)!;
       const idx = fl.cards.findIndex((c) => c.id === a.num);
       const pos = midpoint(fl.cards[idx - 1]?.position, fl.cards[idx + 1]?.position);
-      moveCard(a.num, listId, pos);
+      trackMove(moveCard(a.num, listId, pos));
     }
   }
 
-  return { sensors, collisionDetection, activeDrag, originDrag, handleDragStart, handleDragOver, handleDragEnd };
+  return { sensors, collisionDetection, activeDrag, originDrag, handleDragStart, handleDragOver, handleDragEnd, canAutoRefresh };
 }

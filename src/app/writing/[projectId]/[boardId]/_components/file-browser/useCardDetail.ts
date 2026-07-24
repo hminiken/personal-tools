@@ -17,10 +17,11 @@ import {
   removeCommentMarkFromEditor,
   jumpToCommentInEditor,
 } from '@/utils/writingComments';
+import { defaultCharacterFields, parseCharacterFields, serializeCharacterFields, type CharacterField } from '@/utils/characterFields';
 
 export type GalleryImage = { id: number; path: string };
 export type { CommentRecord };
-export type ProjectCardOption = { id: number; title: string; boardTitle: string; listTitle: string };
+export type ProjectCardOption = { id: number; title: string; boardTitle: string; listTitle: string; cardType: 'standard' | 'character' };
 export type BubbleMode = 'idle' | 'adding' | 'viewing';
 
 // Ports CardEditorModal's card-editing state/logic into a hook so it can be
@@ -29,20 +30,28 @@ export type BubbleMode = 'idle' | 'adding' | 'viewing';
 // there's no explicit Save/Cancel footer here — everything either commits
 // immediately (switches, labels, images, links, comments) or on editor blur
 // (title, content), matching CardEditorModal/CompiledCardEditor exactly.
-export function useCardDetail(card: BoardCard | null, projectId: number, onDeleted: () => void) {
+export function useCardDetail(
+  card: BoardCard | null,
+  projectId: number,
+  onDeleted: () => void,
+  opts?: { smartQuotes?: boolean | null }
+) {
   const router = useRouter();
 
   const [navCard, setNavCard] = useState<BoardCard | null>(null);
   const [cardHistory, setCardHistory] = useState<BoardCard[]>([]);
   const viewingCard = navCard ?? card;
 
-  const editor = useWritingEditor(viewingCard?.content, true);
+  const editor = useWritingEditor(viewingCard?.content, true, { smartQuotes: opts?.smartQuotes });
 
   const [title, setTitle] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
   const [includeInCompile, setIncludeInCompile] = useState(true);
   const [isImageCard, setIsImageCard] = useState(false);
+  const [isCharacterCard, setIsCharacterCard] = useState(false);
+  const [characterFields, setCharacterFields] = useState<CharacterField[]>([]);
   const [hideWordCount, setHideWordCount] = useState(false);
+  const [color, setColor] = useState<string | null>(null);
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [liveWordCount, setLiveWordCount] = useState(0);
@@ -77,7 +86,10 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
     setLiveWordCount(viewingCard?.wordCount ?? 0);
     setIncludeInCompile(viewingCard?.includeInCompile ?? true);
     setIsImageCard(viewingCard?.isImageCard ?? false);
+    setIsCharacterCard(viewingCard?.cardType === 'character');
+    setCharacterFields(parseCharacterFields(viewingCard?.characterFields));
     setHideWordCount(viewingCard?.hideWordCount ?? false);
+    setColor(viewingCard?.color ?? null);
     setCoverImage(viewingCard?.coverImage ?? null);
     setImages((viewingCard?.images ?? []).map((i) => ({ id: i.id, path: i.path })));
     const cardId = viewingCard?.id;
@@ -184,9 +196,32 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
     if (viewingCard) await updateCard(viewingCard.id, { isImageCard: value });
   };
 
+  const handleToggleCharacterCard = async (value: boolean) => {
+    setIsCharacterCard(value);
+    if (!viewingCard) return;
+    if (value && characterFields.length === 0) {
+      const seeded = defaultCharacterFields();
+      setCharacterFields(seeded);
+      await updateCard(viewingCard.id, { cardType: 'character', characterFields: serializeCharacterFields(seeded), includeInCompile: false });
+      setIncludeInCompile(false);
+    } else {
+      await updateCard(viewingCard.id, { cardType: value ? 'character' : 'standard' });
+    }
+  };
+
+  const handleCharacterFieldsChange = (next: CharacterField[]) => {
+    setCharacterFields(next);
+    if (viewingCard) updateCard(viewingCard.id, { characterFields: serializeCharacterFields(next) });
+  };
+
   const handleToggleHideWordCount = async (value: boolean) => {
     setHideWordCount(value);
     if (viewingCard) await updateCard(viewingCard.id, { hideWordCount: value });
+  };
+
+  const handleColorChange = async (next: string | null) => {
+    setColor(next);
+    if (viewingCard) await updateCard(viewingCard.id, { color: next });
   };
 
   const handleSetCover = async (path: string) => {
@@ -226,6 +261,7 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
         title: target.title,
         contentPreview: '',
         boardTitle: target.boardTitle,
+        cardType: target.cardType,
       };
       const newLinks = [...links, newRef];
       setLinks(newLinks);
@@ -315,6 +351,13 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
 
   const linkedCardIds = new Set(links.map((l) => l.cardId));
 
+  // Card color can derive from an applied label flagged to drive card color
+  // (lowest position wins). An explicit `color` on the card overrides it.
+  const drivingLabel = viewingCard?.labels
+    .filter((l) => l.drivesCardColor)
+    .sort((a, b) => a.position - b.position || a.id - b.id)[0] ?? null;
+  const labelColor = drivingLabel?.color ?? null;
+
   return {
     viewingCard,
     editor: editor as Editor | null,
@@ -324,7 +367,11 @@ export function useCardDetail(card: BoardCard | null, projectId: number, onDelet
     setTitle, setEditingTitle, commitTitle,
 
     includeInCompile, isImageCard, hideWordCount,
+    isCharacterCard, characterFields,
     handleToggleCompile, handleToggleImageCard, handleToggleHideWordCount,
+    handleToggleCharacterCard, handleCharacterFieldsChange,
+
+    color, labelColor, drivingLabel, handleColorChange,
 
     coverImage, images,
     handleSetCover, handleDeleteImage, handleImageUploaded,

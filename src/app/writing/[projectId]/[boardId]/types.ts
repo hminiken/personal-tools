@@ -18,6 +18,7 @@ export type LinkedCardRef = {
   title: string;
   contentPreview: string;  // Plain-text excerpt (HTML stripped)
   boardTitle: string;
+  cardType: 'standard' | 'character';
 };
 
 // A card as the board UI consumes it: its own applied labels, gallery

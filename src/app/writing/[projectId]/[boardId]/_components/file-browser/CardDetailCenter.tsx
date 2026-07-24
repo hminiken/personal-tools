@@ -16,6 +16,7 @@ import { docSpacingClass, spacingVars, type Spacing } from '@components/Document
 import { writingEditorStyles } from '@/utils/writingTheme';
 import type { CardDetailState } from './useCardDetail';
 import { editorTextResetStyle } from './types';
+import toolbarClasses from './EditorToolbarBleed.module.css';
 
 // Center pane for a selected card: title and the rich-text editor. All
 // state lives in the shared `useCardDetail` hook — this component only
@@ -77,12 +78,30 @@ export default function CardDetailCenter({
         </Tooltip>
       </Group>
 
+      {/* Sticky toolbar — a separate RichTextEditor instance (bound to the
+          same editor) so it can bleed through the Pane's own padding to sit
+          flush against its edges, matching StackCompileView's toolbar. The
+          real content editor below stays within the normal padded area. */}
+      <div
+        className={toolbarClasses.stickyToolbar}
+        style={{
+          background: 'var(--theme-editor-header-bg, var(--theme-editor-bg, var(--mantine-color-body)))',
+          color: 'var(--theme-editor-header-text, inherit)',
+        }}
+      >
+        <RichTextEditor
+          editor={detail.editor}
+          style={{ border: 'none', background: 'none' }}
+          styles={{ toolbar: writingEditorStyles().toolbar, controlsGroup: writingEditorStyles().controlsGroup, control: writingEditorStyles().control }}
+        >
+          <WritingEditorToolbar />
+        </RichTextEditor>
+      </div>
+
       {/* Editor + comment bubble menu — kept at standard light/dark text
           colors regardless of the glass pane's forced-white chrome text. */}
       <div className={docSpacingClass} style={{ ...spacingVars(spacing), ...editorTextResetStyle }}>
-        <RichTextEditor editor={detail.editor} styles={writingEditorStyles()}>
-          <WritingEditorToolbar />
-
+        <RichTextEditor editor={detail.editor} style={{ border: 'none' }} styles={{ content: writingEditorStyles().content }}>
           {detail.editor && (
             <BubbleMenu
               editor={detail.editor}

@@ -1,0 +1,36 @@
+{
+  "boardBackground": "#faf0f2",
+
+  "glassBackground": "rgba(250,240,242,0.5)",
+  "glassBorder": "transparent",
+  "glassBlur": "10px",
+  "glassText": "#800020",
+
+  "groupBackground": "#f5c4ce",
+  "groupBorder": "transparent",
+  "groupShadow": "0 4px 14px rgba(219,112,147,0.15)",
+
+  "listBackground": "#fad9e0",
+  "listBorder": "transparent",
+  "listText": "#5c0017",
+
+  "cardBackground": "#ffffff",
+  "cardBorder": "transparent",
+  "cardText": "#4a0011",
+  "cardMutedText": "#9e596f",
+
+  "editorBackground": "#ffffff",
+  "editorText": "#4a0011",
+  "editorHeaderBackground": "#fad9e0",
+  "editorHeaderText": "#800020",
+
+  "headingColor": "#c71585",
+  "mutedText": "#9e596f",
+  "accentColor": "#dc143c",
+
+  "buttonBackground": "#f5c4ce",
+  "buttonText": "#4a0011",
+
+  "progressBackground": "#f5c4ce",
+  "progressFill": "#dc143c"
+}

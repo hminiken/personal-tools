@@ -9,6 +9,7 @@ import {
   addCardLink, removeCardLink, getProjectCards, setCardWordGoal,
 } from '../../../../_actions/writing_actions';
 import type { BoardCard, LinkedCardRef } from '../../types';
+import { defaultCharacterFields, parseCharacterFields, serializeCharacterFields, type CharacterField } from '@/utils/characterFields';
 import {
   type CommentRecord,
   parseComments,
@@ -43,7 +44,10 @@ export function useStackCardSidebar({
 
   const [includeInCompile, setIncludeInCompile] = useState(true);
   const [isImageCard, setIsImageCard] = useState(false);
+  const [isCharacterCard, setIsCharacterCard] = useState(false);
+  const [characterFields, setCharacterFields] = useState<CharacterField[]>([]);
   const [hideWordCount, setHideWordCount] = useState(false);
+  const [color, setColor] = useState<string | null>(null);
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [links, setLinks] = useState<LinkedCardRef[]>([]);
@@ -59,7 +63,10 @@ export function useStackCardSidebar({
   useEffect(() => {
     setIncludeInCompile(card?.includeInCompile ?? true);
     setIsImageCard(card?.isImageCard ?? false);
+    setIsCharacterCard(card?.cardType === 'character');
+    setCharacterFields(parseCharacterFields(card?.characterFields));
     setHideWordCount(card?.hideWordCount ?? false);
+    setColor(card?.color ?? null);
     setCoverImage(card?.coverImage ?? null);
     setImages((card?.images ?? []).map((i) => ({ id: i.id, path: i.path })));
     const overrideLinks = card ? linksOverrideRef.current.get(card.id) : undefined;
@@ -88,9 +95,32 @@ export function useStackCardSidebar({
     if (card) updateCard(card.id, { isImageCard: value });
   };
 
+  const handleToggleCharacterCard = (value: boolean) => {
+    setIsCharacterCard(value);
+    if (!card) return;
+    if (value && characterFields.length === 0) {
+      const seeded = defaultCharacterFields();
+      setCharacterFields(seeded);
+      updateCard(card.id, { cardType: 'character', characterFields: serializeCharacterFields(seeded), includeInCompile: false });
+      setIncludeInCompile(false);
+    } else {
+      updateCard(card.id, { cardType: value ? 'character' : 'standard' });
+    }
+  };
+
+  const handleCharacterFieldsChange = (next: CharacterField[]) => {
+    setCharacterFields(next);
+    if (card) updateCard(card.id, { characterFields: serializeCharacterFields(next) });
+  };
+
   const handleToggleHideWordCount = (value: boolean) => {
     setHideWordCount(value);
     if (card) updateCard(card.id, { hideWordCount: value });
+  };
+
+  const handleColorChange = (next: string | null) => {
+    setColor(next);
+    if (card) updateCard(card.id, { color: next });
   };
 
   const handleSetCover = (path: string) => {
@@ -130,6 +160,7 @@ export function useStackCardSidebar({
         title: target.title,
         contentPreview: '',
         boardTitle: target.boardTitle,
+        cardType: target.cardType,
       }];
       setLinks(newLinks);
       linksOverrideRef.current.set(card.id, newLinks);
@@ -179,14 +210,29 @@ export function useStackCardSidebar({
     if (editor) jumpToCommentInEditor(editor, commentId);
   };
 
+  // Card color can derive from an applied label flagged to drive card color
+  // (lowest position wins). An explicit `color` on the card overrides it.
+  const drivingLabel = card?.labels
+    .filter((l) => l.drivesCardColor)
+    .sort((a, b) => a.position - b.position || a.id - b.id)[0] ?? null;
+  const labelColor = drivingLabel?.color ?? null;
+
   return {
     viewingCard: card,
     includeInCompile,
     isImageCard,
+    isCharacterCard,
+    characterFields,
     hideWordCount,
     handleToggleCompile,
     handleToggleImageCard,
+    handleToggleCharacterCard,
+    handleCharacterFieldsChange,
     handleToggleHideWordCount,
+    color,
+    labelColor,
+    drivingLabel,
+    handleColorChange,
     coverImage,
     images,
     handleSetCover,

@@ -1,4 +1,4 @@
-// Pure parser for Trello's board JSON export. No 'use server', no DB access —
+﻿// Pure parser for Trello's board JSON export. No 'use server', no DB access —
 // this only reads the CURRENT state of the board from the export's top-level
 // `lists`/`cards` arrays, plus labels (board-level `labels`/card-level
 // `labels`/`idLabels`), comments (`actions` entries of type `commentCard`),
@@ -7,6 +7,7 @@
 // board looks like right now.
 import { marked } from 'marked';
 import { DEFAULT_LABEL_COLOR } from '@/utils/writingLabels';
+import { decodeHtmlEntities as decodeTrelloEntities } from '@/utils/htmlEntities';
 
 export type ParsedTrelloLabel = { key: string; name: string; color: string }; // color = mapped hex
 export type ParsedTrelloComment = { key: string; text: string; createdAt: string }; // all anchored:false
@@ -66,7 +67,7 @@ export function mapTrelloColor(trelloColor: string | null | undefined): string {
 // A label's display name: its own name if set, else the capitalized color
 // word (e.g. "Green"), else the generic fallback "Label".
 function buildLabelName(label: RawTrelloLabel): string {
-  const trimmed = typeof label.name === 'string' ? label.name.trim() : '';
+  const trimmed = typeof label.name === 'string' ? decodeTrelloEntities(label.name.trim()) : '';
   if (trimmed) return trimmed;
   const base = typeof label.color === 'string' && label.color ? label.color.split('_')[0].toLowerCase() : '';
   if (base) return base.charAt(0).toUpperCase() + base.slice(1);
@@ -77,14 +78,14 @@ function buildLabelName(label: RawTrelloLabel): string {
 // then one "☑ "/"☐ " line per check item, sorted by position.
 function renderChecklistText(checklist: RawTrelloChecklist): string {
   const lines: string[] = [];
-  const name = typeof checklist.name === 'string' ? checklist.name.trim() : '';
+  const name = typeof checklist.name === 'string' ? decodeTrelloEntities(checklist.name.trim()) : '';
   if (name) lines.push(name);
 
   const items = Array.isArray(checklist.checkItems) ? [...checklist.checkItems] : [];
   items.sort((a, b) => (a?.pos ?? 0) - (b?.pos ?? 0));
   for (const item of items) {
     if (!item) continue;
-    const itemName = typeof item.name === 'string' ? item.name : '';
+    const itemName = typeof item.name === 'string' ? decodeTrelloEntities(item.name) : '';
     lines.push((item.state === 'complete' ? '☑ ' : '☐ ') + itemName);
   }
 
@@ -103,7 +104,7 @@ export function parseTrelloExport(jsonText: string): ParsedTrelloBoard {
     throw new Error("This doesn't look like a Trello board export (missing lists/cards).");
   }
 
-  const boardName = (typeof raw.name === 'string' && raw.name.trim()) || 'Imported board';
+  const boardName = (typeof raw.name === 'string' && decodeTrelloEntities(raw.name.trim())) || 'Imported board';
 
   // ---- Labels: dedup by Trello label id, preferring the board-level catalog. ----
   const boardLabels: RawTrelloLabel[] = Array.isArray(raw.labels) ? raw.labels : [];
@@ -130,7 +131,7 @@ export function parseTrelloExport(jsonText: string): ParsedTrelloBoard {
       if (typeof text !== 'string' || typeof cardId !== 'string') continue;
       const key = (typeof a.id === 'string' && a.id) || `commentCard-${actionIndex}`;
       const createdAt = typeof a.date === 'string' ? a.date : '';
-      const comment: ParsedTrelloComment = { key, text, createdAt };
+      const comment: ParsedTrelloComment = { key, text: decodeTrelloEntities(text), createdAt };
       const bucket = commentsByCardId.get(cardId);
       if (bucket) bucket.push(comment);
       else commentsByCardId.set(cardId, [comment]);
@@ -177,12 +178,12 @@ export function parseTrelloExport(jsonText: string): ParsedTrelloBoard {
   const buildList = (l: RawTrelloList, titleOverride?: string): ParsedTrelloList => {
     const rawCards = cardsByListId.get(l.id) ?? [];
     cardCount += rawCards.length;
-    const name = titleOverride ?? ((typeof l.name === 'string' && l.name.trim()) || '(untitled)');
+    const name = titleOverride ?? ((typeof l.name === 'string' && decodeTrelloEntities(l.name.trim())) || '(untitled)');
     return {
       name: name || '(untitled)',
       cards: rawCards.map((c) => {
-        const title = (typeof c.name === 'string' && c.name.trim()) || '(untitled)';
-        const desc = typeof c.desc === 'string' ? c.desc.trim() : '';
+        const title = (typeof c.name === 'string' && decodeTrelloEntities(c.name.trim())) || '(untitled)';
+        const desc = typeof c.desc === 'string' ? decodeTrelloEntities(c.desc.trim()) : '';
         const contentHtml = desc ? (marked.parse(desc, { async: false, gfm: true, breaks: true }) as string) : '';
 
         const rawLabelIds: string[] = Array.isArray(c.labels)
@@ -221,7 +222,7 @@ export function parseTrelloExport(jsonText: string): ParsedTrelloBoard {
     const rawName = typeof l.name === 'string' ? l.name : '';
     if (MARKER_RE.test(rawName)) {
       markerOrdinal++;
-      const cleaned = rawName.replace(MARKER_RE, '').trim();
+      const cleaned = decodeTrelloEntities(rawName.replace(MARKER_RE, '').trim());
       currentGroup = { name: cleaned || `Group ${markerOrdinal}`, lists: [] };
       groups.push(currentGroup);
       const built = buildList(l, cleaned || currentGroup.name);

@@ -1,0 +1,13 @@
+/* A flat sticky toolbar bar that bleeds through its solid Pane's own p="sm"
+   padding to sit flush against the Pane's edges — matching how a themed
+   editor toolbar reads as one continuous bar rather than an inset box with a
+   visible gutter around it. Shared by every solid editor Pane in the file
+   browser (single-card center pane, the compile/stack view) so both render
+   identically. Opaque so scrolled prose never shows through it. */
+.stickyToolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: calc(var(--mantine-spacing-sm) * -1) calc(var(--mantine-spacing-sm) * -1) 0;
+  padding: 4px var(--mantine-spacing-sm) 2px;
+}

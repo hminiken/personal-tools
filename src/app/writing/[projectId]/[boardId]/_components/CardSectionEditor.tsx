@@ -33,6 +33,7 @@ export default function CardSectionEditor({
   comments,
   onCommentsChange,
   withToolbar = false,
+  smartQuotes,
   onEditorReady,
   onEditorFocus,
 }: {
@@ -43,10 +44,12 @@ export default function CardSectionEditor({
   comments: CommentRecord;
   onCommentsChange: (next: CommentRecord) => void;
   withToolbar?: boolean;
+  // Board's smart-quotes toggle (default on) — forwarded to the editor.
+  smartQuotes?: boolean | null;
   onEditorReady?: (cardId: number, editor: Editor | null) => void;
   onEditorFocus?: (editor: Editor) => void;
 }) {
-  const editor = useWritingEditor(card.content, true);
+  const editor = useWritingEditor(card.content, true, { smartQuotes });
   const [focused, setFocused] = useState(false);
   const [saved, setSaved] = useState(false);
   const lastSaved = useRef(card.content ?? '');

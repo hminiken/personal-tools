@@ -64,6 +64,10 @@ export const writingThemes = sqliteTable('writing_themes', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
   definition: text('definition').notNull().default('{}'),
+  // Shipped with the app (seeded by scripts/add-builtin-themes.mjs) vs.
+  // user-uploaded. Built-ins can't be renamed/replaced/deleted — see the
+  // guards in writing_actions.ts.
+  isBuiltin: integer('is_builtin', { mode: 'boolean' }).notNull().default(false),
 
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
@@ -113,6 +117,17 @@ export const boards = sqliteTable('boards', {
   lineHeight: text('line_height'),
   spaceBefore: text('space_before'),
   spaceAfter: text('space_after'),
+
+  // Document-wide typography, also applied as CSS to every card editor.
+  // fontFamily stores a key from utils/writingFonts (null = inherit default);
+  // fontSize is a CSS length e.g. '17px'; paragraphIndent is a CSS length for
+  // the first-line indent of each paragraph (null/empty = no auto-indent).
+  fontFamily: text('font_family'),
+  fontSize: text('font_size'),
+  paragraphIndent: text('paragraph_indent'),
+  // Smart quotes (and other Typography substitutions) toggle. Null = default
+  // on; false = straight quotes. Stored as an integer boolean.
+  smartQuotes: integer('smart_quotes', { mode: 'boolean' }),
 
   // Optional word-count goal for the whole board (sum of every group's cards).
   // No global default — always explicit or null.
@@ -179,6 +194,15 @@ export const cards = sqliteTable('cards', {
   // title/text preview. `imagePath` points at an uploaded /uploads/*.webp file.
   isImageCard: integer('is_image_card', { mode: 'boolean' }).notNull().default(false),
   imagePath: text('image_path'),
+
+  // A "character" card gets a right-rail of named text fields (background,
+  // appearance, etc. — see utils/characterFields.ts) alongside the normal
+  // image gallery + content field, for fleshing out a character rather than
+  // writing prose. `characterFields` is a JSON array of
+  // { id, label, value }, ordered — null/'[]' until the type is turned on
+  // (seeded with the defaults at that point) or the user adds/removes fields.
+  cardType: text('card_type', { enum: ['standard', 'character'] }).notNull().default('standard'),
+  characterFields: text('character_fields'),
 
   // Optional cover image for any card (image card or not). Shown as a small
   // thumbnail beside the title. Stores the path of one of the card's gallery
