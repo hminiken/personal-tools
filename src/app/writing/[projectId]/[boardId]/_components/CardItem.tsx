@@ -41,28 +41,74 @@ export function effectiveCardColor(card: Pick<BoardCard, 'color' | 'labels'>): s
   return driver?.color ?? null;
 }
 
-function LinkChip({
-  link,
+// Shared surface styling for every portaled "hover to preview a linked card"
+// dropdown (this chip's own hover, the card editor modal, the file-browser
+// sidebar). These portal to document.body, so they DON'T inherit the board's
+// --theme-* custom properties through normal CSS cascade — callers that have
+// real theme values on hand (e.g. CardEditorModal's `themeVars` prop) should
+// spread them in ahead of this so the var references below actually resolve
+// to the active board theme instead of falling back to Mantine's default.
+export const linkPreviewDropdownStyle: React.CSSProperties = {
+  backgroundColor: 'var(--theme-group-bg, var(--theme-list-bg, var(--mantine-color-body)))',
+  color: 'var(--theme-heading, inherit)',
+  overflow: 'hidden',
+};
+
+// Content shown inside a linked-card's hover preview — shared by every
+// "hover a linked-card chip" site so they render identically: a full-bleed
+// top strip in the linked card's own accent color (mirrors the accent border
+// the card shows on the board face itself), up to three of its label colors,
+// then title/board/preview text.
+export function LinkedCardPreview({ link, hint }: { link: LinkedCardRef; hint?: string }) {
+  return (
+    <Box>
+      {link.color && <Box style={{ height: 4, background: link.color }} />}
+      <Box p="sm">
+        {link.labelColors.length > 0 && (
+          <Group gap={4} mb={6}>
+            {link.labelColors.map((c, i) => (
+              <Box key={i} style={{ width: 10, height: 10, borderRadius: 3, background: c, flexShrink: 0 }} />
+            ))}
+          </Group>
+        )}
+        <Text size="sm" fw={600} lineClamp={2}>{link.title}</Text>
+        {link.boardTitle && (
+          <Text size="xs" c="dimmed" mt={2}>{link.boardTitle}</Text>
+        )}
+        {link.contentPreview && (
+          <Text size="xs" mt={4} lineClamp={4} c="dimmed">{link.contentPreview}</Text>
+        )}
+        {hint && <Text size="xs" c="blue" mt={6}>{hint}</Text>}
+      </Box>
+    </Box>
+  );
+}
+
+// Board-face indicator for a card's linked cards: a single small chain-link
+// badge instead of one chip per link (which got noisy fast on cards with
+// several links) — hover it to see every linked card via the same rich
+// preview (color strip + label chips) the modal/sidebar use, or click
+// straight through when there's exactly one.
+function LinkedCardsIndicator({
+  links,
   onOpenLinked,
   onPeekLinked,
+  themeVars,
 }: {
-  link: LinkedCardRef;
+  links: LinkedCardRef[];
   onOpenLinked: (cardId: number) => void;
   onPeekLinked?: (cardId: number) => void;
+  // The board's --theme-* vars, if any — this HoverCard portals to
+  // document.body (withinPortal), which breaks out of the board wrapper's CSS
+  // cascade, so the vars have to be spread onto the portaled dropdown
+  // explicitly rather than relying on inheritance (see linkPreviewDropdownStyle).
+  themeVars?: Record<string, string>;
 }) {
-  // Plain click pops the linked card up as a reference window (see
-  // BoardView's peek dock) instead of navigating away — ctrl/cmd-click or
-  // right-click navigates to it for real.
-  const handleClick = (e: React.MouseEvent) => {
+  const openLink = (e: React.MouseEvent, cardId: number) => {
     e.stopPropagation();
-    if (e.ctrlKey || e.metaKey) onOpenLinked(link.cardId);
-    else if (onPeekLinked) onPeekLinked(link.cardId);
-    else onOpenLinked(link.cardId);
-  };
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onOpenLinked(link.cardId);
+    if (e.ctrlKey || e.metaKey) onOpenLinked(cardId);
+    else if (onPeekLinked) onPeekLinked(cardId);
+    else onOpenLinked(cardId);
   };
   return (
     <HoverCard width={260} shadow="md" withinPortal openDelay={300} closeDelay={100}>
@@ -71,35 +117,39 @@ function LinkChip({
           size="xs"
           variant="outline"
           color="gray"
-          leftSection={<IconLink size={9} style={{ display: 'block' }} />}
-          style={{ cursor: 'pointer', maxWidth: 120, textOverflow: 'ellipsis' }}
-          onClick={handleClick}
-          onContextMenu={handleContextMenu}
+          style={{ cursor: links.length === 1 ? 'pointer' : 'default', paddingInline: 5 }}
+          onClick={links.length === 1 ? (e) => openLink(e, links[0].cardId) : undefined}
+          onContextMenu={links.length === 1 ? (e) => { e.preventDefault(); e.stopPropagation(); onOpenLinked(links[0].cardId); } : undefined}
         >
-          {link.title}
+          <IconLink size={10} style={{ display: 'block' }} />
         </Badge>
       </HoverCard.Target>
-      <HoverCard.Dropdown>
-        <Text size="sm" fw={600} lineClamp={2}>{link.title}</Text>
-        {link.boardTitle && (
-          <Text size="xs" c="dimmed" mt={2}>{link.boardTitle}</Text>
-        )}
-        {link.contentPreview && (
-          <Text size="xs" mt={4} lineClamp={4} c="dimmed">{link.contentPreview}</Text>
-        )}
-        {onPeekLinked && (
-          <Text size="xs" c="blue" mt={6}>Click to preview · ctrl/right-click to open</Text>
-        )}
+      <HoverCard.Dropdown p={0} style={{ ...themeVars, ...linkPreviewDropdownStyle }}>
+        {links.map((link, i) => (
+          <Box
+            key={link.linkId}
+            onClick={(e) => openLink(e, link.cardId)}
+            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onOpenLinked(link.cardId); }}
+            style={{ cursor: 'pointer', borderTop: i > 0 ? '1px solid var(--theme-card-border, var(--mantine-color-default-border))' : undefined }}
+          >
+            <LinkedCardPreview link={link} hint="Click to preview · ctrl/right-click to open" />
+          </Box>
+        ))}
       </HoverCard.Dropdown>
     </HoverCard>
   );
 }
 
+// Icon-only, same footprint as LinkedCardsIndicator's badge — the old
+// text pill ("CHARACTER") competed for space with real labels like POV/Book
+// and read as clutter on a face that's mostly there to show those labels.
 function CharacterBadge() {
   return (
-    <Badge size="xs" variant="light" color="grape" leftSection={<IconUserSquare size={9} style={{ display: 'block' }} />}>
-      Character
-    </Badge>
+    <Tooltip label="Character card" withinPortal>
+      <Badge size="xs" variant="outline" color="grape" style={{ paddingInline: 5 }}>
+        <IconUserSquare size={10} style={{ display: 'block' }} />
+      </Badge>
+    </Tooltip>
   );
 }
 
@@ -121,12 +171,14 @@ export const CardFace = memo(function CardFace({
   wcSettings,
   onOpenLinked,
   onPeekLinked,
+  themeVars,
 }: {
   card: BoardCard;
   categories: LabelCategory[];
   wcSettings?: WordCountSettings;
   onOpenLinked?: (cardId: number) => void;
   onPeekLinked?: (cardId: number) => void;
+  themeVars?: Record<string, string>;
 }) {
   const isCharacter = card.cardType === 'character';
   // Card content can be a whole scene — don't re-run the tag-stripping regex
@@ -170,9 +222,9 @@ export const CardFace = memo(function CardFace({
               {card.labels.map((label) => (
                 <LabelBadge key={label.id} label={label} categories={categories} variant="filled" size="sm" />
               ))}
-              {onOpenLinked && card.links.map((link) => (
-                <LinkChip key={link.linkId} link={link} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} />
-              ))}
+              {onOpenLinked && card.links.length > 0 && (
+                <LinkedCardsIndicator links={card.links} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} themeVars={themeVars} />
+              )}
             </Group>
           </Box>
         )}
@@ -189,9 +241,9 @@ export const CardFace = memo(function CardFace({
             {card.labels.map((label) => (
               <LabelBadge key={label.id} label={label} categories={categories} size="sm" />
             ))}
-            {onOpenLinked && card.links.map((link) => (
-              <LinkChip key={link.linkId} link={link} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} />
-            ))}
+            {onOpenLinked && card.links.length > 0 && (
+              <LinkedCardsIndicator links={card.links} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} themeVars={themeVars} />
+            )}
           </Group>
         )}
         <Group gap="xs" wrap="nowrap" align="flex-start">
@@ -235,9 +287,9 @@ export const CardFace = memo(function CardFace({
           {card.labels.map((label) => (
             <LabelBadge key={label.id} label={label} categories={categories} size="sm" />
           ))}
-          {onOpenLinked && card.links.map((link) => (
-            <LinkChip key={link.linkId} link={link} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} />
-          ))}
+          {onOpenLinked && card.links.length > 0 && (
+            <LinkedCardsIndicator links={card.links} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} themeVars={themeVars} />
+          )}
         </Group>
       )}
       <Group gap={4} wrap="nowrap" align="center">
@@ -269,6 +321,7 @@ function CardItem({
   onOpen,
   onOpenLinked,
   onPeekLinked,
+  themeVars,
 }: {
   card: BoardCard;
   categories: LabelCategory[];
@@ -276,6 +329,7 @@ function CardItem({
   onOpen: (card: BoardCard) => void;
   onOpenLinked: (cardId: number) => void;
   onPeekLinked?: (cardId: number) => void;
+  themeVars?: Record<string, string>;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `card:${card.id}`,
@@ -324,7 +378,7 @@ function CardItem({
         {...attributes}
         {...listeners}
       >
-        <CardFace card={card} categories={categories} wcSettings={wcSettings} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} />
+        <CardFace card={card} categories={categories} wcSettings={wcSettings} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} themeVars={themeVars} />
       </Paper>
     );
   }
@@ -353,7 +407,7 @@ function CardItem({
       {...attributes}
       {...listeners}
     >
-      <CardFace card={card} categories={categories} wcSettings={wcSettings} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} />
+      <CardFace card={card} categories={categories} wcSettings={wcSettings} onOpenLinked={onOpenLinked} onPeekLinked={onPeekLinked} themeVars={themeVars} />
     </Paper>
   );
 }

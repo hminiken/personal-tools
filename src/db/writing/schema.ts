@@ -159,6 +159,10 @@ export const groups = sqliteTable('groups', {
   // default group goal (writingSettings.defaultGroupWordGoal).
   wordCountGoal: integer('word_count_goal'),
 
+  // Freeform TipTap HTML note about the group as a whole — a single blob,
+  // not a dated thread like cards.comments, since there's only ever one.
+  notes: text('notes'),
+
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
 });
@@ -175,6 +179,9 @@ export const lists = sqliteTable('lists', {
   // Optional word-count goal for this list. Null = fall back to the global
   // default list goal (writingSettings.defaultListWordGoal).
   wordCountGoal: integer('word_count_goal'),
+
+  // Freeform TipTap HTML note about the list as a whole — see groups.notes.
+  notes: text('notes'),
 
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),

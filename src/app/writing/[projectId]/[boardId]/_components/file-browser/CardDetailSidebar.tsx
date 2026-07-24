@@ -3,12 +3,11 @@
 import { useState } from 'react';
 import {
   ActionIcon, Badge, Box, Button, Collapse, Combobox, Group, HoverCard, Image, Paper,
-  ScrollArea, SimpleGrid, Stack, Switch, Text, Textarea, Tooltip, useCombobox,
-  useComputedColorScheme,
+  ScrollArea, SimpleGrid, Stack, Switch, Text, Tooltip, useCombobox,
 } from '@mantine/core';
 import {
-  IconCheck, IconChevronDown, IconChevronUp, IconLink,
-  IconMessage, IconPalette, IconPhotoPlus, IconPhotoStar, IconPlus, IconTrash, IconX,
+  IconChevronDown, IconChevronUp, IconLink,
+  IconMessage, IconPalette, IconPencil, IconPhotoPlus, IconPhotoStar, IconPlus, IconTrash, IconX,
 } from '@tabler/icons-react';
 import { WordCountDisplay, type WordCountSettings } from '@components/WordCountDisplay';
 import type { Spacing } from '@components/DocumentSpacing';
@@ -22,6 +21,9 @@ import type { CommentRecord } from '@/utils/writingComments';
 import type { GalleryImage, ProjectCardOption } from './useCardDetail';
 import type { CharacterField } from '@/utils/characterFields';
 import CharacterFieldsPanel from '../CharacterFieldsPanel';
+import CardNoteEditor from '../CardNoteEditor';
+import { LinkedCardPreview, linkPreviewDropdownStyle } from '../CardItem';
+import { sanitizePatternHtml } from '@/utils/sanitizeHtml';
 
 // The slice of card state this sidebar needs. Satisfied by useCardDetail's
 // return value (single-card view) and by useStackCardSidebar (the compile
@@ -60,8 +62,9 @@ export type CardSidebarController = {
   comments: CommentRecord;
   commentsOpen: boolean;
   setCommentsOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  addGeneralNote: (text: string) => void;
+  addGeneralNote: (html: string) => void;
   removeComment: (commentId: string) => void;
+  editComment: (commentId: string, html: string) => void;
   jumpToComment: (commentId: string) => void;
 };
 
@@ -102,19 +105,25 @@ export default function CardDetailSidebar({
   const [galleryOpened, setGalleryOpened] = useState(false);
   const viewer = useImageViewer(detail.images.length);
   const [addingNote, setAddingNote] = useState(false);
-  const [noteText, setNoteText] = useState('');
-  const computedScheme = useComputedColorScheme('light');
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
 
   if (!viewingCard) return null;
 
   const commentCount = Object.keys(detail.comments).length;
 
-  const submitNote = () => {
-    if (!noteText.trim()) return;
-    detail.addGeneralNote(noteText);
-    setNoteText('');
+  const handleSaveNote = (html: string) => {
+    detail.addGeneralNote(html);
     setAddingNote(false);
   };
+
+  const handleCancelNote = () => setAddingNote(false);
+
+  const handleEditComment = (id: string, html: string) => {
+    detail.editComment(id, html);
+    setEditingCommentId(null);
+  };
+
+  const handleCancelEdit = () => setEditingCommentId(null);
 
   const handleOpenPicker = async () => {
     await detail.loadProjectCards();
@@ -244,11 +253,8 @@ export default function CardDetailSidebar({
                   {link.title}
                 </Badge>
               </HoverCard.Target>
-              <HoverCard.Dropdown>
-                <Text size="sm" fw={600} lineClamp={2}>{link.title}</Text>
-                {link.boardTitle && <Text size="xs" c="dimmed" mt={2}>{link.boardTitle}</Text>}
-                {link.contentPreview && <Text size="xs" mt={4} lineClamp={4} c="dimmed">{link.contentPreview}</Text>}
-                <Text size="xs" c="blue" mt={6}>Click to preview · ctrl/right-click to open</Text>
+              <HoverCard.Dropdown p={0} style={linkPreviewDropdownStyle}>
+                <LinkedCardPreview link={link} hint="Click to preview · ctrl/right-click to open" />
               </HoverCard.Dropdown>
             </HoverCard>
           ))}
@@ -306,7 +312,7 @@ export default function CardDetailSidebar({
         <Group justify="space-between" gap="xs">
           <Group gap="xs" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => detail.setCommentsOpen((v) => !v)}>
             <IconMessage size={15} color="var(--mantine-color-dimmed)" />
-            <Text size="sm" c="dimmed">Comments {commentCount > 0 ? `(${commentCount})` : ''}</Text>
+            <Text size="sm" fw={600} c="dimmed">Comments {commentCount > 0 ? `(${commentCount})` : ''}</Text>
             {detail.commentsOpen ? <IconChevronUp size={13} color="var(--mantine-color-dimmed)" /> : <IconChevronDown size={13} color="var(--mantine-color-dimmed)" />}
           </Group>
           <Tooltip label="Add a general note (not tied to any text)" withinPortal>
@@ -315,7 +321,7 @@ export default function CardDetailSidebar({
               variant="subtle"
               color="gray"
               style={{ color: 'var(--mantine-color-dimmed)' }}
-              onClick={() => { detail.setCommentsOpen(true); setAddingNote(true); }}
+              onClick={() => { detail.setCommentsOpen(true); setAddingNote(true); setEditingCommentId(null); }}
               aria-label="Add note"
             >
               <IconPlus size={13} />
@@ -326,36 +332,22 @@ export default function CardDetailSidebar({
         <Collapse expanded={detail.commentsOpen}>
           <Stack gap="xs" mt="xs">
             {addingNote && (
-              <Group gap={6} align="flex-start" wrap="nowrap">
-                <Textarea
-                  size="xs"
-                  placeholder="Note about this card…"
-                  styles={{ input: { color: computedScheme === 'dark' ? '#F1F3F5' : '#1A1B1E' } }}
-                  value={noteText}
-                  onChange={(e) => setNoteText(e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitNote(); }
-                    if (e.key === 'Escape') { setAddingNote(false); setNoteText(''); }
-                  }}
-                  autosize
-                  minRows={1}
-                  maxRows={5}
-                  autoFocus
-                  style={{ flex: 1}}
-                />
-                <ActionIcon size="sm" color="dark.6" variant="filled" onClick={submitNote} disabled={!noteText.trim()}>
-                  <IconCheck size={13} />
-                </ActionIcon>
-                <ActionIcon size="sm" color="dark.6" variant="filled" onClick={() => { setAddingNote(false); setNoteText(''); }}>
-                  <IconX size={13} />
-                </ActionIcon>
-              </Group>
+              <CardNoteEditor onSave={handleSaveNote} onCancel={handleCancelNote} smartQuotes={spacing.smartQuotes} />
             )}
 
             {commentCount === 0 && !addingNote ? (
               <Text size="xs" c="dimmed">No comments yet. Select text in the editor to comment on it, or add a general note above.</Text>
             ) : (
               Object.entries(detail.comments).map(([id, { text, createdAt, anchored }]) => (
+                editingCommentId === id ? (
+                  <CardNoteEditor
+                    key={id}
+                    initialContent={text}
+                    onSave={(html) => handleEditComment(id, html)}
+                    onCancel={handleCancelEdit}
+                    smartQuotes={spacing.smartQuotes}
+                  />
+                ) : (
                 <Paper
                   key={id}
                   p="xs"
@@ -385,18 +377,32 @@ export default function CardDetailSidebar({
                       {anchored === false && (
                         <Text size="9px" c="var(--theme-card-muted-text, light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-1)))" fw={700} tt="uppercase" style={{ letterSpacing: 0.5 }}>Note</Text>
                       )}
-                      <Text size="sm" c="var(--theme-card-text, light-dark(var(--mantine-color-black), var(--mantine-color-gray-0)))" style={{ whiteSpace: 'pre-wrap' }}>{text}</Text>
+                      <Box
+                        style={{ fontSize: 'var(--mantine-font-size-sm)', color: 'var(--theme-card-text, light-dark(var(--mantine-color-black), var(--mantine-color-gray-0)))' }}
+                        dangerouslySetInnerHTML={{ __html: sanitizePatternHtml(text) }}
+                      />
                       <Text size="10px" c="var(--theme-card-muted-text, light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-1)))" mt={2}>
                         {new Date(createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </Text>
                     </Box>
-                    <Tooltip label={anchored === false ? 'Remove note' : 'Remove comment'} withinPortal>
-                      <ActionIcon size="xs" color="red.7" variant="subtle" onClick={(e) => { e.stopPropagation(); detail.removeComment(id); }}>
-                        <IconTrash size={12} />
-                      </ActionIcon>
-                    </Tooltip>
+                    <Group gap={2} wrap="nowrap">
+                      {anchored === false && (
+                        <Tooltip label="Edit note" withinPortal>
+                          <ActionIcon size="xs" color="gray" variant="subtle"
+                            onClick={(e) => { e.stopPropagation(); setAddingNote(false); setEditingCommentId(id); }}>
+                            <IconPencil size={12} />
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                      <Tooltip label={anchored === false ? 'Remove note' : 'Remove comment'} withinPortal>
+                        <ActionIcon size="xs" color="red.7" variant="subtle" onClick={(e) => { e.stopPropagation(); detail.removeComment(id); }}>
+                          <IconTrash size={12} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
                   </Group>
                 </Paper>
+                )
               ))
             )}
           </Stack>

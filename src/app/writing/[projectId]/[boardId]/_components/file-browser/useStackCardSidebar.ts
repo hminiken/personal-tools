@@ -161,6 +161,8 @@ export function useStackCardSidebar({
         contentPreview: '',
         boardTitle: target.boardTitle,
         cardType: target.cardType,
+        color: null,
+        labelColors: [],
       }];
       setLinks(newLinks);
       linksOverrideRef.current.set(card.id, newLinks);
@@ -184,11 +186,10 @@ export function useStackCardSidebar({
 
   // A card-level note: no text selection, no mark in the document — just an
   // entry in the same comments list, distinguished by `anchored: false`.
-  const addGeneralNote = (text: string) => {
-    const t = text.trim();
-    if (!t || !card) return;
+  const addGeneralNote = (html: string) => {
+    if (!card) return;
     const commentId = crypto.randomUUID();
-    const next = { ...comments, [commentId]: { text: t, createdAt: new Date().toISOString(), anchored: false } };
+    const next = { ...comments, [commentId]: { text: html, createdAt: new Date().toISOString(), anchored: false } };
     onCommentsChange(next);
     setCommentsOpen(true);
     updateCard(card.id, { comments: serializeComments(next) });
@@ -204,6 +205,13 @@ export function useStackCardSidebar({
       content: editor.getHTML() || '',
       comments: serializeComments(next),
     });
+  };
+
+  const editComment = (commentId: string, html: string) => {
+    if (!card || !comments[commentId]) return;
+    const next = { ...comments, [commentId]: { ...comments[commentId], text: html } };
+    onCommentsChange(next);
+    updateCard(card.id, { comments: serializeComments(next) });
   };
 
   const jumpToComment = (commentId: string) => {
@@ -252,6 +260,7 @@ export function useStackCardSidebar({
     setCommentsOpen,
     addGeneralNote,
     removeComment,
+    editComment,
     jumpToComment,
   };
 }

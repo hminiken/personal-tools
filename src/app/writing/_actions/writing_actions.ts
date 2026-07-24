@@ -491,6 +491,16 @@ export async function setListWordGoal(listId: number, goal: number | null) {
   revalidateBoards();
 }
 
+export async function setGroupNotes(groupId: number, notes: string | null) {
+  await writingDb.update(groups).set({ notes }).where(eq(groups.id, groupId));
+  revalidateBoards();
+}
+
+export async function setListNotes(listId: number, notes: string | null) {
+  await writingDb.update(lists).set({ notes }).where(eq(lists.id, listId));
+  revalidateBoards();
+}
+
 export async function setCardWordGoal(cardId: number, goal: number | null) {
   await writingDb.update(cards).set({ wordCountGoal: goal }).where(eq(cards.id, cardId));
   revalidateBoards();
@@ -802,7 +812,7 @@ export async function getCardById(cardId: number) {
   const otherIds = linkRows.map((l) => (l.sourceCardId === cardId ? l.targetCardId : l.sourceCardId));
   const linkedInfoRows = otherIds.length
     ? await writingDb
-        .select({ id: cards.id, title: cards.title, content: cards.content, boardTitle: boards.title, cardType: cards.cardType })
+        .select({ id: cards.id, title: cards.title, content: cards.content, color: cards.color, boardTitle: boards.title, cardType: cards.cardType })
         .from(cards)
         .innerJoin(lists, eq(cards.listId, lists.id))
         .innerJoin(groups, eq(lists.groupId, groups.id))
@@ -812,12 +822,41 @@ export async function getCardById(cardId: number) {
     : [];
   const linkedMap = new Map(linkedInfoRows.map((r) => [r.id, r]));
 
+  // Labels for the linked cards — feeds the hover preview's color bar +
+  // label-chip row (see effectiveCardColor in CardItem.tsx for the same logic
+  // applied to the board face itself).
+  const linkedLabelRows = otherIds.length
+    ? await writingDb
+        .select({ cardId: cardLabels.cardId, id: labels.id, color: labels.color, position: labels.position, drivesCardColor: labels.drivesCardColor })
+        .from(cardLabels)
+        .innerJoin(labels, eq(cardLabels.labelId, labels.id))
+        .where(inArray(cardLabels.cardId, otherIds))
+        .all()
+    : [];
+  const linkedLabelsByCard = new Map<number, typeof linkedLabelRows>();
+  for (const row of linkedLabelRows) {
+    const arr = linkedLabelsByCard.get(row.cardId) ?? [];
+    arr.push(row);
+    linkedLabelsByCard.set(row.cardId, arr);
+  }
+
   const links = linkRows
     .map((l) => {
       const otherId = l.sourceCardId === cardId ? l.targetCardId : l.sourceCardId;
       const info = linkedMap.get(otherId);
       if (!info) return null;
-      return { linkId: l.id, cardId: otherId, title: info.title, contentPreview: stripHtml(info.content), boardTitle: info.boardTitle, cardType: info.cardType };
+      const otherLabels = linkedLabelsByCard.get(otherId) ?? [];
+      const driver = otherLabels.filter((lb) => lb.drivesCardColor).sort((a, b) => a.position - b.position || a.id - b.id)[0];
+      return {
+        linkId: l.id,
+        cardId: otherId,
+        title: info.title,
+        contentPreview: stripHtml(info.content),
+        boardTitle: info.boardTitle,
+        cardType: info.cardType,
+        color: info.color ?? driver?.color ?? null,
+        labelColors: otherLabels.slice(0, 3).map((lb) => lb.color),
+      };
     })
     .filter(Boolean) as import('@/app/writing/[projectId]/[boardId]/types').LinkedCardRef[];
 

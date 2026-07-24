@@ -13,7 +13,8 @@ import CardItem, { CardFace } from './CardItem';
 import InlineAdd from './InlineAdd';
 import { WordCountDisplay, sumListWords, type WordCountSettings } from '@components/WordCountDisplay';
 import { promptWordGoal } from '@/utils/dialogs';
-import { setListWordGoal } from '../../../_actions/writing_actions';
+import { setListWordGoal, setListNotes } from '../../../_actions/writing_actions';
+import NotesPopover from './NotesPopover';
 import { useInlineRename } from './useInlineRename';
 import type { BoardList, BoardCard, LabelCategory } from '../types';
 
@@ -49,6 +50,8 @@ const ListColumnInner = memo(function ListColumnInner({
   onAddCard,
   onRename,
   onDelete,
+  themeVars,
+  smartQuotes,
 }: {
   list: BoardList;
   categories: LabelCategory[];
@@ -57,6 +60,8 @@ const ListColumnInner = memo(function ListColumnInner({
   setDropRef: (el: HTMLElement | null) => void;
   setActivatorNodeRef: (el: HTMLElement | null) => void;
   listeners: DraggableSyntheticListeners;
+  themeVars?: Record<string, string>;
+  smartQuotes?: boolean | null;
 } & ListCallbacks) {
   const { editing, setEditing, inputProps: titleInputProps } = useInlineRename({
     value: list.title,
@@ -115,6 +120,13 @@ const ListColumnInner = memo(function ListColumnInner({
             {list.title}
           </Text>
         )}
+
+        <NotesPopover
+          notes={list.notes}
+          onSave={async (html) => { await setListNotes(list.id, html); router.refresh(); }}
+          smartQuotes={smartQuotes}
+          themeVars={themeVars}
+        />
 
         <Menu position="bottom-end" withinPortal>
           <Menu.Target>
@@ -180,7 +192,7 @@ const ListColumnInner = memo(function ListColumnInner({
                     <CardFace card={originDrag!.card} categories={categories} />
                   </Paper>
                 ) : (
-                  <CardItem key={item.card.id} card={item.card} categories={categories} wcSettings={wcSettings} onOpen={onOpenCard} onOpenLinked={onOpenCardById} onPeekLinked={onPeekCard} />
+                  <CardItem key={item.card.id} card={item.card} categories={categories} wcSettings={wcSettings} onOpen={onOpenCard} onOpenLinked={onOpenCardById} onPeekLinked={onPeekCard} themeVars={themeVars} />
                 )
               )}
             </Stack>
@@ -217,11 +229,15 @@ function ListColumn({
   onAddCard,
   onRename,
   onDelete,
+  themeVars,
+  smartQuotes,
 }: {
   list: BoardList;
   categories: LabelCategory[];
   wcSettings: WordCountSettings;
   originDrag: { card: BoardCard; listId: number; index: number } | null;
+  themeVars?: Record<string, string>;
+  smartQuotes?: boolean | null;
 } & ListCallbacks) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: `list:${list.id}`, data: { type: 'list', list }, animateLayoutChanges, transition: sortableTransition });
@@ -290,6 +306,8 @@ function ListColumn({
         onAddCard={onAddCard}
         onRename={onRename}
         onDelete={onDelete}
+        themeVars={themeVars}
+        smartQuotes={smartQuotes}
       />
     </Paper>
   );

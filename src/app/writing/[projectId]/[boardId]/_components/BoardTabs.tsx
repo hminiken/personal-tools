@@ -266,6 +266,13 @@ export default function BoardTabs({
         onScrollPositionChange={updateScrollState}
       >
         <DndContext
+          // Explicit id — this tab bar's DndContext mounts alongside
+          // BoardView's board-dnd one on every board page; without a stable
+          // id both fall back to dnd-kit's shared auto-increment counter for
+          // the aria "described-by" id, which can drift between the server
+          // render and the client's first render and trip a hydration
+          // mismatch on that attribute.
+          id="board-tabs-dnd"
           sensors={sensors}
           collisionDetection={closestCenter}
           measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}

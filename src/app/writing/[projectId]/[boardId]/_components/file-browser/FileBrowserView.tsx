@@ -42,7 +42,10 @@ export default function FileBrowserView({
   onDeleteList,
   onRenameCard,
   onDeleteCard,
+  onGroupNotes,
+  onListNotes,
   onPeekCard,
+  themeVars,
   dnd,
 }: {
   projectId: number;
@@ -62,7 +65,10 @@ export default function FileBrowserView({
   onDeleteList: (listId: number) => void | Promise<void>;
   onRenameCard: (cardId: number, title: string) => void | Promise<void>;
   onDeleteCard: (cardId: number) => void | Promise<void>;
+  onGroupNotes: (groupId: number, notes: string | null) => void | Promise<void>;
+  onListNotes: (listId: number, notes: string | null) => void | Promise<void>;
   onPeekCard: (cardId: number) => void;
+  themeVars?: Record<string, string>;
   dnd: TreeDnd;
 }) {
   const router = useRouter();
@@ -167,7 +173,11 @@ export default function FileBrowserView({
               onDeleteList={onDeleteList}
               onRenameCard={onRenameCard}
               onDeleteCard={onDeleteCard}
+              onGroupNotes={onGroupNotes}
+              onListNotes={onListNotes}
               onPeekCard={onPeekCard}
+              themeVars={themeVars}
+              smartQuotes={spacing.smartQuotes}
               dnd={dnd}
             />
           </>

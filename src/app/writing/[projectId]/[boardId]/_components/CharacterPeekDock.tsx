@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ActionIcon, Box, Button, Group, Image, ScrollArea, Stack, Text, Tooltip } from '@mantine/core';
-import { IconArrowsMaximize, IconFileText, IconMinus, IconUserSquare, IconX } from '@tabler/icons-react';
+import { ActionIcon, Box, Button, Group, Image, Portal, ScrollArea, Stack, Text, Tooltip } from '@mantine/core';
+import { IconArrowsMaximize, IconChevronDown, IconFileText, IconMinus, IconUserSquare, IconX } from '@tabler/icons-react';
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -11,6 +11,7 @@ import { sanitizePatternHtml } from '@/utils/sanitizeHtml';
 import { parseCharacterFields, serializeCharacterFields, type CharacterField } from '@/utils/characterFields';
 import type { Spacing } from '@components/DocumentSpacing';
 import CharacterFieldsPanel from './CharacterFieldsPanel';
+import { cardAccentBorder, effectiveCardColor } from './CardItem';
 import type { BoardCard } from '../types';
 
 export type PeekWindowState = { cardId: number; minimized: boolean };
@@ -99,10 +100,18 @@ function PeekWindow({
   const title = card?.title || 'Untitled';
   const TitleIcon = card?.cardType === 'character' ? IconUserSquare : IconFileText;
 
+  // Same accent-strip technique as the board face itself (see CardItem's
+  // cardAccentBorder) — a thick colored top border, so a peeked card reads
+  // as "the same card" at a glance instead of a generic gray panel.
+  const accentColor = card ? effectiveCardColor(card) : null;
+  const accentTop = cardAccentBorder(accentColor);
+  const accentTopStyle = accentTop ? { borderTop: accentTop } : {};
+  const labelColors = (card?.labels ?? []).slice(0, 3).map((l) => l.color);
+
   if (win.minimized) {
     return (
       <Box
-        style={{ ...themedSurface, width: 220, borderRadius: 8, border: themedBorder, boxShadow: 'var(--mantine-shadow-md)', cursor: 'grab' }}
+        style={{ ...themedSurface, width: 220, borderRadius: 8, border: themedBorder, ...accentTopStyle, boxShadow: 'var(--mantine-shadow-md)', cursor: 'grab' }}
         onClick={onToggleMinimize}
         {...dragHandleProps}
       >
@@ -126,16 +135,38 @@ function PeekWindow({
       ref={panelRef}
       style={{
         ...themedSurface,
+        position: 'relative',
         width: PANEL_WIDTH,
         height: heightPx != null ? heightPx : `${DEFAULT_HEIGHT_VH}vh`,
         borderRadius: 8,
         border: themedBorder,
+        ...accentTopStyle,
         boxShadow: 'var(--mantine-shadow-lg)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
       }}
     >
+      {/* Quick-minimize corner — tucks the window back into its dock pill,
+          the same corner it visually docks to. A faster target than hunting
+          for the header's minimize button. */}
+      {/* Bottom-LEFT, deliberately — the pill this collapses into has its
+          close (X) button at top-right, so keeping this on the opposite
+          side means your cursor doesn't land right on top of "close"
+          immediately after minimizing. */}
+      <Tooltip label="Minimize" withinPortal position="top" openDelay={300}>
+        <ActionIcon
+          variant="filled"
+          color="dark"
+          radius="xl"
+          size={30}
+          onClick={onToggleMinimize}
+          style={{ position: 'absolute', left: 10, bottom: 10, boxShadow: 'var(--mantine-shadow-md)', zIndex: 2 }}
+          aria-label="Minimize"
+        >
+          <IconChevronDown size={16} />
+        </ActionIcon>
+      </Tooltip>
       {/* Drag the top edge to resize — grows/shrinks upward so the panel
           stays anchored to the corner it's docked in. */}
       <Tooltip label="Drag to resize" withinPortal position="top" openDelay={400}>
@@ -153,9 +184,16 @@ function PeekWindow({
         style={{ flexShrink: 0, borderBottom: themedBorder, cursor: 'grab' }}
         {...dragHandleProps}
       >
-        <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
+        <Group gap={6} wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
           <TitleIcon size={14} style={{ flexShrink: 0 }} />
-          <Text size="sm" fw={600} lineClamp={1}>{title}</Text>
+          <Text size="sm" fw={600} lineClamp={1} style={{ minWidth: 0 }}>{title}</Text>
+          {labelColors.length > 0 && (
+            <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
+              {labelColors.map((c, i) => (
+                <Box key={i} style={{ width: 8, height: 8, borderRadius: 2, background: c, flexShrink: 0 }} />
+              ))}
+            </Group>
+          )}
         </Group>
         <Group gap={2} wrap="nowrap">
           <Tooltip label="Minimize" withinPortal>
@@ -171,7 +209,13 @@ function PeekWindow({
         </Group>
       </Group>
 
-      <ScrollArea style={{ flex: 1 }} p="sm">
+      {/* minHeight: 0 — a flex item defaults to min-height: auto, which lets
+          it grow to fit its content instead of shrinking to the space this
+          column actually has. Without it, the ScrollArea's true box can end
+          up taller than what's visible (the panel's own overflow: hidden
+          clips the rest), so wheel scroll lands outside the real scrollable
+          frame while the thumb — a direct scrollTop drag — still works. */}
+      <ScrollArea style={{ flex: 1, minHeight: 0 }} p="sm">
         {!card ? (
           <Text size="sm" c="dimmed">Loading…</Text>
         ) : (
@@ -244,6 +288,8 @@ export default function CharacterPeekDock({
   onOpenFull,
   onReorder,
   spacing,
+  containerRef,
+  themeVars,
 }: {
   cards: PeekWindowState[];
   onClose: (cardId: number) => void;
@@ -251,6 +297,19 @@ export default function CharacterPeekDock({
   onOpenFull: (card: BoardCard) => void;
   onReorder: (next: PeekWindowState[]) => void;
   spacing: Spacing;
+  // Handed to CardEditorModal as a react-remove-scroll "shard" — Mantine's
+  // Modal locks background scroll while open (global wheel/touchmove
+  // blocking, not just body overflow), and the dock lives outside the
+  // Modal's own DOM subtree, so without this it goes scroll-dead the moment
+  // a card is opened full while a peek window is up. Dragging the scrollbar
+  // thumb still worked (that's a plain mouse drag, which the lock doesn't
+  // touch) — only wheel/touch scrolling was actually blocked.
+  containerRef?: React.RefObject<HTMLDivElement | null>;
+  // The board's --theme-* CSS custom properties. The dock is portaled to
+  // <body> below (to escape BoardView's stacking context — see the Portal
+  // comment further down), which also escapes the themed wrapper's CSS
+  // cascade, so these have to be applied explicitly instead of inherited.
+  themeVars?: Record<string, string>;
 }) {
   // A small movement threshold before a drag engages, so a plain click on
   // the pill (to toggle minimize) or the header's buttons isn't swallowed.
@@ -267,21 +326,40 @@ export default function CharacterPeekDock({
 
   if (cards.length === 0) return null;
   return (
-    <Box style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 1000, display: 'flex', alignItems: 'flex-end', gap: 12, pointerEvents: 'none' }}>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={cards.map((w) => w.cardId)} strategy={horizontalListSortingStrategy}>
-          {cards.map((win) => (
-            <SortablePeekWindow
-              key={win.cardId}
-              win={win}
-              onClose={() => onClose(win.cardId)}
-              onToggleMinimize={() => onToggleMinimize(win.cardId)}
-              onOpenFull={onOpenFull}
-              spacing={spacing}
-            />
-          ))}
-        </SortableContext>
-      </DndContext>
-    </Box>
+    // Portaled to <body>: rendered inline, this div's z-index:1000 only ever
+    // competes with its own React-tree siblings — it can't outrank a modal's
+    // overlay, which Mantine portals to its OWN <body>-level container. Two
+    // separate top-level stacking contexts don't compare by z-index at all;
+    // the later-mounted one just paints on top regardless of the number, so
+    // the (invisible, full-viewport) overlay silently ate every wheel/click
+    // over the dock the moment a card was open full alongside it. Portaling
+    // this too makes both true siblings under <body>, where 1000 vs the
+    // modal's 200 finally means something.
+    <Portal>
+      <Box
+        ref={containerRef}
+        style={{ ...themeVars, position: 'fixed', bottom: 16, right: 16, zIndex: 1000, display: 'flex', alignItems: 'flex-end', gap: 12, pointerEvents: 'none' }}
+      >
+        {/* Explicit id — see BoardView's board-dnd DndContext for why: without
+            one, a second DndContext on the page can drift out of sync with the
+            server-rendered aria "described-by" id and trigger a hydration
+            mismatch. This dock never renders during SSR (cards start empty),
+            but a stable id keeps it safe if that ever changes. */}
+        <DndContext id="peek-dock-dnd" sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={cards.map((w) => w.cardId)} strategy={horizontalListSortingStrategy}>
+            {cards.map((win) => (
+              <SortablePeekWindow
+                key={win.cardId}
+                win={win}
+                onClose={() => onClose(win.cardId)}
+                onToggleMinimize={() => onToggleMinimize(win.cardId)}
+                onOpenFull={onOpenFull}
+                spacing={spacing}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
+      </Box>
+    </Portal>
   );
 }

@@ -19,6 +19,8 @@ export type LinkedCardRef = {
   contentPreview: string;  // Plain-text excerpt (HTML stripped)
   boardTitle: string;
   cardType: 'standard' | 'character';
+  color: string | null;      // The other card's effective color (explicit or label-driven) — for the preview's top bar
+  labelColors: string[];     // The other card's label colors, capped to a few — for the preview's chip row
 };
 
 // A card as the board UI consumes it: its own applied labels, gallery

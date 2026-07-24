@@ -4,13 +4,13 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Modal, TextInput, Button, Group, Stack, Switch, Tooltip, Image, Box, Text,
   Title, ActionIcon, SimpleGrid, Paper, Textarea, Collapse, Badge, Combobox,
-  useCombobox, ScrollArea, HoverCard,
+  useCombobox, ScrollArea, HoverCard, Popover, Divider,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
   IconPhotoPlus, IconPencil, IconTrash, IconPhotoStar,
   IconMessage, IconCheck, IconX, IconMessageOff, IconChevronDown, IconChevronUp,
-  IconLink, IconArrowLeft, IconPlus, IconPalette,
+  IconLink, IconArrowLeft, IconPlus, IconPalette, IconAdjustments,
 } from '@tabler/icons-react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import { RichTextEditor } from '@mantine/tiptap';
@@ -32,6 +32,8 @@ import LabelPicker from './LabelPicker';
 import ColorPicker from './ColorPicker';
 import ImageViewerModal, { useImageViewer } from './ImageViewerModal';
 import CharacterFieldsPanel from './CharacterFieldsPanel';
+import CardNoteEditor from './CardNoteEditor';
+import { LinkedCardPreview, linkPreviewDropdownStyle } from './CardItem';
 import {
   type CommentRecord,
   parseComments,
@@ -56,6 +58,7 @@ export default function CardEditorModal({
   wcSettings,
   themeVars = {},
   onPeekCard,
+  removeScrollShards,
 }: {
   card: BoardCard | null;
   catalog: LabelCatalog;
@@ -74,6 +77,12 @@ export default function CardEditorModal({
   // Opens a linked character card as a docked reference panel instead of
   // navigating this modal away from what's currently open.
   onPeekCard: (cardId: number) => void;
+  // Mantine's Modal locks background scroll via react-remove-scroll, which
+  // blocks wheel/touch scrolling everywhere outside the modal's own DOM —
+  // including the peek dock, which renders as a sibling in BoardView, not a
+  // child of this modal. Passed through to Modal's removeScrollProps.shards
+  // so the dock stays scrollable while a card is open full.
+  removeScrollShards?: Array<React.RefObject<HTMLElement | null>>;
 }) {
   const router = useRouter();
 
@@ -116,6 +125,7 @@ export default function CardEditorModal({
   const [isSaving, setIsSaving] = useState(false);
   const [liveWordCount, setLiveWordCount] = useState(0);
   const [galleryOpened, { open: openGallery, close: closeGallery }] = useDisclosure(false);
+  const [settingsOpened, setSettingsOpened] = useState(false);
 
   // --- Links state ---
   const [links, setLinks] = useState<LinkedCardRef[]>([]);
@@ -136,7 +146,7 @@ export default function CardEditorModal({
   const [newCommentText, setNewCommentText] = useState('');
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [addingNote, setAddingNote] = useState(false);
-  const [noteText, setNoteText] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [autoSaved, setAutoSaved] = useState(false);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const bubbleModeRef = useRef<'idle' | 'adding' | 'viewing'>('idle');
@@ -175,7 +185,7 @@ export default function CardEditorModal({
     setNewCommentText('');
     setActiveCommentId(null);
     setAddingNote(false);
-    setNoteText('');
+    setEditingCommentId(null);
   }, [viewingCard?.id]);
 
   // The modal reuses ONE editor instance for every card (useWritingEditor only
@@ -185,7 +195,12 @@ export default function CardEditorModal({
   // we're now showing on every card-id change. emitUpdate:false so this
   // programmatic reset doesn't trip the blur/update autosave.
   useEffect(() => {
-    if (!editor) return;
+    // Opening a peeked card as the full editor can land here while TipTap's
+    // own effect (recreating the editor for the new card's content) is still
+    // mid-flight — `editor` can be a reference to an instance that's already
+    // been torn down (commandManager nulled out in destroy()). Bail rather
+    // than let setContent throw; the next render passes the live instance.
+    if (!editor || editor.isDestroyed) return;
     editor.commands.setContent(sanitizePatternHtml(viewingCard?.content) || '', { emitUpdate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewingCard?.id, editor]);
@@ -353,6 +368,8 @@ export default function CardEditorModal({
         contentPreview: '',
         boardTitle: target.boardTitle,
         cardType: target.cardType,
+        color: null,
+        labelColors: [],
       };
       const newLinks = [...links, newRef];
       setLinks(newLinks);
@@ -389,17 +406,29 @@ export default function CardEditorModal({
 
   // A card-level note: no text selection, no mark in the document — just an
   // entry in the same comments list, distinguished by `anchored: false`.
-  const submitNote = () => {
-    const text = noteText.trim();
-    if (!text || !viewingCard) return;
+  const handleSaveNote = (html: string) => {
+    if (!viewingCard) return;
     const commentId = crypto.randomUUID();
-    const next: CommentRecord = { ...comments, [commentId]: { text, createdAt: new Date().toISOString(), anchored: false } };
+    const next: CommentRecord = { ...comments, [commentId]: { text: html, createdAt: new Date().toISOString(), anchored: false } };
     setComments(next);
     setCommentsOpen(true);
-    setNoteText('');
     setAddingNote(false);
     updateCard(viewingCard.id, { comments: serializeComments(next) });
   };
+
+  const handleCancelNote = () => {
+    setAddingNote(false);
+  };
+
+  const handleEditComment = (id: string, html: string) => {
+    if (!viewingCard || !comments[id]) return;
+    const next: CommentRecord = { ...comments, [id]: { ...comments[id], text: html } };
+    setComments(next);
+    setEditingCommentId(null);
+    updateCard(viewingCard.id, { comments: serializeComments(next) });
+  };
+
+  const handleCancelEdit = () => setEditingCommentId(null);
 
   const removeComment = (commentId: string) => {
     if (!editor) return;
@@ -488,6 +517,7 @@ export default function CardEditorModal({
       size={isCharacterCard ? 1000 : 'xl'}
       centered
       title={titleNode}
+      removeScrollProps={removeScrollShards ? { shards: removeScrollShards } : undefined}
       styles={{
         title: { flex: 1, marginRight: 'var(--mantine-spacing-sm)' },
         // Theme vars live here (content is the ancestor of header + body), so
@@ -509,41 +539,58 @@ export default function CardEditorModal({
       <Stack gap="sm" style={{ flex: 1, minWidth: 0 }}>
         {viewingCard && (
           <LabelPicker key={viewingCard.id} card={viewingCard} catalog={catalog} onManage={onManageLabels} inline>
-            <Tooltip label="When off, this card is skipped in the compiled chapter/board view." withinPortal multiline w={260} position="top-start">
-              <Switch label="Include in compile" checked={includeInCompile} onChange={(e) => handleToggleCompile(e.currentTarget.checked)} color="dark" w="fit-content" />
-            </Tooltip>
-            <Tooltip label="Show an image on the board instead of the title and text." withinPortal multiline w={260} position="top-start">
-              <Switch label="Image card" checked={isImageCard} onChange={(e) => handleToggleImageCard(e.currentTarget.checked)} color="dark" w="fit-content" />
-            </Tooltip>
-            <Tooltip label="A character sheet: image gallery plus a right-hand rail of named fields (background, appearance, etc). Excluded from compile by default." withinPortal multiline w={260} position="top-start">
-              <Switch label="Character card" checked={isCharacterCard} onChange={(e) => handleToggleCharacterCard(e.currentTarget.checked)} color="dark" w="fit-content" />
-            </Tooltip>
-            <Tooltip label="Leave this card out of word tracking: it won't show a count anywhere, and its words won't count toward any list, group, board, or project total." withinPortal multiline w={260} position="top-start">
-              <Switch label="Hide word count" checked={hideWordCount} onChange={(e) => handleToggleHideWordCount(e.currentTarget.checked)} color="dark" w="fit-content" />
-            </Tooltip>
-          </LabelPicker>
-        )}
+            {/* Card color lives on the labels row — explicit color overrides any label-driven color */}
+            <Group gap="xs" align="center" wrap="nowrap">
+              <IconPalette size={16} color="var(--mantine-color-dimmed)" />
+              <Text size="sm">Card color</Text>
+              <ColorPicker value={(color ?? labelColor) ?? 'transparent'} onChange={handleColorChange} size={22} />
+              {color ? (
+                <Button variant="subtle" size="compact-xs" color="gray" onClick={() => handleColorChange(null)}>
+                  {labelColor ? 'Use label color' : 'Clear'}
+                </Button>
+              ) : labelColor ? (
+                <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                  From label{drivingLabel ? ` “${drivingLabel.name}”` : ''}
+                </Text>
+              ) : null}
+            </Group>
 
-        {/* Card color — explicit color overrides any label-driven color */}
-        {viewingCard && (
-          <Group gap="xs" align="center">
-            <IconPalette size={16} color="var(--mantine-color-dimmed)" />
-            <Text size="sm">Card color</Text>
-            <ColorPicker value={(color ?? labelColor) ?? 'transparent'} onChange={handleColorChange} size={22} />
-            {color ? (
-              <Button variant="subtle" size="compact-xs" color="gray" onClick={() => handleColorChange(null)}>
-                {labelColor ? 'Use label color' : 'Clear'}
-              </Button>
-            ) : labelColor ? (
-              <Text size="xs" c="dimmed">
-                From label{drivingLabel ? ` “${drivingLabel.name}”` : ''}
-              </Text>
-            ) : null}
-          </Group>
+            {/* Card settings — tucked behind a dropdown so this row stays scannable */}
+            <Popover position="bottom-start" withinPortal shadow="md" width={260} opened={settingsOpened} onChange={setSettingsOpened}>
+              <Popover.Target>
+                <Button
+                  size="compact-xs"
+                  variant="light"
+                  color="gray"
+                  leftSection={<IconAdjustments size={14} />}
+                  onClick={() => setSettingsOpened((o) => !o)}
+                >
+                  Card settings
+                </Button>
+              </Popover.Target>
+              <Popover.Dropdown style={{ ...themeVars, backgroundColor: 'var(--theme-group-bg, var(--theme-list-bg, var(--mantine-color-body)))', color: 'var(--theme-heading, inherit)' }}>
+                <Stack gap="xs">
+                  <Tooltip label="When off, this card is skipped in the compiled chapter/board view." withinPortal multiline w={220} position="top-start">
+                    <Switch label="Include in compile" checked={includeInCompile} onChange={(e) => handleToggleCompile(e.currentTarget.checked)} color="dark" w="fit-content" />
+                  </Tooltip>
+                  <Tooltip label="Show an image on the board instead of the title and text." withinPortal multiline w={220} position="top-start">
+                    <Switch label="Image card" checked={isImageCard} onChange={(e) => handleToggleImageCard(e.currentTarget.checked)} color="dark" w="fit-content" />
+                  </Tooltip>
+                  <Tooltip label="A character sheet: image gallery plus a right-hand rail of named fields (background, appearance, etc). Excluded from compile by default." withinPortal multiline w={220} position="top-start">
+                    <Switch label="Character card" checked={isCharacterCard} onChange={(e) => handleToggleCharacterCard(e.currentTarget.checked)} color="dark" w="fit-content" />
+                  </Tooltip>
+                  <Tooltip label="Leave this card out of word tracking: it won't show a count anywhere, and its words won't count toward any list, group, board, or project total." withinPortal multiline w={220} position="top-start">
+                    <Switch label="Hide word count" checked={hideWordCount} onChange={(e) => handleToggleHideWordCount(e.currentTarget.checked)} color="dark" w="fit-content" />
+                  </Tooltip>
+                </Stack>
+              </Popover.Dropdown>
+            </Popover>
+          </LabelPicker>
         )}
 
         {/* Linked cards */}
         <Box>
+          <Text size="sm" fw={600} c="dimmed" mb={6}>Linked cards</Text>
           <Group gap={6} align="center" mb={links.length > 0 ? 6 : 0}>
             {links.map((link) => (
               <HoverCard key={link.linkId} width={260} shadow="md" withinPortal openDelay={300} closeDelay={100}>
@@ -574,13 +621,8 @@ export default function CardEditorModal({
                     {link.title}
                   </Badge>
                 </HoverCard.Target>
-                <HoverCard.Dropdown>
-                  <Text size="sm" fw={600} lineClamp={2}>{link.title}</Text>
-                  {link.boardTitle && <Text size="xs" c="dimmed" mt={2}>{link.boardTitle}</Text>}
-                  {link.contentPreview && (
-                    <Text size="xs" mt={4} lineClamp={4} c="dimmed">{link.contentPreview}</Text>
-                  )}
-                  <Text size="xs" c="blue" mt={6}>Click to preview · ctrl/right-click to open</Text>
+                <HoverCard.Dropdown p={0} style={{ ...themeVars, ...linkPreviewDropdownStyle }}>
+                  <LinkedCardPreview link={link} hint="Click to preview · ctrl/right-click to open" />
                 </HoverCard.Dropdown>
               </HoverCard>
             ))}
@@ -637,11 +679,13 @@ export default function CardEditorModal({
 
         {/* Image gallery */}
         <Box>
-          <Group justify="space-between" mb="xs">
+          <Group gap={6} mb="xs">
             <Text size="sm" fw={500}>Images ({images.length})</Text>
-            <Button color="dark" size="compact-sm" leftSection={<IconPhotoPlus size={16} />} onClick={openGallery} disabled={!viewingCard}>
-              Add image
-            </Button>
+            <Tooltip label="Add image" withinPortal>
+              <ActionIcon color="dark" size="sm" variant="light" onClick={openGallery} disabled={!viewingCard} aria-label="Add image">
+                <IconPhotoPlus size={16} />
+              </ActionIcon>
+            </Tooltip>
           </Group>
           {images.length > 0 ? (
             <SimpleGrid cols={{ base: 3, sm: 4 }} spacing="xs">
@@ -781,7 +825,7 @@ export default function CardEditorModal({
               onClick={() => setCommentsOpen((v) => !v)}
             >
               <IconMessage size={15} color="var(--mantine-color-dimmed)" />
-              <Text size="sm" c="dimmed">
+              <Text size="sm" fw={600} c="dimmed">
                 Comments {commentCount > 0 ? `(${commentCount})` : ''}
               </Text>
               {commentsOpen ? <IconChevronUp size={13} color="var(--mantine-color-dimmed)" /> : <IconChevronDown size={13} color="var(--mantine-color-dimmed)" />}
@@ -791,7 +835,7 @@ export default function CardEditorModal({
                 size="sm"
                 variant="light"
                 color="gray"
-                onClick={() => { setCommentsOpen(true); setAddingNote(true); }}
+                onClick={() => { setCommentsOpen(true); setAddingNote(true); setEditingCommentId(null); }}
                 aria-label="Add note"
               >
                 <IconPlus size={15} stroke={2.5} />
@@ -802,35 +846,22 @@ export default function CardEditorModal({
           <Collapse expanded={commentsOpen}>
             <Stack gap="xs" mt="xs">
               {addingNote && (
-                <Group gap={6} align="flex-start" wrap="nowrap">
-                  <Textarea
-                    size="xs"
-                    placeholder="Note about this card…"
-                    value={noteText}
-                    onChange={(e) => setNoteText(e.currentTarget.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitNote(); }
-                      if (e.key === 'Escape') { setAddingNote(false); setNoteText(''); }
-                    }}
-                    autosize
-                    minRows={1}
-                    maxRows={5}
-                    autoFocus
-                    style={{ flex: 1 }}
-                  />
-                  <ActionIcon size="sm" color="dark.6" variant="filled" onClick={submitNote} disabled={!noteText.trim()}>
-                    <IconCheck size={13} />
-                  </ActionIcon>
-                  <ActionIcon size="sm" color="dark.6" variant="filled" onClick={() => { setAddingNote(false); setNoteText(''); }}>
-                    <IconX size={13} />
-                  </ActionIcon>
-                </Group>
+                <CardNoteEditor onSave={handleSaveNote} onCancel={handleCancelNote} smartQuotes={spacing.smartQuotes} />
               )}
 
               {commentCount === 0 && !addingNote ? (
                 <Text size="xs" c="dimmed">No comments yet. Select text in the editor to comment on it, or add a general note above.</Text>
               ) : (
                 Object.entries(comments).map(([id, { text, createdAt, anchored }]) => (
+                  editingCommentId === id ? (
+                    <CardNoteEditor
+                      key={id}
+                      initialContent={text}
+                      onSave={(html) => handleEditComment(id, html)}
+                      onCancel={handleCancelEdit}
+                      smartQuotes={spacing.smartQuotes}
+                    />
+                  ) : (
                   <Paper key={id} p="xs" withBorder radius="sm"
                     // Use the active board theme's card surface so these sit on the
                     // themed modal instead of a hardcoded gray box (falling back to
@@ -850,26 +881,42 @@ export default function CardEditorModal({
                         {anchored === false && (
                           <Text size="9px" c="var(--theme-card-muted-text, var(--mantine-color-dimmed))" fw={700} tt="uppercase" style={{ letterSpacing: 0.5 }}>Note</Text>
                         )}
-                        <Text size="sm" c="var(--theme-card-text, var(--mantine-color-text))" style={{ whiteSpace: 'pre-wrap' }}>{text}</Text>
+                        <Box
+                          style={{ fontSize: 'var(--mantine-font-size-sm)', color: 'var(--theme-card-text, var(--mantine-color-text))' }}
+                          dangerouslySetInnerHTML={{ __html: sanitizePatternHtml(text) }}
+                        />
                         <Text size="10px" c="var(--theme-card-muted-text, var(--mantine-color-dimmed))" mt={2}>
                           {new Date(createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </Text>
                       </Box>
-                      <Tooltip label={anchored === false ? 'Remove note' : 'Remove comment'} withinPortal>
-                        <ActionIcon size="xs" color="red.7" variant="subtle"
-                          onClick={(e) => { e.stopPropagation(); removeComment(id); }}>
-                          <IconTrash size={12} />
-                        </ActionIcon>
-                      </Tooltip>
+                      <Group gap={2} wrap="nowrap">
+                        {anchored === false && (
+                          <Tooltip label="Edit note" withinPortal>
+                            <ActionIcon size="xs" color="gray" variant="subtle"
+                              onClick={(e) => { e.stopPropagation(); setAddingNote(false); setEditingCommentId(id); }}>
+                              <IconPencil size={12} />
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
+                        <Tooltip label={anchored === false ? 'Remove note' : 'Remove comment'} withinPortal>
+                          <ActionIcon size="xs" color="red.7" variant="subtle"
+                            onClick={(e) => { e.stopPropagation(); removeComment(id); }}>
+                            <IconTrash size={12} />
+                          </ActionIcon>
+                        </Tooltip>
+                      </Group>
                     </Group>
                   </Paper>
+                  )
                 ))
               )}
             </Stack>
           </Collapse>
         </Box>
 
-        <Group justify="space-between" mt="md">
+        <Divider mt="sm" />
+
+        <Group justify="space-between">
           <Button variant="subtle" color="red.7" onClick={handleDelete} disabled={isSaving}>Delete</Button>
           <Group>
             {autoSaved && <Text size="xs" c="dimmed">Saved</Text>}
@@ -880,7 +927,16 @@ export default function CardEditorModal({
       </Stack>
 
       {isCharacterCard && viewingCard && (
-        <Box w={300} style={{ flexShrink: 0 }}>
+        <Box
+          w={300}
+          style={{
+            flexShrink: 0,
+            position: 'sticky',
+            top: 0,
+            maxHeight: '75vh',
+            overflowY: 'auto',
+          }}
+        >
           <CharacterFieldsPanel key={viewingCard.id} fields={characterFields} onChange={handleCharacterFieldsChange} spacing={spacing} />
         </Box>
       )}

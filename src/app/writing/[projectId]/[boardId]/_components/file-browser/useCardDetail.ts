@@ -262,6 +262,8 @@ export function useCardDetail(
         contentPreview: '',
         boardTitle: target.boardTitle,
         cardType: target.cardType,
+        color: null,
+        labelColors: [],
       };
       const newLinks = [...links, newRef];
       setLinks(newLinks);
@@ -301,11 +303,10 @@ export function useCardDetail(
 
   // A card-level note: no text selection, no mark in the document — just an
   // entry in the same comments list, distinguished by `anchored: false`.
-  const addGeneralNote = (text: string) => {
-    const t = text.trim();
-    if (!t || !viewingCard) return;
+  const addGeneralNote = (html: string) => {
+    if (!viewingCard) return;
     const commentId = crypto.randomUUID();
-    const next = { ...comments, [commentId]: { text: t, createdAt: new Date().toISOString(), anchored: false } };
+    const next = { ...comments, [commentId]: { text: html, createdAt: new Date().toISOString(), anchored: false } };
     setComments(next);
     setCommentsOpen(true);
     updateCard(viewingCard.id, { comments: serializeComments(next) });
@@ -323,6 +324,13 @@ export function useCardDetail(
       content: html,
       comments: serializeComments(next),
     });
+  };
+
+  const editComment = (commentId: string, html: string) => {
+    if (!viewingCard || !comments[commentId]) return;
+    const next = { ...comments, [commentId]: { ...comments[commentId], text: html } };
+    setComments(next);
+    updateCard(viewingCard.id, { comments: serializeComments(next) });
   };
 
   const handleBubbleShow = () => {
@@ -387,7 +395,7 @@ export function useCardDetail(
     bubbleMode, setBubbleMode,
     newCommentText, setNewCommentText,
     activeCommentId, commentInputRef,
-    addComment, addGeneralNote, removeComment, jumpToComment, handleBubbleShow,
+    addComment, addGeneralNote, removeComment, editComment, jumpToComment, handleBubbleShow,
 
     handleDelete,
     flushSave,

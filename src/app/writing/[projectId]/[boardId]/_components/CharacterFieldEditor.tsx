@@ -12,8 +12,9 @@ import type { CharacterField } from '@/utils/characterFields';
 
 // One field's editor — a small TipTap instance matching the main card
 // editor (same theming, headers/formatting available), scoped to just this
-// field's value. Its own toolbar only shows while focused, so a card with
-// several fields doesn't stack a toolbar per field at all times.
+// field's value. Uses the abbreviated single-row toolbar (see
+// WritingEditorToolbar's `compact` mode) since several of these stack in the
+// narrow side rail; it's always visible rather than only-on-focus.
 export default function CharacterFieldEditor({
   field,
   onLabelChange,
@@ -36,7 +37,6 @@ export default function CharacterFieldEditor({
   smartQuotes?: boolean | null;
 }) {
   const [label, setLabel] = useState(field.label);
-  const [focused, setFocused] = useState(false);
   const editor = useWritingEditor(field.value, true, { smartQuotes });
   const onValueChangeRef = useRef(onValueChange);
   onValueChangeRef.current = onValueChange;
@@ -49,11 +49,9 @@ export default function CharacterFieldEditor({
 
   useEffect(() => {
     if (!editor) return;
-    const onFocus = () => setFocused(true);
-    const onBlur = () => { setFocused(false); onValueChangeRef.current(editor.getHTML()); };
-    editor.on('focus', onFocus);
+    const onBlur = () => onValueChangeRef.current(editor.getHTML());
     editor.on('blur', onBlur);
-    return () => { editor.off('focus', onFocus); editor.off('blur', onBlur); };
+    return () => { editor.off('blur', onBlur); };
   }, [editor]);
 
   return (
@@ -89,12 +87,10 @@ export default function CharacterFieldEditor({
         editor={editor}
         styles={{
           ...writingEditorStyles(),
-          content: { ...writingEditorStyles().content, minHeight: 60, maxHeight: 220, overflowY: 'auto' },
+          content: { ...writingEditorStyles().content, minHeight: 60, maxHeight: 220, overflowY: 'auto', paddingRight: 30 },
         }}
       >
-        <div style={{ visibility: focused ? 'visible' : 'hidden' }}>
-          <WritingEditorToolbar />
-        </div>
+        <WritingEditorToolbar compact />
         <RichTextEditor.Content />
       </RichTextEditor>
     </Box>

@@ -15,6 +15,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-
 import { CSS } from '@dnd-kit/utilities';
 import { animateLayoutChanges, sortableTransition } from '../sortableConfig';
 import { effectiveCardColor } from '../CardItem';
+import NotesPopover from '../NotesPopover';
 import { promptText } from '@/utils/dialogs';
 import type { ActiveDrag } from '../useBoardDnd';
 import type { BoardCard, BoardGroup, BoardList } from '../../types';
@@ -62,6 +63,10 @@ type TreeHelpers = {
   addCard: (listId: number) => void;
   openCtx: (e: React.MouseEvent, node: CtxNode) => void;
   onPeekCard: (cardId: number) => void;
+  onGroupNotes: (groupId: number, notes: string | null) => void;
+  onListNotes: (listId: number, notes: string | null) => void;
+  themeVars?: Record<string, string>;
+  smartQuotes?: boolean | null;
 };
 
 // The "+" on a folder row. onPointerDown stop-prop so grabbing it never starts
@@ -226,7 +231,17 @@ function SortableList({ list, h }: { list: BoardList; h: TreeHelpers }) {
           chevron={<Chevron collapsed={collapsed} onToggle={() => h.toggleList(list.id)} what="list" />}
           icon={collapsed ? <IconFolder size={16} /> : <IconFolderOpen size={16} />}
           label={list.title}
-          trailing={<AddButton onClick={() => h.addCard(list.id)} label="Add card" />}
+          trailing={
+            <Group gap={2} wrap="nowrap">
+              <NotesPopover
+                notes={list.notes}
+                onSave={(notes) => h.onListNotes(list.id, notes)}
+                smartQuotes={h.smartQuotes}
+                themeVars={h.themeVars}
+              />
+              <AddButton onClick={() => h.addCard(list.id)} label="Add card" />
+            </Group>
+          }
         />
         {!collapsed && (
           <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
@@ -267,7 +282,17 @@ function SortableGroup({ group, h }: { group: BoardGroup; h: TreeHelpers }) {
           chevron={<Chevron collapsed={collapsed} onToggle={() => h.toggleGroup(group.id)} what="group" />}
           icon={collapsed ? <IconFolder size={16} /> : <IconFolderOpen size={16} />}
           label={group.title}
-          trailing={<AddButton onClick={() => h.addList(group.id)} label="Add list" />}
+          trailing={
+            <Group gap={2} wrap="nowrap">
+              <NotesPopover
+                notes={group.notes}
+                onSave={(notes) => h.onGroupNotes(group.id, notes)}
+                smartQuotes={h.smartQuotes}
+                themeVars={h.themeVars}
+              />
+              <AddButton onClick={() => h.addList(group.id)} label="Add list" />
+            </Group>
+          }
         />
         {!collapsed && (
           <SortableContext items={listIds} strategy={verticalListSortingStrategy}>
@@ -305,7 +330,11 @@ export default function FileTree({
   onDeleteList,
   onRenameCard,
   onDeleteCard,
+  onGroupNotes,
+  onListNotes,
   onPeekCard,
+  themeVars,
+  smartQuotes,
   dnd,
 }: {
   boardTitle: string;
@@ -324,7 +353,11 @@ export default function FileTree({
   onDeleteList: (listId: number) => void | Promise<void>;
   onRenameCard: (cardId: number, title: string) => void | Promise<void>;
   onDeleteCard: (cardId: number) => void | Promise<void>;
+  onGroupNotes: (groupId: number, notes: string | null) => void | Promise<void>;
+  onListNotes: (listId: number, notes: string | null) => void | Promise<void>;
   onPeekCard: (cardId: number) => void;
+  themeVars?: Record<string, string>;
+  smartQuotes?: boolean | null;
   dnd: TreeDnd;
 }) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(() => new Set());
@@ -432,6 +465,10 @@ export default function FileTree({
     addCard,
     openCtx,
     onPeekCard,
+    onGroupNotes,
+    onListNotes,
+    themeVars,
+    smartQuotes,
   };
 
   // Spring-loaded folders: while dragging, hovering a collapsed group/list for
@@ -489,6 +526,11 @@ export default function FileTree({
 
   return (
     <DndContext
+      // Explicit id — see BoardView's board-dnd DndContext for why: without
+      // one, dnd-kit's shared auto-increment counter for the aria
+      // "described-by" id can drift between server and client renders and
+      // trip a hydration mismatch.
+      id="file-tree-dnd"
       sensors={dnd.sensors}
       collisionDetection={dnd.collisionDetection}
       measuring={{ droppable: { strategy: MeasuringStrategy.WhileDragging, frequency: MeasuringFrequency.Optimized } }}

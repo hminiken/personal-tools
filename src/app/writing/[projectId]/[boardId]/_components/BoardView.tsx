@@ -35,6 +35,7 @@ import {
   createList, renameList, deleteList,
   createCard, updateCard, deleteCard, setBoardSpacing, setBoardBackground, getCardById,
   updateWritingSettings, setBoardWordGoal, getBoardActivityStamp,
+  setGroupNotes, setListNotes,
 } from '../../../_actions/writing_actions';
 
 // Reads the latest updatedAt across a board's own row plus everything nested
@@ -117,6 +118,12 @@ export default function BoardView({
   // plays and reopening stays instant. Written in render (idempotent ref).
   const editorMountedRef = useRef(false);
   editorMountedRef.current = editorMountedRef.current || editorOpened;
+  // Mantine's Modal locks background scroll (react-remove-scroll) while open —
+  // a global wheel/touch blocker, not just `overflow:hidden` on body — and the
+  // peek dock renders as a sibling here, outside the modal's own DOM. Handed
+  // to the modal as a scroll-lock "shard" so peeked cards stay scrollable
+  // with a full card editor open at the same time.
+  const peekDockRef = useRef<HTMLDivElement>(null);
 
   // Label manager
   const [labelsOpened, { open: openLabels, close: closeLabels }] = useDisclosure(false);
@@ -242,6 +249,8 @@ export default function BoardView({
   const onRenameList = useCallback(async (listId: number, title: string) => { await renameList(listId, title); router.refresh(); }, [router]);
   const onDeleteList = useCallback(async (listId: number) => { if (await confirmAction({ title: 'Delete list', message: 'Delete this list and its cards?' })) { await deleteList(listId); router.refresh(); } }, [router]);
   const onRenameCard = useCallback(async (cardId: number, title: string) => { await updateCard(cardId, { title }); router.refresh(); }, [router]);
+  const onGroupNotes = useCallback(async (groupId: number, notes: string | null) => { await setGroupNotes(groupId, notes); router.refresh(); }, [router]);
+  const onListNotes = useCallback(async (listId: number, notes: string | null) => { await setListNotes(listId, notes); router.refresh(); }, [router]);
   const onDeleteCard = useCallback(async (cardId: number) => { if (await confirmAction({ title: 'Delete card', message: 'Delete this card?' })) { await deleteCard(cardId); router.refresh(); } }, [router]);
 
   const onOpenCard = useCallback((card: BoardCard) => { setEditingCard(card); openEditor(); }, [openEditor]);
@@ -469,6 +478,13 @@ export default function BoardView({
       {viewMode === 'kanban' && (
       <Box>
       <DndContext
+        // Explicit id: without one, dnd-kit derives its internal aria
+        // "described-by" id from a module-level auto-increment counter shared
+        // across every DndContext instance in the app — with more than one on
+        // the page (this one + the peek dock's) the count differs between the
+        // server render and the client's first render, producing a hydration
+        // mismatch on that attribute. A stable id sidesteps the counter.
+        id="board-dnd"
         sensors={sensors}
         collisionDetection={collisionDetection}
         // WhileDragging (NOT Always): Always keeps dnd-kit re-measuring every
@@ -506,6 +522,8 @@ export default function BoardView({
                 onDeleteList={onDeleteList}
                 onRenameGroup={onRenameGroup}
                 onDeleteGroup={onDeleteGroup}
+                themeVars={themeStyle}
+                smartQuotes={spacing.smartQuotes}
               />
             ))}
           </Stack>
@@ -552,7 +570,10 @@ export default function BoardView({
           onDeleteList={onDeleteList}
           onRenameCard={onRenameCard}
           onDeleteCard={onDeleteCard}
+          onGroupNotes={onGroupNotes}
+          onListNotes={onListNotes}
           onPeekCard={onPeekCard}
+          themeVars={themeStyle}
           dnd={{ sensors, collisionDetection, activeDrag, onDragStart: handleDragStart, onDragOver: handleDragOver, onDragEnd: handleDragEnd }}
         />
       )}
@@ -599,6 +620,7 @@ export default function BoardView({
           wcSettings={wcSettings}
           themeVars={themeStyle}
           onPeekCard={onPeekCard}
+          removeScrollShards={[peekDockRef]}
         />
       )}
 
@@ -609,6 +631,8 @@ export default function BoardView({
         onOpenFull={onPeekOpenFull}
         onReorder={onReorderPeekCards}
         spacing={spacing}
+        containerRef={peekDockRef}
+        themeVars={themeStyle}
       />
 
       <ManageLabelsModal

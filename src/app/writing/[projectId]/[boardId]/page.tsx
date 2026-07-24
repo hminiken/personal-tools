@@ -141,7 +141,7 @@ export default async function BoardPage({ params }: PageProps) {
   // Fetch title/board info for external linked cards so we can build previews.
   const externalRows = externalLinkedIds.size
     ? await writingDb
-        .select({ id: cards.id, title: cards.title, content: cards.content, boardTitle: boards.title, cardType: cards.cardType })
+        .select({ id: cards.id, title: cards.title, content: cards.content, color: cards.color, boardTitle: boards.title, cardType: cards.cardType })
         .from(cards)
         .innerJoin(lists, eq(cards.listId, lists.id))
         .innerJoin(groups, eq(lists.groupId, groups.id))
@@ -150,22 +150,55 @@ export default async function BoardPage({ params }: PageProps) {
         .all()
     : [];
 
+  // Labels for external linked cards (current-board cards already have theirs
+  // in labelsByCard above) — feeds the hover preview's color bar + label chips.
+  const externalLabelRows = externalLinkedIds.size
+    ? await writingDb
+        .select({ cardId: cardLabels.cardId, id: labels.id, color: labels.color, position: labels.position, drivesCardColor: labels.drivesCardColor })
+        .from(cardLabels)
+        .innerJoin(labels, eq(cardLabels.labelId, labels.id))
+        .where(inArray(cardLabels.cardId, [...externalLinkedIds]))
+        .all()
+    : [];
+  const externalLabelsByCard = new Map<number, typeof externalLabelRows>();
+  for (const row of externalLabelRows) {
+    const arr = externalLabelsByCard.get(row.cardId) ?? [];
+    arr.push(row);
+    externalLabelsByCard.set(row.cardId, arr);
+  }
+
   // Build a unified info map: current-board cards + external linked cards.
   function stripHtml(html: string | null | undefined) {
     if (!html) return '';
     return decodeHtmlEntities(html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 160);
   }
-  const cardInfoMap = new Map<number, { title: string; content: string | null; boardTitle: string; cardType: 'standard' | 'character' }>();
-  for (const c of boardCards) cardInfoMap.set(c.id, { title: c.title, content: c.content, boardTitle: activeBoard.title, cardType: c.cardType as 'standard' | 'character' });
-  for (const r of externalRows) cardInfoMap.set(r.id, { title: r.title, content: r.content, boardTitle: r.boardTitle, cardType: r.cardType as 'standard' | 'character' });
+  type LinkedLabel = { id: number; color: string; position: number; drivesCardColor: boolean };
+  const cardInfoMap = new Map<number, { title: string; content: string | null; boardTitle: string; cardType: 'standard' | 'character'; color: string | null; labels: LinkedLabel[] }>();
+  for (const c of boardCards) {
+    cardInfoMap.set(c.id, {
+      title: c.title, content: c.content, boardTitle: activeBoard.title, cardType: c.cardType as 'standard' | 'character',
+      color: c.color, labels: labelsByCard.get(c.id) ?? [],
+    });
+  }
+  for (const r of externalRows) {
+    cardInfoMap.set(r.id, {
+      title: r.title, content: r.content, boardTitle: r.boardTitle, cardType: r.cardType as 'standard' | 'character',
+      color: r.color, labels: externalLabelsByCard.get(r.id) ?? [],
+    });
+  }
 
   // Build linksByCard (bidirectional: each card gets refs for all its links).
-  const linksByCard = new Map<number, { linkId: number; cardId: number; title: string; contentPreview: string; boardTitle: string; cardType: 'standard' | 'character' }[]>();
+  const linksByCard = new Map<number, { linkId: number; cardId: number; title: string; contentPreview: string; boardTitle: string; cardType: 'standard' | 'character'; color: string | null; labelColors: string[] }[]>();
   const addRef = (forCardId: number, otherId: number, linkId: number) => {
     const info = cardInfoMap.get(otherId);
     if (!info) return;
+    const driver = info.labels.filter((lb) => lb.drivesCardColor).sort((a, b) => a.position - b.position || a.id - b.id)[0];
     const arr = linksByCard.get(forCardId) ?? [];
-    arr.push({ linkId, cardId: otherId, title: info.title, contentPreview: stripHtml(info.content), boardTitle: info.boardTitle, cardType: info.cardType });
+    arr.push({
+      linkId, cardId: otherId, title: info.title, contentPreview: stripHtml(info.content), boardTitle: info.boardTitle, cardType: info.cardType,
+      color: info.color ?? driver?.color ?? null,
+      labelColors: info.labels.slice(0, 3).map((lb) => lb.color),
+    });
     linksByCard.set(forCardId, arr);
   };
   for (const l of linkRows) {

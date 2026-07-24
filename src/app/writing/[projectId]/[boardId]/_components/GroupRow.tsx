@@ -16,7 +16,8 @@ import ListColumn from './ListColumn';
 import InlineAdd from './InlineAdd';
 import { WordCountDisplay, sumGroupWords, type WordCountSettings } from '@components/WordCountDisplay';
 import { promptWordGoal } from '@/utils/dialogs';
-import { setGroupWordGoal } from '../../../_actions/writing_actions';
+import { setGroupWordGoal, setGroupNotes } from '../../../_actions/writing_actions';
+import NotesPopover from './NotesPopover';
 import { useInlineRename } from './useInlineRename';
 import type { BoardGroup, BoardCard, LabelCategory } from '../types';
 
@@ -58,6 +59,8 @@ const GroupRowInner = memo(function GroupRowInner({
   onDeleteList,
   onRenameGroup,
   onDeleteGroup,
+  themeVars,
+  smartQuotes,
 }: {
   group: BoardGroup;
   boardHasBg: boolean;
@@ -67,6 +70,8 @@ const GroupRowInner = memo(function GroupRowInner({
   setDropRef: (el: HTMLElement | null) => void;
   setActivatorNodeRef: (el: HTMLElement | null) => void;
   listeners: DraggableSyntheticListeners;
+  themeVars?: Record<string, string>;
+  smartQuotes?: boolean | null;
 } & GroupCallbacks) {
   const { editing, setEditing, inputProps: titleInputProps } = useInlineRename({
     value: group.title,
@@ -179,6 +184,14 @@ const GroupRowInner = memo(function GroupRowInner({
           )}
         </Group>
 
+        <NotesPopover
+          notes={group.notes}
+          onSave={async (html) => { await setGroupNotes(group.id, html); router.refresh(); }}
+          smartQuotes={smartQuotes}
+          light={hasBg}
+          themeVars={themeVars}
+        />
+
         <Menu position="bottom-end" withinPortal>
           <Menu.Target>
             <ActionIcon variant="subtle" color="gray" size="sm" aria-label="Group options" style={hasBg ? { color: 'rgba(255,255,255,0.8)' } : undefined}>
@@ -241,6 +254,8 @@ const GroupRowInner = memo(function GroupRowInner({
                   onAddCard={onAddCard}
                   onRename={onRenameList}
                   onDelete={onDeleteList}
+                  themeVars={themeVars}
+                  smartQuotes={smartQuotes}
                 />
               ))}
               <Box
@@ -317,12 +332,16 @@ function GroupRow({
   onDeleteList,
   onRenameGroup,
   onDeleteGroup,
+  themeVars,
+  smartQuotes,
 }: {
   group: BoardGroup;
   boardHasBg: boolean;
   categories: LabelCategory[];
   wcSettings: WordCountSettings;
   originDrag: { card: BoardCard; listId: number; index: number } | null;
+  themeVars?: Record<string, string>;
+  smartQuotes?: boolean | null;
 } & GroupCallbacks) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: `group:${group.id}`, data: { type: 'group', group }, animateLayoutChanges, transition: sortableTransition });
@@ -409,6 +428,8 @@ function GroupRow({
         onDeleteList={onDeleteList}
         onRenameGroup={onRenameGroup}
         onDeleteGroup={onDeleteGroup}
+        themeVars={themeVars}
+        smartQuotes={smartQuotes}
       />
     </Paper>
   );
