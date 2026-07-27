@@ -89,7 +89,7 @@ function CompactToolbar() {
           </ActionIcon>
         </Tooltip>
       </Group>
-      <Collapse in={expanded} w="100%">
+      <Collapse expanded={expanded} w="100%">
         <Group gap={4} wrap="wrap" mt={4}>
           <RichTextEditor.ControlsGroup>
             <RichTextEditor.Highlight />

@@ -221,7 +221,11 @@ function PeekWindow({
         ) : (
           <Stack gap="md">
             {card.coverImage && (
-              <Image src={card.coverImage} alt="" radius="sm" h={140} fit="cover" fallbackSrc="https://placehold.co/320x140?text=Image" />
+              <Image
+                src={card.coverImage} alt="" radius="sm" h={140} fit="cover"
+                style={{ objectPosition: `${card.imageFocalX ?? 50}% ${card.imageFocalY ?? 50}%` }}
+                fallbackSrc="https://placehold.co/320x140?text=Image"
+              />
             )}
             {card.content && (
               <Box style={{ fontSize: 'var(--mantine-font-size-sm)' }} dangerouslySetInnerHTML={{ __html: sanitizePatternHtml(card.content) }} />

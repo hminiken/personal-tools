@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '5mb', // Increases the limit to 5 megabytes
     },
   },
+  logging: {
+    incomingRequests: false,
+    browserToTerminal: 'error',
+  },
 };
 
 export default nextConfig;

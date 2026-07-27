@@ -343,7 +343,13 @@ export default function BoardTabs({
             color="gray"
             size="lg"
             aria-label="Board options"
-            style={hasBg ? { color: 'rgba(255,255,255,0.85)' } : undefined}
+            style={hasBg ? {
+              color: 'var(--theme-glass-text, #fff)',
+              background: 'var(--theme-glass-bg, rgba(109, 109, 109, 0.22))',
+              backdropFilter: 'blur(var(--theme-glass-blur, 10px))',
+              WebkitBackdropFilter: 'blur(var(--theme-glass-blur, 10px))',
+              border: '1px solid var(--theme-glass-border, rgba(255,255,255,0.18))',
+            } : undefined}
           >
             <IconDots size={18} />
           </ActionIcon>

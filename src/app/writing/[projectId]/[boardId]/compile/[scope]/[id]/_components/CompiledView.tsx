@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Paper, Title, Text, Box, Button, Divider, Group } from '@mantine/core';
-import { IconArrowLeft } from '@tabler/icons-react';
+import { Paper, Title, Text, Box, Button, Divider, Group, Drawer, ActionIcon, Tooltip } from '@mantine/core';
+import { IconArrowLeft, IconLineHeight } from '@tabler/icons-react';
 import Link from 'next/link';
-import { DocumentSpacingMenu, docSpacingClass, spacingVars, type Spacing } from '@components/DocumentSpacing';
+import { DocumentFormattingControls, docSpacingClass, spacingVars, type Spacing } from '@components/DocumentSpacing';
 import { setBoardSpacing } from '@app/writing/_actions/writing_actions';
 import CardSectionEditor from '../../../../_components/CardSectionEditor';
 import { type CommentRecord, parseComments } from '@/utils/writingComments';
@@ -119,6 +119,7 @@ export default function CompiledView({
 }) {
   const scopeLabel = data.scope === 'list' ? 'chapter' : data.scope;
   const [spacing, setSpacing] = useState<Spacing>(initialSpacing);
+  const [formattingOpen, setFormattingOpen] = useState(false);
 
   // Live comment state for all cards — source of truth for the sidebar.
   const [cardComments, setCardComments] = useState<Record<number, CommentRecord>>(() => {
@@ -214,9 +215,30 @@ export default function CompiledView({
             Compiled {scopeLabel} · one editor per card. Edits save automatically when you click out of a scene.
           </Text>
         </Box>
-        <DocumentSpacingMenu value={spacing} onChange={handleSpacing} />
+        <Tooltip label="Document formatting">
+          <ActionIcon
+            variant="light"
+            color="gray"
+            size="lg"
+            aria-label="Document formatting"
+            onClick={() => setFormattingOpen(true)}
+          >
+            <IconLineHeight size={18} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
       <Divider mb="xl" />
+
+      <Drawer
+        opened={formattingOpen}
+        onClose={() => setFormattingOpen(false)}
+        position="right"
+        title="Document formatting"
+        size="sm"
+        padding="md"
+      >
+        <DocumentFormattingControls value={spacing} onChange={handleSpacing} />
+      </Drawer>
 
       {/* Flex row: prose on the left, floating comment cards on the right */}
       <div style={{ display: 'flex', gap: 24 }}>

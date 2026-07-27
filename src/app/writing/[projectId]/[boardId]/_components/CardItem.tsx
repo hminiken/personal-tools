@@ -198,7 +198,10 @@ export const CardFace = memo(function CardFace({
           display="block"
           // Cap the height at the card's own width (a square ceiling). Taller
           // images are center-cropped to fit; shorter ones show in full.
-          style={{ maxHeight: '100cqw' }}
+          style={{
+            maxHeight: '100cqw',
+            objectPosition: `${card.imageFocalX ?? 50}% ${card.imageFocalY ?? 50}%`,
+          }}
           fallbackSrc="https://placehold.co/240x160?text=Image"
         />
         {(card.labels.length > 0 || card.links.length > 0 || !card.includeInCompile || isCharacter) && (
@@ -254,7 +257,10 @@ export const CardFace = memo(function CardFace({
             h={72}
             radius="sm"
             fit="cover"
-            style={{ flexShrink: 0 }}
+            style={{
+              flexShrink: 0,
+              objectPosition: `${card.imageFocalX ?? 50}% ${card.imageFocalY ?? 50}%`,
+            }}
           />
           <Box style={{ flex: 1, minWidth: 0 }}>
             <Group gap={4} wrap="nowrap" align="center">

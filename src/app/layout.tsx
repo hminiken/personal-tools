@@ -1,7 +1,7 @@
 // src/app/layout.tsx
 
 import '@mantine/core/styles.css';
-import {  MantineProvider, createTheme, MantineColorsTuple, ColorSchemeScript } from '@mantine/core';
+import { MantineProvider, createTheme, MantineColorsTuple } from '@mantine/core';
 import { ModalsProvider } from '@mantine/modals';
 import NavigationShell from '@/components/NavigationShell';
 import { PageTitleProvider } from '@/components/PageTitleContext';
@@ -77,12 +77,25 @@ export const metadata = {
   description: 'Personal tools and tracking',
 };
 
+// Inlined here (rather than Mantine's <ColorSchemeScript />) because that
+// component is "use client", which puts this <script> tag on React's client
+// render path — and React 19 warns there since client-rendered <script> tags
+// are never executed. A plain string rendered from this Server Component
+// avoids that path entirely; the browser executes it directly from the HTML.
+const colorSchemeScript = `try {
+  var _colorScheme = window.localStorage.getItem("mantine-color-scheme-value");
+  var colorScheme = _colorScheme === "light" || _colorScheme === "dark" || _colorScheme === "auto" ? _colorScheme : "auto";
+  var computedColorScheme = colorScheme !== "auto" ? colorScheme : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  document.documentElement.setAttribute("data-mantine-color-scheme", computedColorScheme);
+} catch (e) {}
+`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Tells Mantine to inject the script that checks for the user's system preference to prevent flashing */}
-        <ColorSchemeScript defaultColorScheme="auto" />
+        {/* Checks the user's system/localStorage color scheme preference to prevent flashing */}
+        <script data-mantine-script dangerouslySetInnerHTML={{ __html: colorSchemeScript }} />
       </head>
       <body>
         <MantineProvider theme={theme} defaultColorScheme="auto">

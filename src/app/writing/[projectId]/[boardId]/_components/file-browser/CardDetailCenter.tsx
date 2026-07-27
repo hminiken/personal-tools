@@ -64,7 +64,12 @@ export default function CardDetailCenter({
           />
         ) : (
           <Group gap="xs" wrap="nowrap" align="center" style={{ cursor: 'text', flex: 1, minWidth: 0 }} onClick={() => detail.setEditingTitle(true)}>
-            {detail.coverImage && <Image src={detail.coverImage} alt="" w={28} h={28} radius="sm" fit="cover" style={{ flexShrink: 0 }} />}
+            {detail.coverImage && (
+              <Image
+                src={detail.coverImage} alt="" w={28} h={28} radius="sm" fit="cover"
+                style={{ flexShrink: 0, objectPosition: `${detail.imageFocalX ?? 50}% ${detail.imageFocalY ?? 50}%` }}
+              />
+            )}
             <Title order={4} style={{ minWidth: 0 }} lineClamp={1}>{detail.title || 'Untitled'}</Title>
             <Tooltip label="Click to rename" withinPortal>
               <IconPencil size={15} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />

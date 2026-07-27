@@ -4,7 +4,7 @@ import { useState } from 'react';
 import {
   Stack, Group, Text, Button, TextInput, Select, SegmentedControl,
   Switch, Divider, Radio, Paper, Loader, Alert, Box, Badge, Accordion,
-  Checkbox,
+  Checkbox, Grid,
 } from '@mantine/core';
 import { IconDownload, IconAlertCircle, IconFileWord } from '@tabler/icons-react';
 import type { EpubSettings, NumberStyle, HeadingContent } from '@/utils/epub';
@@ -346,11 +346,40 @@ export default function EpubExportForm({ projectId, projectTitle, boards, defaul
   }
 
   return (
-    <Stack gap="md" style={{ maxWidth: 600 }}>
+    <Grid gap="xl">
+
+      {/* ── Preview — sticky, stays in view while the options column scrolls ── */}
+      <Grid.Col span={{ base: 12, md: 5 }}>
+        <Box style={{ position: 'sticky', top: 20 }}>
+          <Text fw={600} size="sm" mb={4}>Preview</Text>
+          <Text size="xs" c="dimmed" mb="sm">
+            Sample chapter with lorem ipsum — updates live as you change settings.
+            {multiBook && ' Book title strip shown because multiple boards are selected.'}
+          </Text>
+          <EpubPreview
+            structure={structure}
+            paragraphStyle={paragraphStyle}
+            fontSize={fontSize}
+            lineSpacing={lineSpacing}
+            groupHeadingContent={groupHeadingContent}
+            groupNumberStyle={groupNumberStyle}
+            listHeadingContent={listHeadingContent}
+            listNumberStyle={listNumberStyle}
+            cardHeadingContent={cardHeadingContent}
+            cardNumberStyle={cardNumberStyle}
+            sceneBreak={sceneBreak}
+            showBookTitle={multiBook}
+          />
+        </Box>
+      </Grid.Col>
+
+      {/* ── Options — scrolls normally ──────────────────────────────────── */}
+      <Grid.Col span={{ base: 12, md: 7 }}>
+      <Stack gap="md">
 
       <Accordion
         multiple
-        defaultValue={['books', 'metadata', 'structure', 'headings', 'typography', 'preview']}
+        defaultValue={['books', 'metadata', 'structure', 'headings', 'typography']}
         variant="separated"
         styles={{ item: { borderRadius: 6 } }}
       >
@@ -681,33 +710,6 @@ export default function EpubExportForm({ projectId, projectTitle, boards, defaul
           </Accordion.Panel>
         </Accordion.Item>
 
-        {/* ── Preview ───────────────────────────────────────────────── */}
-        <Accordion.Item value="preview">
-          <Accordion.Control>
-            <Text fw={600} size="sm">Preview</Text>
-          </Accordion.Control>
-          <Accordion.Panel>
-            <Text size="xs" c="dimmed" mb="sm">
-              Sample chapter with lorem ipsum — updates live as you change settings.
-              {multiBook && ' Book title strip shown because multiple boards are selected.'}
-            </Text>
-            <EpubPreview
-              structure={structure}
-              paragraphStyle={paragraphStyle}
-              fontSize={fontSize}
-              lineSpacing={lineSpacing}
-              groupHeadingContent={groupHeadingContent}
-              groupNumberStyle={groupNumberStyle}
-              listHeadingContent={listHeadingContent}
-              listNumberStyle={listNumberStyle}
-              cardHeadingContent={cardHeadingContent}
-              cardNumberStyle={cardNumberStyle}
-              sceneBreak={sceneBreak}
-              showBookTitle={multiBook}
-            />
-          </Accordion.Panel>
-        </Accordion.Item>
-
       </Accordion>
 
       {/* ── Download buttons ──────────────────────────────────────────── */}
@@ -750,6 +752,9 @@ export default function EpubExportForm({ projectId, projectTitle, boards, defaul
         </Text>
       </Box>
 
-    </Stack>
+      </Stack>
+      </Grid.Col>
+
+    </Grid>
   );
 }

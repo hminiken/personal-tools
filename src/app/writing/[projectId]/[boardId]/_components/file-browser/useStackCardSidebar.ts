@@ -49,6 +49,8 @@ export function useStackCardSidebar({
   const [hideWordCount, setHideWordCount] = useState(false);
   const [color, setColor] = useState<string | null>(null);
   const [coverImage, setCoverImage] = useState<string | null>(null);
+  const [imageFocalX, setImageFocalX] = useState<number | null>(null);
+  const [imageFocalY, setImageFocalY] = useState<number | null>(null);
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [links, setLinks] = useState<LinkedCardRef[]>([]);
   // Optimistic link edits survive focus moving away and back: the card prop
@@ -68,6 +70,8 @@ export function useStackCardSidebar({
     setHideWordCount(card?.hideWordCount ?? false);
     setColor(card?.color ?? null);
     setCoverImage(card?.coverImage ?? null);
+    setImageFocalX(card?.imageFocalX ?? null);
+    setImageFocalY(card?.imageFocalY ?? null);
     setImages((card?.images ?? []).map((i) => ({ id: i.id, path: i.path })));
     const overrideLinks = card ? linksOverrideRef.current.get(card.id) : undefined;
     setLinks(overrideLinks ?? card?.links ?? []);
@@ -127,7 +131,16 @@ export function useStackCardSidebar({
     if (!card) return;
     const next = coverImage === path ? null : path;
     setCoverImage(next);
+    setImageFocalX(null);
+    setImageFocalY(null);
     setCardCover(card.id, next);
+  };
+
+  const handleSetImageFocalPoint = (x: number, y: number) => {
+    if (!card) return;
+    setImageFocalX(x);
+    setImageFocalY(y);
+    updateCard(card.id, { imageFocalX: x, imageFocalY: y });
   };
 
   const handleDeleteImage = (img: GalleryImage) => {
@@ -242,10 +255,13 @@ export function useStackCardSidebar({
     drivingLabel,
     handleColorChange,
     coverImage,
+    imageFocalX,
+    imageFocalY,
     images,
     handleSetCover,
     handleDeleteImage,
     handleImageUploaded,
+    handleSetImageFocalPoint,
     links,
     linkedCardIds: new Set(links.map((l) => l.cardId)),
     projectCards,

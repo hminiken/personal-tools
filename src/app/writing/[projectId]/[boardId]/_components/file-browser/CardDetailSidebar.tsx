@@ -6,12 +6,13 @@ import {
   ScrollArea, SimpleGrid, Stack, Switch, Text, Tooltip, useCombobox,
 } from '@mantine/core';
 import {
-  IconChevronDown, IconChevronUp, IconLink,
+  IconChevronDown, IconChevronUp, IconFocusCentered, IconLink,
   IconMessage, IconPalette, IconPencil, IconPhotoPlus, IconPhotoStar, IconPlus, IconTrash, IconX,
 } from '@tabler/icons-react';
 import { WordCountDisplay, type WordCountSettings } from '@components/WordCountDisplay';
 import type { Spacing } from '@components/DocumentSpacing';
 import { UploadModal } from '@components/UploadModal';
+import { ImageFocalPointModal } from '@components/ImageFocalPointModal';
 import { addCardImage } from '../../../../_actions/writing_actions';
 import LabelPicker from '../LabelPicker';
 import ColorPicker from '../ColorPicker';
@@ -46,10 +47,13 @@ export type CardSidebarController = {
   drivingLabel: Label | null;
   handleColorChange: (next: string | null) => void;
   coverImage: string | null;
+  imageFocalX: number | null;
+  imageFocalY: number | null;
   images: GalleryImage[];
   handleSetCover: (path: string) => void;
   handleDeleteImage: (img: GalleryImage) => void;
   handleImageUploaded: (result: GalleryImage | null) => void;
+  handleSetImageFocalPoint: (x: number, y: number) => void;
   links: LinkedCardRef[];
   linkedCardIds: Set<number>;
   projectCards: ProjectCardOption[];
@@ -103,6 +107,7 @@ export default function CardDetailSidebar({
     onDropdownClose: () => { pickerCombobox.resetSelectedOption(); setPickerSearch(''); },
   });
   const [galleryOpened, setGalleryOpened] = useState(false);
+  const [focalPointOpened, setFocalPointOpened] = useState(false);
   const viewer = useImageViewer(detail.images.length);
   const [addingNote, setAddingNote] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -191,31 +196,57 @@ export default function CardDetailSidebar({
         </Group>
         {detail.images.length > 0 && (
           <SimpleGrid cols={2} spacing="xs">
-            {detail.images.map((img, index) => (
-              <Box key={img.id} style={{ position: 'relative' }}>
-                <Image
-                  src={img.path} alt="" h={80} radius="sm" fit="cover"
-                  style={{ cursor: 'pointer', outline: detail.coverImage === img.path ? '2px solid var(--mantine-color-dark-6)' : 'none' }}
-                  onClick={() => viewer.open(index)}
-                  fallbackSrc="https://placehold.co/120x120?text=Image"
-                />
-                <Tooltip label={detail.coverImage === img.path ? 'Cover image' : 'Set as cover'} withinPortal>
-                  <ActionIcon variant="filled" color={detail.coverImage === img.path ? 'dark.6' : 'gray'} size="sm"
-                    style={{ position: 'absolute', top: 4, left: 4, zIndex: 2 }}
-                    onClick={() => detail.handleSetCover(img.path)} aria-label="Set as cover">
-                    <IconPhotoStar size={14} />
-                  </ActionIcon>
-                </Tooltip>
-                <Tooltip label="Delete image" withinPortal>
-                  <ActionIcon variant="filled" color="red.7" size="sm"
-                    style={{ position: 'absolute', top: 4, right: 4, zIndex: 2 }}
-                    onClick={() => detail.handleDeleteImage(img)} aria-label="Delete image">
-                    <IconTrash size={14} />
-                  </ActionIcon>
-                </Tooltip>
-              </Box>
-            ))}
+            {detail.images.map((img, index) => {
+              const isCover = detail.coverImage === img.path;
+              return (
+                <Box key={img.id} style={{ position: 'relative' }}>
+                  <Image
+                    src={img.path} alt="" h={80} radius="sm" fit="cover"
+                    style={{
+                      cursor: 'pointer',
+                      outline: isCover ? '2px solid var(--mantine-color-dark-6)' : 'none',
+                      objectPosition: isCover ? `${detail.imageFocalX ?? 50}% ${detail.imageFocalY ?? 50}%` : undefined,
+                    }}
+                    onClick={() => viewer.open(index)}
+                    fallbackSrc="https://placehold.co/120x120?text=Image"
+                  />
+                  <Tooltip label={isCover ? 'Cover image' : 'Set as cover'} withinPortal>
+                    <ActionIcon variant="filled" color={isCover ? 'dark.6' : 'gray'} size="sm"
+                      style={{ position: 'absolute', top: 4, left: 4, zIndex: 2 }}
+                      onClick={() => detail.handleSetCover(img.path)} aria-label="Set as cover">
+                      <IconPhotoStar size={14} />
+                    </ActionIcon>
+                  </Tooltip>
+                  {isCover && (
+                    <Tooltip label="Adjust position" withinPortal>
+                      <ActionIcon variant="filled" color="gray" size="sm"
+                        style={{ position: 'absolute', bottom: 4, left: 4, zIndex: 2 }}
+                        onClick={() => setFocalPointOpened(true)} aria-label="Adjust image position">
+                        <IconFocusCentered size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                  <Tooltip label="Delete image" withinPortal>
+                    <ActionIcon variant="filled" color="red.7" size="sm"
+                      style={{ position: 'absolute', top: 4, right: 4, zIndex: 2 }}
+                      onClick={() => detail.handleDeleteImage(img)} aria-label="Delete image">
+                      <IconTrash size={14} />
+                    </ActionIcon>
+                  </Tooltip>
+                </Box>
+              );
+            })}
           </SimpleGrid>
+        )}
+        {detail.coverImage && (
+          <ImageFocalPointModal
+            opened={focalPointOpened}
+            onClose={() => setFocalPointOpened(false)}
+            src={detail.coverImage}
+            focalX={detail.imageFocalX ?? 50}
+            focalY={detail.imageFocalY ?? 50}
+            onChange={detail.handleSetImageFocalPoint}
+          />
         )}
       </Box>
 

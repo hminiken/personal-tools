@@ -216,6 +216,13 @@ export const cards = sqliteTable('cards', {
   // images (see cardImages); null means no cover chosen.
   coverImage: text('cover_image'),
 
+  // Focal point (0-100, % from top-left) for whichever image is currently
+  // shown cropped — coverImage's 72x72 thumbnail or imagePath's full-bleed
+  // image-card view. Null = default center crop. Lets a portrait's face stay
+  // in frame instead of getting cut off by an off-center center-crop.
+  imageFocalX: real('image_focal_x'),
+  imageFocalY: real('image_focal_y'),
+
   // Optional background color for the whole card on the board (CSS hex, see
   // LABEL_COLORS). Applied as a soft tint behind the card. Null = default.
   color: text('color'),

@@ -53,6 +53,8 @@ export function useCardDetail(
   const [hideWordCount, setHideWordCount] = useState(false);
   const [color, setColor] = useState<string | null>(null);
   const [coverImage, setCoverImage] = useState<string | null>(null);
+  const [imageFocalX, setImageFocalX] = useState<number | null>(null);
+  const [imageFocalY, setImageFocalY] = useState<number | null>(null);
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [liveWordCount, setLiveWordCount] = useState(0);
   const [saved, setSaved] = useState(false);
@@ -91,6 +93,8 @@ export function useCardDetail(
     setHideWordCount(viewingCard?.hideWordCount ?? false);
     setColor(viewingCard?.color ?? null);
     setCoverImage(viewingCard?.coverImage ?? null);
+    setImageFocalX(viewingCard?.imageFocalX ?? null);
+    setImageFocalY(viewingCard?.imageFocalY ?? null);
     setImages((viewingCard?.images ?? []).map((i) => ({ id: i.id, path: i.path })));
     const cardId = viewingCard?.id;
     const overrideLinks = cardId != null ? linksOverrideRef.current.get(cardId) : undefined;
@@ -228,7 +232,16 @@ export function useCardDetail(
     if (!viewingCard) return;
     const next = coverImage === path ? null : path;
     setCoverImage(next);
+    setImageFocalX(null);
+    setImageFocalY(null);
     await setCardCover(viewingCard.id, next);
+  };
+
+  const handleSetImageFocalPoint = async (x: number, y: number) => {
+    if (!viewingCard) return;
+    setImageFocalX(x);
+    setImageFocalY(y);
+    await updateCard(viewingCard.id, { imageFocalX: x, imageFocalY: y });
   };
 
   const handleDeleteImage = async (img: GalleryImage) => {
@@ -382,7 +395,8 @@ export function useCardDetail(
     color, labelColor, drivingLabel, handleColorChange,
 
     coverImage, images,
-    handleSetCover, handleDeleteImage, handleImageUploaded,
+    imageFocalX, imageFocalY,
+    handleSetCover, handleDeleteImage, handleImageUploaded, handleSetImageFocalPoint,
 
     links, linkedCardIds, projectCards, loadProjectCards,
     handleAddLink, handleRemoveLink,

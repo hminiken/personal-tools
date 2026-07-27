@@ -395,6 +395,7 @@ export async function updateCard(
     title?: string; content?: string; includeInCompile?: boolean; isImageCard?: boolean; imagePath?: string | null;
     coverImage?: string | null; comments?: string | null; hideWordCount?: boolean; color?: string | null;
     cardType?: 'standard' | 'character'; characterFields?: string | null;
+    imageFocalX?: number | null; imageFocalY?: number | null;
   }
 ) {
   const patch: Partial<typeof cards.$inferInsert> = {};
@@ -409,6 +410,8 @@ export async function updateCard(
   if (data.color !== undefined) patch.color = data.color;
   if (data.cardType !== undefined) patch.cardType = data.cardType;
   if (data.characterFields !== undefined) patch.characterFields = data.characterFields;
+  if (data.imageFocalX !== undefined) patch.imageFocalX = data.imageFocalX;
+  if (data.imageFocalY !== undefined) patch.imageFocalY = data.imageFocalY;
   if (Object.keys(patch).length > 0) {
     await writingDb.update(cards).set(patch).where(eq(cards.id, cardId));
   }
@@ -459,7 +462,9 @@ export async function deleteCardImage(imageId: number) {
 
 // Flag one gallery image (by path) as the card's cover. Pass null to clear.
 export async function setCardCover(cardId: number, imagePath: string | null) {
-  await writingDb.update(cards).set({ coverImage: imagePath }).where(eq(cards.id, cardId));
+  // Reset the focal point — it was calibrated for whichever image was
+  // previously the cover, and won't line up with a different image.
+  await writingDb.update(cards).set({ coverImage: imagePath, imageFocalX: null, imageFocalY: null }).where(eq(cards.id, cardId));
   revalidateBoards();
 }
 

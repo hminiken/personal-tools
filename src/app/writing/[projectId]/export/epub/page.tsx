@@ -41,7 +41,7 @@ export default async function EpubExportPage({ params, searchParams }: PageProps
   const defaultBoardId = boardRaw ? parseInt(boardRaw, 10) : null;
 
   return (
-    <Stack gap="xl" p="xl" style={{ maxWidth: 680, margin: '0 auto' }}>
+    <Stack gap="xl" p="xl" style={{ maxWidth: 1100, margin: '0 auto' }}>
 
       <Anchor href={`/writing/${projectId}`} size="sm" c="dimmed">
         ← Back to {project.title}

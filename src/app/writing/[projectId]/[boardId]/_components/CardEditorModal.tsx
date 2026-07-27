@@ -8,7 +8,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
-  IconPhotoPlus, IconPencil, IconTrash, IconPhotoStar,
+  IconPhotoPlus, IconPencil, IconTrash, IconPhotoStar, IconFocusCentered,
   IconMessage, IconCheck, IconX, IconMessageOff, IconChevronDown, IconChevronUp,
   IconLink, IconArrowLeft, IconPlus, IconPalette, IconAdjustments,
 } from '@tabler/icons-react';
@@ -22,6 +22,7 @@ import { WritingEditorToolbar } from '@components/WritingEditorToolbar';
 import { docSpacingClass, spacingVars, type Spacing } from '@components/DocumentSpacing';
 import { writingEditorStyles } from '@/utils/writingTheme';
 import { UploadModal } from '@components/UploadModal';
+import { ImageFocalPointModal } from '@components/ImageFocalPointModal';
 import { WordCountDisplay, type WordCountSettings } from '@components/WordCountDisplay';
 import { confirmAction, promptWordGoal } from '@/utils/dialogs';
 import {
@@ -121,6 +122,9 @@ export default function CardEditorModal({
   const [hideWordCount, setHideWordCount] = useState(false);
   const [color, setColor] = useState<string | null>(null);
   const [coverImage, setCoverImage] = useState<string | null>(null);
+  const [imageFocalX, setImageFocalX] = useState<number | null>(null);
+  const [imageFocalY, setImageFocalY] = useState<number | null>(null);
+  const [focalPointOpened, setFocalPointOpened] = useState(false);
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [liveWordCount, setLiveWordCount] = useState(0);
@@ -173,6 +177,8 @@ export default function CardEditorModal({
     setHideWordCount(viewingCard?.hideWordCount ?? false);
     setColor(viewingCard?.color ?? null);
     setCoverImage(viewingCard?.coverImage ?? null);
+    setImageFocalX(viewingCard?.imageFocalX ?? null);
+    setImageFocalY(viewingCard?.imageFocalY ?? null);
     setImages((viewingCard?.images ?? []).map((i) => ({ id: i.id, path: i.path })));
     const cardId = viewingCard?.id;
     const overrideLinks = cardId != null ? linksOverrideRef.current.get(cardId) : undefined;
@@ -288,7 +294,16 @@ export default function CardEditorModal({
     if (!viewingCard) return;
     const next = coverImage === path ? null : path;
     setCoverImage(next);
+    setImageFocalX(null);
+    setImageFocalY(null);
     await setCardCover(viewingCard.id, next);
+  };
+
+  const handleSetImageFocalPoint = async (x: number, y: number) => {
+    if (!viewingCard) return;
+    setImageFocalX(x);
+    setImageFocalY(y);
+    await updateCard(viewingCard.id, { imageFocalX: x, imageFocalY: y });
   };
 
   const handleDeleteImage = async (img: GalleryImage) => {
@@ -499,7 +514,12 @@ export default function CardEditorModal({
         />
       ) : (
         <Group gap="xs" wrap="nowrap" align="center" style={{ cursor: 'text', flex: 1, minWidth: 0 }} onClick={() => setEditingTitle(true)}>
-          {coverImage && <Image src={coverImage} alt="" w={28} h={28} radius="sm" fit="cover" style={{ flexShrink: 0 }} />}
+          {coverImage && (
+            <Image
+              src={coverImage} alt="" w={28} h={28} radius="sm" fit="cover"
+              style={{ flexShrink: 0, objectPosition: `${imageFocalX ?? 50}% ${imageFocalY ?? 50}%` }}
+            />
+          )}
           <Title order={4} style={{ minWidth: 0 }} lineClamp={1}>{title || 'Untitled'}</Title>
           <Tooltip label="Click to rename" withinPortal>
             <IconPencil size={15} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
@@ -689,33 +709,59 @@ export default function CardEditorModal({
           </Group>
           {images.length > 0 ? (
             <SimpleGrid cols={{ base: 3, sm: 4 }} spacing="xs">
-              {images.map((img, index) => (
-                <Box key={img.id} style={{ position: 'relative' }}>
-                  <Image
-                    src={img.path} alt="" h={90} radius="sm" fit="cover"
-                    style={{ cursor: 'pointer', outline: coverImage === img.path ? '2px solid var(--mantine-color-dark-6)' : 'none' }}
-                    onClick={() => handleViewImage(index)}
-                    fallbackSrc="https://placehold.co/120x120?text=Image"
-                  />
-                  <Tooltip label={coverImage === img.path ? 'Cover image' : 'Set as cover'} withinPortal>
-                    <ActionIcon variant="filled" color={coverImage === img.path ? 'dark.6' : 'gray'} size="sm"
-                      style={{ position: 'absolute', top: 4, left: 4, zIndex: 2 }}
-                      onClick={() => handleSetCover(img.path)} aria-label="Set as cover">
-                      <IconPhotoStar size={14} />
-                    </ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="Delete image" withinPortal>
-                    <ActionIcon variant="filled" color="red.7" size="sm"
-                      style={{ position: 'absolute', top: 4, right: 4, zIndex: 2 }}
-                      onClick={() => handleDeleteImage(img)} aria-label="Delete image">
-                      <IconTrash size={14} />
-                    </ActionIcon>
-                  </Tooltip>
-                </Box>
-              ))}
+              {images.map((img, index) => {
+                const isCover = coverImage === img.path;
+                return (
+                  <Box key={img.id} style={{ position: 'relative' }}>
+                    <Image
+                      src={img.path} alt="" h={90} radius="sm" fit="cover"
+                      style={{
+                        cursor: 'pointer',
+                        outline: isCover ? '2px solid var(--mantine-color-dark-6)' : 'none',
+                        objectPosition: isCover ? `${imageFocalX ?? 50}% ${imageFocalY ?? 50}%` : undefined,
+                      }}
+                      onClick={() => handleViewImage(index)}
+                      fallbackSrc="https://placehold.co/120x120?text=Image"
+                    />
+                    <Tooltip label={isCover ? 'Cover image' : 'Set as cover'} withinPortal>
+                      <ActionIcon variant="filled" color={isCover ? 'dark.6' : 'gray'} size="sm"
+                        style={{ position: 'absolute', top: 4, left: 4, zIndex: 2 }}
+                        onClick={() => handleSetCover(img.path)} aria-label="Set as cover">
+                        <IconPhotoStar size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                    {isCover && (
+                      <Tooltip label="Adjust position" withinPortal>
+                        <ActionIcon variant="filled" color="gray" size="sm"
+                          style={{ position: 'absolute', bottom: 4, left: 4, zIndex: 2 }}
+                          onClick={() => setFocalPointOpened(true)} aria-label="Adjust image position">
+                          <IconFocusCentered size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                    <Tooltip label="Delete image" withinPortal>
+                      <ActionIcon variant="filled" color="red.7" size="sm"
+                        style={{ position: 'absolute', top: 4, right: 4, zIndex: 2 }}
+                        onClick={() => handleDeleteImage(img)} aria-label="Delete image">
+                        <IconTrash size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Box>
+                );
+              })}
             </SimpleGrid>
           ) : (
             <Text size="sm" c="dimmed">No images yet.</Text>
+          )}
+          {coverImage && (
+            <ImageFocalPointModal
+              opened={focalPointOpened}
+              onClose={() => setFocalPointOpened(false)}
+              src={coverImage}
+              focalX={imageFocalX ?? 50}
+              focalY={imageFocalY ?? 50}
+              onChange={handleSetImageFocalPoint}
+            />
           )}
         </Box>
 
