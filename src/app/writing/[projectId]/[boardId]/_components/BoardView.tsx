@@ -35,7 +35,7 @@ import {
   createList, renameList, deleteList,
   createCard, updateCard, deleteCard, setBoardSpacing, setBoardBackground, getCardById,
   updateWritingSettings, setBoardWordGoal, getBoardActivityStamp,
-  setGroupNotes, setListNotes,
+  setGroupNotes, setListNotes, getOrCreateGroupNoteCard, getOrCreateListNoteCard,
 } from '../../../_actions/writing_actions';
 
 // Reads the latest updatedAt across a board's own row plus everything nested
@@ -76,6 +76,7 @@ export default function BoardView({
   catalog,
   wcSettings: initialWcSettings,
   themes,
+  stickyHeader: initialStickyHeader,
 }: {
   projectId: number;
   projectTitle: string;
@@ -88,6 +89,7 @@ export default function BoardView({
   catalog: LabelCatalog;
   wcSettings: WordCountSettings;
   themes: WritingTheme[];
+  stickyHeader: boolean;
 }) {
   const router = useRouter();
   const [groups, setGroups] = useState<BoardGroup[]>(initialGroups);
@@ -192,6 +194,31 @@ export default function BoardView({
     updateWritingSettings(patch);
   };
 
+  // Whether the header (project title + board tabs) stays pinned while
+  // scrolling. Optimistic local copy, same pattern as wcSettings above.
+  const [stickyHeader, setStickyHeader] = useState(initialStickyHeader);
+  const handleStickyHeader = (next: boolean) => {
+    setStickyHeader(next);
+    updateWritingSettings({ stickyBoardHeader: next });
+  };
+
+  // Measure the sticky header's real height (varies with word-count display,
+  // board-tab wrapping, etc.) and expose it as a CSS var so anything ELSE
+  // that sticks to the top of the same page scroll — the file-browser's tree/
+  // sidebar Panes, its editor toolbar — can offset below it instead of being
+  // covered by it. 0 when the header isn't sticky, so those keep their old
+  // top offset unchanged.
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el || !stickyHeader) { setHeaderHeight(0); return; }
+    const observer = new ResizeObserver(() => setHeaderHeight(el.offsetHeight));
+    observer.observe(el);
+    setHeaderHeight(el.offsetHeight);
+    return () => observer.disconnect();
+  }, [stickyHeader]);
+
   // Memoized: setGroups fires on every drag-over tick, and summing walks the
   // whole board tree — no need to redo it unless the tree actually changed.
   const boardWordCount = useMemo(() => sumBoardWords(groups), [groups]);
@@ -249,17 +276,33 @@ export default function BoardView({
   const onRenameList = useCallback(async (listId: number, title: string) => { await renameList(listId, title); router.refresh(); }, [router]);
   const onDeleteList = useCallback(async (listId: number) => { if (await confirmAction({ title: 'Delete list', message: 'Delete this list and its cards?' })) { await deleteList(listId); router.refresh(); } }, [router]);
   const onRenameCard = useCallback(async (cardId: number, title: string) => { await updateCard(cardId, { title }); router.refresh(); }, [router]);
-  const onGroupNotes = useCallback(async (groupId: number, notes: string | null) => { await setGroupNotes(groupId, notes); router.refresh(); }, [router]);
-  const onListNotes = useCallback(async (listId: number, notes: string | null) => { await setListNotes(listId, notes); router.refresh(); }, [router]);
+
+  // Read via a ref so id-keyed callbacks below (onGroupNotes/onOpenCardById/
+  // etc.) stay identity-stable while groups change mid-drag.
+  const groupsRef = useRef(groups);
+  useEffect(() => { groupsRef.current = groups; }, [groups]);
+
+  // Once a group/list's note has been promoted into a real "note card" (see
+  // onExpandGroupNote/onPeekGroupNote below), its content lives on that card
+  // instead of the plain notes column — route the quick popover's save there.
+  const onGroupNotes = useCallback(async (groupId: number, notes: string | null) => {
+    const noteCardId = groupsRef.current.find((g) => g.id === groupId)?.noteCard?.id;
+    if (noteCardId) await updateCard(noteCardId, { content: notes ?? '' });
+    else await setGroupNotes(groupId, notes);
+    router.refresh();
+  }, [router]);
+  const onListNotes = useCallback(async (listId: number, notes: string | null) => {
+    const noteCardId = groupsRef.current.flatMap((g) => g.lists).find((l) => l.id === listId)?.noteCard?.id;
+    if (noteCardId) await updateCard(noteCardId, { content: notes ?? '' });
+    else await setListNotes(listId, notes);
+    router.refresh();
+  }, [router]);
   const onDeleteCard = useCallback(async (cardId: number) => { if (await confirmAction({ title: 'Delete card', message: 'Delete this card?' })) { await deleteCard(cardId); router.refresh(); } }, [router]);
 
   const onOpenCard = useCallback((card: BoardCard) => { setEditingCard(card); openEditor(); }, [openEditor]);
 
-  // Open a card by ID — checks the current board first, falls back to a server
-  // fetch for linked cards that live on a different board. Reads groups via a
-  // ref so the callback stays identity-stable while groups change mid-drag.
-  const groupsRef = useRef(groups);
-  useEffect(() => { groupsRef.current = groups; }, [groups]);
+  // Open a card by ID — checks the current board first, falls back to a
+  // server fetch for linked cards that live on a different board.
   const onOpenCardById = useCallback(async (cardId: number) => {
     for (const g of groupsRef.current) {
       for (const l of g.lists) {
@@ -293,6 +336,33 @@ export default function BoardView({
     setPeekCards((prev) => prev.map((w) => (w.cardId === cardId ? { ...w, minimized: !w.minimized } : w)));
   }, []);
   const onReorderPeekCards = useCallback((next: PeekWindowState[]) => setPeekCards(next), []);
+
+  // Note-card promotion: getOrCreateGroupNoteCard/getOrCreateListNoteCard is
+  // idempotent (returns the existing note card if one's already there, else
+  // creates one seeded from the plain-text note) — so these can be called
+  // unconditionally from NotesPopover's "expand"/"peek" buttons regardless of
+  // whether this group/list already has one.
+  const onExpandGroupNote = useCallback(async (groupId: number) => {
+    const card = await getOrCreateGroupNoteCard(groupId);
+    if (card) onOpenCard(card as BoardCard);
+    router.refresh();
+  }, [onOpenCard, router]);
+  const onPeekGroupNote = useCallback(async (groupId: number) => {
+    const card = await getOrCreateGroupNoteCard(groupId);
+    if (card) onPeekCard(card.id);
+    router.refresh();
+  }, [onPeekCard, router]);
+  const onExpandListNote = useCallback(async (listId: number) => {
+    const card = await getOrCreateListNoteCard(listId);
+    if (card) onOpenCard(card as BoardCard);
+    router.refresh();
+  }, [onOpenCard, router]);
+  const onPeekListNote = useCallback(async (listId: number) => {
+    const card = await getOrCreateListNoteCard(listId);
+    if (card) onPeekCard(card.id);
+    router.refresh();
+  }, [onPeekCard, router]);
+
   const onPeekOpenFull = useCallback((card: BoardCard) => {
     setPeekCards((prev) => prev.filter((w) => w.cardId !== card.id));
     setEditingCard(card);
@@ -341,6 +411,11 @@ export default function BoardView({
   const hasThemeBoardBg = !!themeStyle['--theme-board-bg'];
   const bleed = !!boardBg || hasThemeBoardBg;
 
+  // See headerHeight above — read by stickyPaneStyle (Pane.tsx) and the
+  // editor's sticky toolbar (EditorToolbarBleed.module.css) so they offset
+  // below the sticky header instead of being covered by it.
+  const stickyHeaderVars = { '--sticky-header-h': `${stickyHeader ? headerHeight : 0}px` } as React.CSSProperties;
+
   return (
     <Box
       // The full-bleed background must cancel the Writing route's AppShell
@@ -374,6 +449,7 @@ export default function BoardView({
               // `color` and are unaffected.
               color: 'var(--theme-heading, inherit)',
               ...themeStyle,
+              ...stickyHeaderVars,
             }
           : {
               display: 'flow-root',
@@ -381,6 +457,7 @@ export default function BoardView({
               minHeight: hasThemeBoardBg ? '100vh' : undefined,
               color: 'var(--theme-heading, inherit)',
               ...themeStyle,
+              ...stickyHeaderVars,
             }
       }
     >
@@ -401,6 +478,24 @@ export default function BoardView({
           }}
         />
       )}
+      {/* Header + board tabs — optionally pinned (writing settings) so the
+          project title and board tabs stay visible while scrolling either the
+          Kanban board or the file-browser view below. Needs its own backdrop
+          once it's sticky so scrolled content doesn't show through behind it:
+          the frosted glass recipe over a photo, a flat themed bar otherwise. */}
+      <Box
+        ref={headerRef}
+        style={
+          stickyHeader
+            ? {
+                position: 'sticky',
+                top: 0,
+                zIndex: 100,
+                ...(boardBg ? glassStyle : { background: 'var(--theme-board-bg, var(--mantine-color-body))' }),
+              }
+            : undefined
+        }
+      >
       {/* Header */}
       <Group justify="space-between" mb="sm" mt={'10px'} wrap="nowrap">
         <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
@@ -473,6 +568,7 @@ export default function BoardView({
         onRemoveBackground={onRemoveBackground}
         onImportBoard={openImport}
       />
+      </Box>
 
       {/* Board body: groups + drag context (Kanban view) */}
       {viewMode === 'kanban' && (
@@ -522,6 +618,10 @@ export default function BoardView({
                 onDeleteList={onDeleteList}
                 onRenameGroup={onRenameGroup}
                 onDeleteGroup={onDeleteGroup}
+                onExpandGroupNote={onExpandGroupNote}
+                onPeekGroupNote={onPeekGroupNote}
+                onExpandListNote={onExpandListNote}
+                onPeekListNote={onPeekListNote}
                 themeVars={themeStyle}
                 smartQuotes={spacing.smartQuotes}
               />
@@ -573,6 +673,10 @@ export default function BoardView({
           onGroupNotes={onGroupNotes}
           onListNotes={onListNotes}
           onPeekCard={onPeekCard}
+          onExpandGroupNote={onExpandGroupNote}
+          onPeekGroupNote={onPeekGroupNote}
+          onExpandListNote={onExpandListNote}
+          onPeekListNote={onPeekListNote}
           themeVars={themeStyle}
           dnd={{ sensors, collisionDetection, activeDrag, onDragStart: handleDragStart, onDragOver: handleDragOver, onDragEnd: handleDragEnd }}
         />
@@ -591,6 +695,9 @@ export default function BoardView({
         themes={themes}
         activeThemeId={activeBoard?.themeId ?? null}
         onManageThemes={openThemes}
+        stickyHeader={stickyHeader}
+        onStickyHeader={handleStickyHeader}
+        themeVars={themeStyle}
       />
 
       <ManageThemesModal
@@ -640,6 +747,7 @@ export default function BoardView({
         catalog={catalog}
         opened={labelsOpened}
         onClose={closeLabels}
+        themeVars={themeStyle}
       />
 
       {/* Import a NEW board into this (existing) project. Defaults its target to

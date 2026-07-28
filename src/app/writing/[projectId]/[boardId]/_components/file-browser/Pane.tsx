@@ -9,8 +9,11 @@ import { glassStyle, glassTextStyle } from '../glass';
 // with the rest of the page.
 export const stickyPaneStyle: React.CSSProperties = {
   position: 'sticky',
-  top: 16,
-  maxHeight: 'calc(100vh - 32px)',
+  // Offset below the board's own sticky header (--sticky-header-h, set by
+  // BoardView; 0 when that header isn't sticky) so this pane sticks under it
+  // instead of being covered by it.
+  top: 'calc(var(--sticky-header-h, 0px) + 16px)',
+  maxHeight: 'calc(100vh - var(--sticky-header-h, 0px) - 32px)',
   overflowY: 'auto',
   // Without an explicit overflow-x, browsers auto-compute it to 'auto' too
   // (per spec, once one axis is non-visible) — any 1px horizontal overflow

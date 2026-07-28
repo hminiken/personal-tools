@@ -13,7 +13,7 @@ import CardItem, { CardFace } from './CardItem';
 import InlineAdd from './InlineAdd';
 import { WordCountDisplay, sumListWords, type WordCountSettings } from '@components/WordCountDisplay';
 import { promptWordGoal } from '@/utils/dialogs';
-import { setListWordGoal, setListNotes } from '../../../_actions/writing_actions';
+import { setListWordGoal, setListNotes, updateCard } from '../../../_actions/writing_actions';
 import NotesPopover from './NotesPopover';
 import { useInlineRename } from './useInlineRename';
 import type { BoardList, BoardCard, LabelCategory } from '../types';
@@ -25,6 +25,10 @@ type ListCallbacks = {
   onAddCard: (listId: number, title: string) => void;
   onRename: (listId: number, title: string) => void;
   onDelete: (listId: number) => void;
+  // Ensures a note card exists (promoting the list's plain-text note the
+  // first time), then opens it full or pops it into the peek dock.
+  onExpandListNote: (listId: number) => void;
+  onPeekListNote: (listId: number) => void;
 };
 
 // All of the list's visible chrome (header/menu/word-count, the card stack, the
@@ -50,6 +54,8 @@ const ListColumnInner = memo(function ListColumnInner({
   onAddCard,
   onRename,
   onDelete,
+  onExpandListNote,
+  onPeekListNote,
   themeVars,
   smartQuotes,
 }: {
@@ -123,7 +129,14 @@ const ListColumnInner = memo(function ListColumnInner({
 
         <NotesPopover
           notes={list.notes}
-          onSave={async (html) => { await setListNotes(list.id, html); router.refresh(); }}
+          noteCard={list.noteCard}
+          onSave={async (html) => {
+            if (list.noteCard) await updateCard(list.noteCard.id, { content: html ?? '' });
+            else await setListNotes(list.id, html);
+            router.refresh();
+          }}
+          onExpand={() => onExpandListNote(list.id)}
+          onPeek={() => onPeekListNote(list.id)}
           smartQuotes={smartQuotes}
           themeVars={themeVars}
         />
@@ -229,6 +242,8 @@ function ListColumn({
   onAddCard,
   onRename,
   onDelete,
+  onExpandListNote,
+  onPeekListNote,
   themeVars,
   smartQuotes,
 }: {
@@ -306,6 +321,8 @@ function ListColumn({
         onAddCard={onAddCard}
         onRename={onRename}
         onDelete={onDelete}
+        onExpandListNote={onExpandListNote}
+        onPeekListNote={onPeekListNote}
         themeVars={themeVars}
         smartQuotes={smartQuotes}
       />

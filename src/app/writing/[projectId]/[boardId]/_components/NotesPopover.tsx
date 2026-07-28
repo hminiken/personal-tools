@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { ActionIcon, Box, Group, Popover, Text, Tooltip } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconNotes, IconPencil, IconTrash } from '@tabler/icons-react';
+import { IconArrowsMaximize, IconNotes, IconPencil, IconPin, IconTrash } from '@tabler/icons-react';
 import CardNoteEditor from './CardNoteEditor';
 import { linkPreviewDropdownStyle } from './CardItem';
 import { sanitizePatternHtml } from '@/utils/sanitizeHtml';
+import type { BoardCard } from '../types';
 
 // Freeform note attached to a list or group as a whole — the same idea as a
 // card's note but a single blob rather than a dated thread (there's only ever
@@ -18,6 +19,9 @@ export default function NotesPopover({
   smartQuotes,
   light,
   themeVars,
+  noteCard,
+  onExpand,
+  onPeek,
 }: {
   notes: string | null | undefined;
   onSave: (html: string | null) => void;
@@ -30,8 +34,20 @@ export default function NotesPopover({
   // the vars have to be spread onto the portaled dropdown explicitly (see
   // linkPreviewDropdownStyle, used the same way by CardItem's link preview).
   themeVars?: Record<string, string>;
+  // Once this note has been "promoted" (see onExpand/onPeek below), its
+  // content lives on this real card instead of the plain `notes` column —
+  // the quick editor here reads/writes it as its source of truth from then on.
+  noteCard?: BoardCard | null;
+  // Ensures a note card exists (promoting the plain-text note the first time,
+  // same content carried over) then opens it in the full CardEditorModal —
+  // same layout as any card: images, labels, linked cards, comments.
+  onExpand?: () => void;
+  // Same promotion, but pops it into the bottom-right peek dock instead of
+  // the modal — the same "peek" a linked card gets.
+  onPeek?: () => void;
 }) {
-  const hasNotes = !!notes?.trim();
+  const effectiveContent = noteCard ? noteCard.content : notes;
+  const hasNotes = !!effectiveContent?.trim();
   const [opened, { close, toggle }] = useDisclosure(false);
   const [editing, setEditing] = useState(false);
 
@@ -47,6 +63,31 @@ export default function NotesPopover({
     close();
     setEditing(false);
   };
+
+  const handleExpand = () => { handleClose(); onExpand?.(); };
+  const handlePeek = () => { handleClose(); onPeek?.(); };
+
+  // Rendered into CardNoteEditor's own header row (opposite side from its
+  // Save/Cancel) so editing has one unified button row instead of two
+  // stacked ones with mismatched icon styles.
+  const promoteActions = (onExpand || onPeek) && (
+    <Group gap={4} wrap="nowrap">
+      {onExpand && (
+        <Tooltip label="Expand to full card" withinPortal>
+          <ActionIcon size="sm" color="gray" variant="light" onClick={handleExpand} aria-label="Expand to full card">
+            <IconArrowsMaximize size={13} />
+          </ActionIcon>
+        </Tooltip>
+      )}
+      {onPeek && (
+        <Tooltip label="Pop into dock" withinPortal>
+          <ActionIcon size="sm" color="gray" variant="light" onClick={handlePeek} aria-label="Pop into dock">
+            <IconPin size={13} />
+          </ActionIcon>
+        </Tooltip>
+      )}
+    </Group>
+  );
 
   return (
     <Popover
@@ -65,7 +106,16 @@ export default function NotesPopover({
             size="sm"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={handleOpen}
-            style={light ? { color: 'rgba(255,255,255,0.8)' } : undefined}
+            style={
+              light
+                ? { color: 'rgba(255,255,255,0.8)' }
+                : hasNotes
+                ? {
+                    color: 'var(--theme-accent, var(--mantine-color-yellow-6))',
+                    backgroundColor: 'color-mix(in srgb, var(--theme-accent, var(--mantine-color-yellow-6)) 15%, transparent)',
+                  }
+                : undefined
+            }
             aria-label="Notes"
           >
             <IconNotes size={16} />
@@ -85,14 +135,29 @@ export default function NotesPopover({
       >
         {editing ? (
           <CardNoteEditor
-            initialContent={notes ?? ''}
+            initialContent={effectiveContent ?? ''}
             onSave={(html) => { onSave(html); setEditing(false); }}
             onCancel={() => (hasNotes ? setEditing(false) : handleClose())}
             smartQuotes={smartQuotes}
+            leadingActions={promoteActions}
           />
         ) : (
           <Box>
             <Group justify="flex-end" gap={2} mb={2}>
+              {onExpand && (
+                <Tooltip label="Expand to full card" withinPortal>
+                  <ActionIcon size="xs" color="gray" variant="subtle" onClick={handleExpand} aria-label="Expand to full card">
+                    <IconArrowsMaximize size={12} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+              {onPeek && (
+                <Tooltip label="Pop into dock" withinPortal>
+                  <ActionIcon size="xs" color="gray" variant="subtle" onClick={handlePeek} aria-label="Pop into dock">
+                    <IconPin size={12} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
               <Tooltip label="Edit notes" withinPortal>
                 <ActionIcon size="xs" color="gray" variant="subtle" onClick={() => setEditing(true)} aria-label="Edit notes">
                   <IconPencil size={12} />
@@ -107,7 +172,7 @@ export default function NotesPopover({
             {hasNotes ? (
               <Box
                 style={{ fontSize: 'var(--mantine-font-size-sm)', color: 'var(--theme-card-text, var(--mantine-color-text))' }}
-                dangerouslySetInnerHTML={{ __html: sanitizePatternHtml(notes) ?? '' }}
+                dangerouslySetInnerHTML={{ __html: sanitizePatternHtml(effectiveContent) ?? '' }}
               />
             ) : (
               <Text size="sm" style={{ color: 'var(--theme-card-muted-text, var(--mantine-color-dimmed))' }}>No notes yet.</Text>

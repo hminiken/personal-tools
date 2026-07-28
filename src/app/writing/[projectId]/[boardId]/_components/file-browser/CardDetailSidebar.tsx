@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import {
   ActionIcon, Badge, Box, Button, Collapse, Combobox, Group, HoverCard, Image, Paper,
-  ScrollArea, SimpleGrid, Stack, Switch, Text, Tooltip, useCombobox,
+  Popover, ScrollArea, SimpleGrid, Stack, Switch, Text, Tooltip, useCombobox,
 } from '@mantine/core';
 import {
-  IconChevronDown, IconChevronUp, IconFocusCentered, IconLink,
+  IconAdjustments, IconChevronDown, IconChevronUp, IconFocusCentered, IconLink,
   IconMessage, IconPalette, IconPencil, IconPhotoPlus, IconPhotoStar, IconPlus, IconTrash, IconX,
 } from '@tabler/icons-react';
 import { WordCountDisplay, type WordCountSettings } from '@components/WordCountDisplay';
@@ -90,6 +90,7 @@ export default function CardDetailSidebar({
   wcSettings,
   onPeekCard,
   spacing,
+  themeVars,
 }: {
   detail: CardSidebarController;
   catalog: LabelCatalog;
@@ -99,6 +100,11 @@ export default function CardDetailSidebar({
   // navigating this view away from what's currently open.
   onPeekCard: (cardId: number) => void;
   spacing: Spacing;
+  // This sidebar's popovers/comboboxes portal to document.body (withinPortal),
+  // which breaks out of the board wrapper's CSS cascade — the active board
+  // theme's --theme-* vars have to be spread onto each portaled dropdown
+  // explicitly (see NotesPopover).
+  themeVars?: Record<string, string>;
 }) {
   const { viewingCard } = detail;
 
@@ -108,6 +114,7 @@ export default function CardDetailSidebar({
   });
   const [galleryOpened, setGalleryOpened] = useState(false);
   const [focalPointOpened, setFocalPointOpened] = useState(false);
+  const [settingsOpened, setSettingsOpened] = useState(false);
   const viewer = useImageViewer(detail.images.length);
   const [addingNote, setAddingNote] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -149,42 +156,58 @@ export default function CardDetailSidebar({
         <Text fw={700} lineClamp={2}>{viewingCard.title || 'Untitled'}</Text>
       </Box>
 
-      <LabelPicker key={viewingCard.id} card={viewingCard} catalog={catalog} onManage={onManageLabels} inline>
-        <Stack gap={6} mt={6}>
-          <Tooltip label="When off, this card is skipped in the compiled chapter/board view." withinPortal multiline w={220} position="top-start">
-            <Switch label="Include in compile" checked={detail.includeInCompile} onChange={(e) => detail.handleToggleCompile(e.currentTarget.checked)} color="dark" w="fit-content" />
-          </Tooltip>
-          <Tooltip label="Show an image on the board instead of the title and text." withinPortal multiline w={220} position="top-start">
-            <Switch label="Image card" checked={detail.isImageCard} onChange={(e) => detail.handleToggleImageCard(e.currentTarget.checked)} color="dark" w="fit-content" />
-          </Tooltip>
-          <Tooltip label="A character sheet: image gallery plus a rail of named fields (background, appearance, etc). Excluded from compile by default." withinPortal multiline w={220} position="top-start">
-            <Switch label="Character card" checked={detail.isCharacterCard} onChange={(e) => detail.handleToggleCharacterCard(e.currentTarget.checked)} color="dark" w="fit-content" />
-          </Tooltip>
-          <Tooltip label="Leave this card out of word tracking: it won't show a count anywhere, and its words won't count toward any total." withinPortal multiline w={220} position="top-start">
-            <Switch label="Disable word count" checked={detail.hideWordCount} onChange={(e) => detail.handleToggleHideWordCount(e.currentTarget.checked)} color="dark" w="fit-content" />
-          </Tooltip>
-        </Stack>
+      <LabelPicker key={viewingCard.id} card={viewingCard} catalog={catalog} onManage={onManageLabels} inline themeVars={themeVars}>
+        {/* Card color lives on the labels row — explicit color overrides any label-driven color */}
+        <Group gap="xs" align="center" wrap="nowrap">
+          <IconPalette size={16} color="var(--mantine-color-dimmed)" />
+          <Text size="sm">Card color</Text>
+          <ColorPicker value={(detail.color ?? detail.labelColor) ?? 'transparent'} onChange={detail.handleColorChange} size={22} />
+          {detail.color ? (
+            <Button variant="subtle" size="compact-xs" color="gray" onClick={() => detail.handleColorChange(null)}>
+              {detail.labelColor ? 'Use label color' : 'Clear'}
+            </Button>
+          ) : detail.labelColor ? (
+            <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+              From label{detail.drivingLabel ? ` “${detail.drivingLabel.name}”` : ''}
+            </Text>
+          ) : null}
+        </Group>
+
+        {/* Card settings — tucked behind a dropdown so this row stays scannable */}
+        <Popover position="bottom-start" withinPortal shadow="md" width={260} opened={settingsOpened} onChange={setSettingsOpened}>
+          <Popover.Target>
+            <Button
+              size="compact-xs"
+              variant="light"
+              color="gray"
+              leftSection={<IconAdjustments size={14} />}
+              onClick={() => setSettingsOpened((o) => !o)}
+            >
+              Card settings
+            </Button>
+          </Popover.Target>
+          <Popover.Dropdown style={{ ...themeVars, backgroundColor: 'var(--theme-group-bg, var(--theme-list-bg, var(--mantine-color-body)))', color: 'var(--theme-heading, inherit)' }}>
+            <Stack gap="xs">
+              <Tooltip label="When off, this card is skipped in the compiled chapter/board view." withinPortal multiline w={220} position="top-start">
+                <Switch label="Include in compile" checked={detail.includeInCompile} onChange={(e) => detail.handleToggleCompile(e.currentTarget.checked)} color="dark" w="fit-content" />
+              </Tooltip>
+              <Tooltip label="Show an image on the board instead of the title and text." withinPortal multiline w={220} position="top-start">
+                <Switch label="Image card" checked={detail.isImageCard} onChange={(e) => detail.handleToggleImageCard(e.currentTarget.checked)} color="dark" w="fit-content" />
+              </Tooltip>
+              <Tooltip label="A character sheet: image gallery plus a rail of named fields (background, appearance, etc). Excluded from compile by default." withinPortal multiline w={220} position="top-start">
+                <Switch label="Character card" checked={detail.isCharacterCard} onChange={(e) => detail.handleToggleCharacterCard(e.currentTarget.checked)} color="dark" w="fit-content" />
+              </Tooltip>
+              <Tooltip label="Leave this card out of word tracking: it won't show a count anywhere, and its words won't count toward any total." withinPortal multiline w={220} position="top-start">
+                <Switch label="Disable word count" checked={detail.hideWordCount} onChange={(e) => detail.handleToggleHideWordCount(e.currentTarget.checked)} color="dark" w="fit-content" />
+              </Tooltip>
+            </Stack>
+          </Popover.Dropdown>
+        </Popover>
       </LabelPicker>
 
       {detail.isCharacterCard && (
         <CharacterFieldsPanel key={viewingCard.id} fields={detail.characterFields} onChange={detail.handleCharacterFieldsChange} spacing={spacing} />
       )}
-
-      {/* Card color — explicit color overrides any label-driven color */}
-      <Group gap="xs" align="center">
-        <IconPalette size={16} color="var(--mantine-color-dimmed)" />
-        <Text size="sm">Card color</Text>
-        <ColorPicker value={(detail.color ?? detail.labelColor) ?? 'transparent'} onChange={detail.handleColorChange} size={22} />
-        {detail.color ? (
-          <Button variant="subtle" size="compact-xs" color="gray" onClick={() => detail.handleColorChange(null)}>
-            {detail.labelColor ? 'Use label color' : 'Clear'}
-          </Button>
-        ) : detail.labelColor ? (
-          <Text size="xs" c="dimmed">
-            From label{detail.drivingLabel ? ` “${detail.drivingLabel.name}”` : ''}
-          </Text>
-        ) : null}
-      </Group>
 
       {/* Images */}
       <Box>
@@ -284,7 +307,7 @@ export default function CardDetailSidebar({
                   {link.title}
                 </Badge>
               </HoverCard.Target>
-              <HoverCard.Dropdown p={0} style={linkPreviewDropdownStyle}>
+              <HoverCard.Dropdown p={0} style={{ ...themeVars, ...linkPreviewDropdownStyle }}>
                 <LinkedCardPreview link={link} hint="Click to preview · ctrl/right-click to open" />
               </HoverCard.Dropdown>
             </HoverCard>
@@ -298,7 +321,7 @@ export default function CardDetailSidebar({
                 </ActionIcon>
               </Tooltip>
             </Combobox.Target>
-            <Combobox.Dropdown style={{ minWidth: 260 }}>
+            <Combobox.Dropdown style={{ ...themeVars, minWidth: 260, backgroundColor: 'var(--theme-group-bg, var(--theme-list-bg, var(--mantine-color-body)))', color: 'var(--theme-heading, inherit)' }}>
               <Combobox.Search value={pickerSearch} onChange={(e) => setPickerSearch(e.currentTarget.value)} placeholder="Search cards…" />
               <Combobox.Options>
                 <ScrollArea.Autosize mah={240} type="scroll">

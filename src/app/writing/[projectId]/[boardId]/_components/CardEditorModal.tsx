@@ -558,7 +558,7 @@ export default function CardEditorModal({
       <Group align="flex-start" wrap="nowrap" gap="lg">
       <Stack gap="sm" style={{ flex: 1, minWidth: 0 }}>
         {viewingCard && (
-          <LabelPicker key={viewingCard.id} card={viewingCard} catalog={catalog} onManage={onManageLabels} inline>
+          <LabelPicker key={viewingCard.id} card={viewingCard} catalog={catalog} onManage={onManageLabels} inline themeVars={themeVars}>
             {/* Card color lives on the labels row — explicit color overrides any label-driven color */}
             <Group gap="xs" align="center" wrap="nowrap">
               <IconPalette size={16} color="var(--mantine-color-dimmed)" />
@@ -666,7 +666,7 @@ export default function CardEditorModal({
                   </ActionIcon>
                 </Tooltip>
               </Combobox.Target>
-              <Combobox.Dropdown style={{ minWidth: 280 }}>
+              <Combobox.Dropdown style={{ ...themeVars, minWidth: 280, backgroundColor: 'var(--theme-group-bg, var(--theme-list-bg, var(--mantine-color-body)))', color: 'var(--theme-heading, inherit)' }}>
                 <Combobox.Search
                   value={pickerSearch}
                   onChange={(e) => setPickerSearch(e.currentTarget.value)}

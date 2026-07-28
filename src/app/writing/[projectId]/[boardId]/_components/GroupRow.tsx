@@ -6,7 +6,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { IconGripVertical, IconDots, IconPencil, IconTrash, IconBook2, IconPhoto, IconPhotoOff } from '@tabler/icons-react';
 import { useParams, useRouter } from 'next/navigation';
 import UnsplashPicker from '@components/UnsplashPicker';
-import { setGroupBackground } from '../../../_actions/writing_actions';
+import { setGroupBackground, updateCard } from '../../../_actions/writing_actions';
 import { useSortable } from '@dnd-kit/sortable';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { useDroppable, type DraggableSyntheticListeners } from '@dnd-kit/core';
@@ -31,6 +31,12 @@ type GroupCallbacks = {
   onDeleteList: (listId: number) => void;
   onRenameGroup: (groupId: number, title: string) => void;
   onDeleteGroup: (groupId: number) => void;
+  // Ensures a note card exists (promoting the group/list's plain-text note
+  // the first time), then opens it full or pops it into the peek dock.
+  onExpandGroupNote: (groupId: number) => void;
+  onPeekGroupNote: (groupId: number) => void;
+  onExpandListNote: (listId: number) => void;
+  onPeekListNote: (listId: number) => void;
 };
 
 // All of the group's visible chrome (header/menu/word-count, the horizontally
@@ -59,6 +65,10 @@ const GroupRowInner = memo(function GroupRowInner({
   onDeleteList,
   onRenameGroup,
   onDeleteGroup,
+  onExpandGroupNote,
+  onPeekGroupNote,
+  onExpandListNote,
+  onPeekListNote,
   themeVars,
   smartQuotes,
 }: {
@@ -186,7 +196,14 @@ const GroupRowInner = memo(function GroupRowInner({
 
         <NotesPopover
           notes={group.notes}
-          onSave={async (html) => { await setGroupNotes(group.id, html); router.refresh(); }}
+          noteCard={group.noteCard}
+          onSave={async (html) => {
+            if (group.noteCard) await updateCard(group.noteCard.id, { content: html ?? '' });
+            else await setGroupNotes(group.id, html);
+            router.refresh();
+          }}
+          onExpand={() => onExpandGroupNote(group.id)}
+          onPeek={() => onPeekGroupNote(group.id)}
           smartQuotes={smartQuotes}
           light={hasBg}
           themeVars={themeVars}
@@ -254,6 +271,8 @@ const GroupRowInner = memo(function GroupRowInner({
                   onAddCard={onAddCard}
                   onRename={onRenameList}
                   onDelete={onDeleteList}
+                  onExpandListNote={onExpandListNote}
+                  onPeekListNote={onPeekListNote}
                   themeVars={themeVars}
                   smartQuotes={smartQuotes}
                 />
@@ -332,6 +351,10 @@ function GroupRow({
   onDeleteList,
   onRenameGroup,
   onDeleteGroup,
+  onExpandGroupNote,
+  onPeekGroupNote,
+  onExpandListNote,
+  onPeekListNote,
   themeVars,
   smartQuotes,
 }: {
@@ -428,6 +451,10 @@ function GroupRow({
         onDeleteList={onDeleteList}
         onRenameGroup={onRenameGroup}
         onDeleteGroup={onDeleteGroup}
+        onExpandGroupNote={onExpandGroupNote}
+        onPeekGroupNote={onPeekGroupNote}
+        onExpandListNote={onExpandListNote}
+        onPeekListNote={onPeekListNote}
         themeVars={themeVars}
         smartQuotes={smartQuotes}
       />

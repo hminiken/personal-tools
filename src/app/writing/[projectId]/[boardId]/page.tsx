@@ -4,7 +4,7 @@ import { writingProjects, boards, groups, lists, cards, cardImages, labels, labe
 import { eq, desc, inArray, or, and, sql } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import BoardView from './_components/BoardView';
-import { getWritingSettings, listThemes } from '../../_actions/writing_actions';
+import { getWritingSettings, listThemes, getCardById } from '../../_actions/writing_actions';
 import { decodeHtmlEntities } from '@/utils/htmlEntities';
 import type { BoardGroup, LabelCatalog } from './types';
 
@@ -55,6 +55,27 @@ export default async function BoardPage({ params }: PageProps) {
   const boardCards = listIds.length
     ? await writingDb.select().from(cards).where(inArray(cards.listId, listIds)).orderBy(cards.position).all()
     : [];
+
+  // Group/list "note cards" — a note promoted into a full card (images,
+  // labels, links, comments; see getOrCreateGroupNoteCard/getOrCreateListNoteCard).
+  // Most groups/lists have none, so this is usually a couple of ids at most.
+  const ownerConditions = [
+    ...(groupIds.length ? [inArray(cards.ownerGroupId, groupIds)] : []),
+    ...(listIds.length ? [inArray(cards.ownerListId, listIds)] : []),
+  ];
+  const noteCardIdRows = ownerConditions.length
+    ? await writingDb
+        .select({ id: cards.id, ownerGroupId: cards.ownerGroupId, ownerListId: cards.ownerListId })
+        .from(cards)
+        .where(or(...ownerConditions))
+        .all()
+    : [];
+  const noteCards = noteCardIdRows.length
+    ? (await Promise.all(noteCardIdRows.map((r) => getCardById(r.id)))).filter((c): c is NonNullable<typeof c> => c != null)
+    : [];
+  const noteCardByGroupId = new Map(noteCardIdRows.filter((r) => r.ownerGroupId != null).map((r) => [r.ownerGroupId as number, r.id]));
+  const noteCardByListId = new Map(noteCardIdRows.filter((r) => r.ownerListId != null).map((r) => [r.ownerListId as number, r.id]));
+  const noteCardById = new Map(noteCards.map((c) => [c.id, c]));
 
   // Project-wide label catalog (categories + labels), used by pickers/manager.
   const projectCategories = await writingDb
@@ -209,10 +230,18 @@ export default async function BoardPage({ params }: PageProps) {
   // Nest into the shape the board UI consumes.
   const tree: BoardGroup[] = boardGroups.map((g) => ({
     ...g,
+    noteCard: (() => {
+      const id = noteCardByGroupId.get(g.id);
+      return id != null ? noteCardById.get(id) ?? null : null;
+    })(),
     lists: boardLists
       .filter((l) => l.groupId === g.id)
       .map((l) => ({
         ...l,
+        noteCard: (() => {
+          const id = noteCardByListId.get(l.id);
+          return id != null ? noteCardById.get(id) ?? null : null;
+        })(),
         cards: boardCards
           .filter((c) => c.listId === l.id)
           .map((c) => ({ ...c, labels: labelsByCard.get(c.id) ?? [], images: imagesByCard.get(c.id) ?? [], links: linksByCard.get(c.id) ?? [] })),
@@ -238,6 +267,7 @@ export default async function BoardPage({ params }: PageProps) {
         defaultListGoal: settings.defaultListWordGoal,
         defaultGroupGoal: settings.defaultGroupWordGoal,
       }}
+      stickyHeader={settings.stickyBoardHeader}
     />
   );
 }

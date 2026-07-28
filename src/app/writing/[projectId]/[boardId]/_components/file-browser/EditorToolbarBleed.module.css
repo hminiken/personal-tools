@@ -6,7 +6,10 @@
    identically. Opaque so scrolled prose never shows through it. */
 .stickyToolbar {
   position: sticky;
-  top: 0;
+  /* Offset below the board's own sticky header (--sticky-header-h, set by
+     BoardView; 0 when that header isn't sticky) so this toolbar sticks under
+     it instead of being covered by it. */
+  top: var(--sticky-header-h, 0px);
   z-index: 5;
   margin: calc(var(--mantine-spacing-sm) * -1) calc(var(--mantine-spacing-sm) * -1) 0;
   padding: 4px var(--mantine-spacing-sm) 2px;

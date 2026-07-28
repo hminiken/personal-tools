@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import {
-  Accordion, ActionIcon, Button, Divider, Drawer, Group, NumberInput, SegmentedControl, Select, Stack, Text,
+  Accordion, ActionIcon, Button, Divider, Drawer, Group, NumberInput, SegmentedControl, Select, Stack, Switch, Text,
   useMantineColorScheme, useComputedColorScheme,
 } from '@mantine/core';
 import { IconBook2, IconFileExport, IconMoon, IconSun, IconTags, IconPalette } from '@tabler/icons-react';
@@ -31,6 +31,9 @@ export default function BoardSettingsDrawer({
   themes,
   activeThemeId,
   onManageThemes,
+  stickyHeader,
+  onStickyHeader,
+  themeVars,
 }: {
   opened: boolean;
   onClose: () => void;
@@ -49,6 +52,14 @@ export default function BoardSettingsDrawer({
   themes: WritingTheme[];
   activeThemeId: number | null;
   onManageThemes: () => void;
+  // Pins the project title + board tabs while scrolling either the Kanban
+  // board or the file-browser view — a global preference, same as word count.
+  stickyHeader: boolean;
+  onStickyHeader: (next: boolean) => void;
+  // The active board's --theme-* vars — this drawer is portaled outside
+  // BoardView's themed wrapper (see CardEditorModal for the same pattern),
+  // so they have to be applied explicitly instead of inherited.
+  themeVars?: Record<string, string>;
 }) {
   const { setColorScheme } = useMantineColorScheme();
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
@@ -74,6 +85,17 @@ export default function BoardSettingsDrawer({
       title="Board settings"
       size="sm"
       padding="md"
+      styles={{
+        content: {
+          ...themeVars,
+          backgroundColor: 'var(--theme-group-bg, var(--theme-list-bg, var(--mantine-color-body)))',
+          color: 'var(--theme-heading, inherit)',
+        },
+        header: {
+          backgroundColor: 'var(--theme-group-bg, var(--theme-list-bg, var(--mantine-color-body)))',
+          color: 'var(--theme-heading, inherit)',
+        },
+      }}
     >
       <Stack gap="lg">
         {/* Collapsible settings sections — all open by default so nothing is
@@ -106,6 +128,14 @@ export default function BoardSettingsDrawer({
                   <IconSun stroke={1.5} className="mantine-light-hidden" />
                   <IconMoon stroke={1.5} className="mantine-dark-hidden" />
                 </ActionIcon>
+              </Group>
+              <Group justify="space-between" mt="sm">
+                <Text size="sm">Sticky board header</Text>
+                <Switch
+                  checked={stickyHeader}
+                  onChange={(e) => onStickyHeader(e.currentTarget.checked)}
+                  aria-label="Keep the project title and board tabs pinned while scrolling"
+                />
               </Group>
             </Accordion.Panel>
           </Accordion.Item>

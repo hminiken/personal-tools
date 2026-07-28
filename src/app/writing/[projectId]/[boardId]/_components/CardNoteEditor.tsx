@@ -20,11 +20,16 @@ export default function CardNoteEditor({
   onCancel,
   smartQuotes,
   initialContent,
+  leadingActions,
 }: {
   onSave: (html: string) => void;
   onCancel: () => void;
   smartQuotes?: boolean | null;
   initialContent?: string;
+  // Extra actions (e.g. NotesPopover's "expand to full card"/"peek in dock")
+  // rendered in the same header row as Save/Cancel, pinned to the opposite
+  // (left) side — one unified row instead of two stacked ones.
+  leadingActions?: React.ReactNode;
 }) {
   const editor = useWritingEditor(initialContent ?? '', true, { smartQuotes });
   const [isEmpty, setIsEmpty] = useState(!initialContent?.trim());
@@ -63,17 +68,20 @@ export default function CardNoteEditor({
 
   return (
     <Box>
-      <Group justify="flex-end" gap={4} mb={2}>
-        <Tooltip label="Save note" withinPortal>
-          <ActionIcon size="sm" color="dark.6" variant="filled" onClick={handleSave} disabled={isEmpty} aria-label="Save note">
-            <IconCheck size={13} />
-          </ActionIcon>
-        </Tooltip>
-        <Tooltip label="Cancel" withinPortal>
-          <ActionIcon size="sm" color="dark.6" variant="filled" onClick={onCancel} aria-label="Cancel note">
-            <IconX size={13} />
-          </ActionIcon>
-        </Tooltip>
+      <Group justify={leadingActions ? 'space-between' : 'flex-end'} gap={4} mb={2} wrap="nowrap">
+        {leadingActions}
+        <Group gap={4} wrap="nowrap">
+          <Tooltip label="Save note" withinPortal>
+            <ActionIcon size="sm" color="dark.6" variant="filled" onClick={handleSave} disabled={isEmpty} aria-label="Save note">
+              <IconCheck size={13} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Cancel" withinPortal>
+            <ActionIcon size="sm" color="dark.6" variant="filled" onClick={onCancel} aria-label="Cancel note">
+              <IconX size={13} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
       </Group>
       <RichTextEditor
         editor={editor}

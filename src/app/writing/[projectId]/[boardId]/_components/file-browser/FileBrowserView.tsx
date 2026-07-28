@@ -14,6 +14,7 @@ import CardDetailCenter from './CardDetailCenter';
 import CardDetailSidebar from './CardDetailSidebar';
 import StackCompileView, { type CompileSection } from './StackCompileView';
 import Pane, { stickyPaneStyle } from './Pane';
+import CardSidebarPane from './CardSidebarPane';
 
 function EmptyCenterState() {
   return (
@@ -45,6 +46,10 @@ export default function FileBrowserView({
   onGroupNotes,
   onListNotes,
   onPeekCard,
+  onExpandGroupNote,
+  onPeekGroupNote,
+  onExpandListNote,
+  onPeekListNote,
   themeVars,
   dnd,
 }: {
@@ -68,12 +73,19 @@ export default function FileBrowserView({
   onGroupNotes: (groupId: number, notes: string | null) => void | Promise<void>;
   onListNotes: (listId: number, notes: string | null) => void | Promise<void>;
   onPeekCard: (cardId: number) => void;
+  onExpandGroupNote: (groupId: number) => void;
+  onPeekGroupNote: (groupId: number) => void;
+  onExpandListNote: (listId: number) => void;
+  onPeekListNote: (listId: number) => void;
   themeVars?: Record<string, string>;
   dnd: TreeDnd;
 }) {
   const router = useRouter();
   const [selection, setSelection] = useState<FileBrowserSelection>(null);
   const [treeCollapsed, setTreeCollapsed] = useState(false);
+  // "Focus mode" is just this collapsed alongside treeCollapsed — no separate
+  // toggle, so either rail can be hidden independently of the other.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const selectedCard = selection?.type === 'card' ? findCardInGroups(groups, selection.cardId) : null;
 
@@ -120,7 +132,7 @@ export default function FileBrowserView({
     <Box
       style={{
         display: 'grid',
-        gridTemplateColumns: `${treeCollapsed ? 40 : 260}px minmax(0, 1fr) 300px`,
+        gridTemplateColumns: `${treeCollapsed ? 40 : 260}px minmax(0, 1fr) ${sidebarCollapsed ? 40 : 300}px`,
         gap: 16,
         alignItems: 'start',
       }}
@@ -176,6 +188,10 @@ export default function FileBrowserView({
               onGroupNotes={onGroupNotes}
               onListNotes={onListNotes}
               onPeekCard={onPeekCard}
+              onExpandGroupNote={onExpandGroupNote}
+              onPeekGroupNote={onPeekGroupNote}
+              onExpandListNote={onExpandListNote}
+              onPeekListNote={onPeekListNote}
               themeVars={themeVars}
               smartQuotes={spacing.smartQuotes}
               dnd={dnd}
@@ -189,9 +205,9 @@ export default function FileBrowserView({
           <Pane hasBg={hasBg} solid>
             <CardDetailCenter detail={detail} spacing={spacing} />
           </Pane>
-          <Pane hasBg={hasBg} style={stickyPaneStyle}>
-            <CardDetailSidebar detail={detail} catalog={catalog} onManageLabels={onManageLabels} wcSettings={wcSettings} onPeekCard={onPeekCard} spacing={spacing} />
-          </Pane>
+          <CardSidebarPane hasBg={hasBg} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((v) => !v)}>
+            <CardDetailSidebar detail={detail} catalog={catalog} onManageLabels={onManageLabels} wcSettings={wcSettings} onPeekCard={onPeekCard} spacing={spacing} themeVars={themeVars} />
+          </CardSidebarPane>
         </>
       ) : sections ? (
         // Renders its own two grid columns (main pane + focused-card sidebar).
@@ -207,6 +223,9 @@ export default function FileBrowserView({
           onManageLabels={onManageLabels}
           onNavigateToCard={(cardId) => select({ type: 'card', cardId })}
           onPeekCard={onPeekCard}
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
+          themeVars={themeVars}
         />
       ) : (
         <>

@@ -17,6 +17,7 @@ export default function LabelPicker({
   catalog,
   onManage,
   inline = false,
+  themeVars,
   children,
 }: {
   card: BoardCard;
@@ -25,6 +26,10 @@ export default function LabelPicker({
   // When inline: the trigger sits on a controls row (alongside any `children`,
   // e.g. the card switches) and the applied chips drop to their own row below.
   inline?: boolean;
+  // This popover portals to document.body (withinPortal), which breaks out of
+  // the board wrapper's CSS cascade — the active board theme's --theme-* vars
+  // have to be spread onto the portaled dropdown explicitly (see NotesPopover).
+  themeVars?: Record<string, string>;
   children?: React.ReactNode;
 }) {
   const [applied, setApplied] = useState<Label[]>(card.labels);
@@ -78,7 +83,10 @@ export default function LabelPicker({
           {inline ? 'Add / edit labels' : 'Add / edit'}
         </Button>
       </Popover.Target>
-      <Popover.Dropdown p="xs">
+      <Popover.Dropdown
+        p="xs"
+        style={{ ...themeVars, backgroundColor: 'var(--theme-group-bg, var(--theme-list-bg, var(--mantine-color-body)))', color: 'var(--theme-heading, inherit)' }}
+      >
             <ScrollArea.Autosize mah={320}>
               <Stack gap="xs">
                 {catalog.labels.length === 0 && (

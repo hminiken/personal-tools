@@ -123,11 +123,16 @@ export default function ManageLabelsModal({
   catalog,
   opened,
   onClose,
+  themeVars,
 }: {
   projectId: number;
   catalog: LabelCatalog;
   opened: boolean;
   onClose: () => void;
+  // The active board's --theme-* vars (see CardEditorModal, which this modal
+  // is commonly opened from) — labels are project-wide, not board-specific,
+  // so this just borrows whichever board's theme was on screen when opened.
+  themeVars?: Record<string, string>;
 }) {
   const router = useRouter();
   const refresh = () => router.refresh();
@@ -169,7 +174,29 @@ export default function ManageLabelsModal({
   };
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Manage labels" size="lg" centered>
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title="Manage labels"
+      size="lg"
+      centered
+      // Opened from on top of the card editor modal (both default to the same
+      // z-index, which left DOM order deciding the winner) — bump this one
+      // explicitly so it always wins over CardEditorModal instead of hiding
+      // behind it.
+      zIndex={300}
+      styles={{
+        content: {
+          ...themeVars,
+          backgroundColor: 'var(--theme-group-bg, var(--theme-list-bg, var(--mantine-color-body)))',
+          color: 'var(--theme-heading, inherit)',
+        },
+        header: {
+          backgroundColor: 'var(--theme-group-bg, var(--theme-list-bg, var(--mantine-color-body)))',
+          color: 'var(--theme-heading, inherit)',
+        },
+      }}
+    >
       <Stack gap="md">
         {/* Category chooser + new-category toggle */}
         <Group gap="xs" align="flex-end" wrap="nowrap">

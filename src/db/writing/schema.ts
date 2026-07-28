@@ -48,6 +48,9 @@ export const writingSettings = sqliteTable('writing_settings', {
   defaultCardWordGoal: integer('default_card_word_goal'),
   defaultListWordGoal: integer('default_list_word_goal'),
   defaultGroupWordGoal: integer('default_group_word_goal'),
+  // Whether the board header (project title + board tabs) stays pinned while
+  // scrolling a board, in both Kanban and file-browser view. On by default.
+  stickyBoardHeader: integer('sticky_board_header', { mode: 'boolean' }).notNull().default(true),
 
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
@@ -192,10 +195,21 @@ export const lists = sqliteTable('lists', {
 // ==========================================
 export const cards = sqliteTable('cards', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  listId: integer('list_id').notNull().references(() => lists.id, { onDelete: 'cascade' }),
+  // Null for a "note card" (see ownerGroupId/ownerListId below) — those don't
+  // sit in any kanban list, so they're automatically invisible to every query
+  // that fetches cards by listId (the board itself, compile, word totals).
+  listId: integer('list_id').references(() => lists.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   content: text('content'), // TipTap HTML
   position: real('position').notNull().default(0),
+
+  // Set (mutually exclusively with each other and with listId) when this row
+  // is a group's or list's own "note card" — the full-card view a group/list
+  // note can optionally be promoted into (images, labels, linked cards,
+  // comments; same CardEditorModal as a real card, just not filed in a list).
+  // A unique index caps each group/list at one note card.
+  ownerGroupId: integer('owner_group_id').references(() => groups.id, { onDelete: 'cascade' }),
+  ownerListId: integer('owner_list_id').references(() => lists.id, { onDelete: 'cascade' }),
 
   // An "image card" shows its image (and labels) on the board instead of the
   // title/text preview. `imagePath` points at an uploaded /uploads/*.webp file.
@@ -248,7 +262,10 @@ export const cards = sqliteTable('cards', {
 
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).$onUpdateFn(() => new Date()).notNull(),
-});
+}, (t) => ({
+  ownerGroupUniq: uniqueIndex('cards_owner_group_uniq').on(t.ownerGroupId),
+  ownerListUniq: uniqueIndex('cards_owner_list_uniq').on(t.ownerListId),
+}));
 
 // ==========================================
 // 5b. CARD IMAGES  (gallery: a card may hold many reference photos)

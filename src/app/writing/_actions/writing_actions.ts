@@ -506,6 +506,55 @@ export async function setListNotes(listId: number, notes: string | null) {
   revalidateBoards();
 }
 
+// ==========================================
+// GROUP / LIST "NOTE CARDS"
+// ==========================================
+// A list/group's plain-text `notes` can be promoted into a real card — same
+// shape as any board card (images, labels, linked cards, comments), just
+// owned via ownerGroupId/ownerListId instead of filed under a list (see
+// schema.ts's cards table). Lazily created the first time the user expands a
+// note into the full-card view or pops it into the peek dock; the legacy
+// `notes` column is cleared at that point since the card's own `content`
+// becomes the source of truth going forward (the quick popover switches to
+// reading/writing the note card once one exists).
+export async function getOrCreateGroupNoteCard(groupId: number) {
+  const existing = await writingDb.select({ id: cards.id }).from(cards).where(eq(cards.ownerGroupId, groupId)).get();
+  if (existing) return getCardById(existing.id);
+
+  const group = await writingDb.select({ title: groups.title, notes: groups.notes }).from(groups).where(eq(groups.id, groupId)).get();
+  if (!group) return null;
+
+  const inserted = await writingDb
+    .insert(cards)
+    .values({ ownerGroupId: groupId, title: group.title, content: group.notes ?? '', wordCount: countWords(group.notes ?? ''), includeInCompile: false })
+    .returning({ id: cards.id })
+    .get();
+  if (!inserted) return null;
+
+  if (group.notes) await writingDb.update(groups).set({ notes: null }).where(eq(groups.id, groupId));
+  revalidateBoards();
+  return getCardById(inserted.id);
+}
+
+export async function getOrCreateListNoteCard(listId: number) {
+  const existing = await writingDb.select({ id: cards.id }).from(cards).where(eq(cards.ownerListId, listId)).get();
+  if (existing) return getCardById(existing.id);
+
+  const list = await writingDb.select({ title: lists.title, notes: lists.notes }).from(lists).where(eq(lists.id, listId)).get();
+  if (!list) return null;
+
+  const inserted = await writingDb
+    .insert(cards)
+    .values({ ownerListId: listId, title: list.title, content: list.notes ?? '', wordCount: countWords(list.notes ?? ''), includeInCompile: false })
+    .returning({ id: cards.id })
+    .get();
+  if (!inserted) return null;
+
+  if (list.notes) await writingDb.update(lists).set({ notes: null }).where(eq(lists.id, listId));
+  revalidateBoards();
+  return getCardById(inserted.id);
+}
+
 export async function setCardWordGoal(cardId: number, goal: number | null) {
   await writingDb.update(cards).set({ wordCountGoal: goal }).where(eq(cards.id, cardId));
   revalidateBoards();
@@ -525,6 +574,7 @@ export async function getWritingSettings() {
       defaultCardWordGoal: null,
       defaultListWordGoal: null,
       defaultGroupWordGoal: null,
+      stickyBoardHeader: true,
     }
   );
 }
@@ -534,6 +584,7 @@ export async function updateWritingSettings(patch: {
   defaultCardWordGoal?: number | null;
   defaultListWordGoal?: number | null;
   defaultGroupWordGoal?: number | null;
+  stickyBoardHeader?: boolean;
 }) {
   await writingDb
     .insert(writingSettings)

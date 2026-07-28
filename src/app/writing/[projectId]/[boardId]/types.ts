@@ -26,8 +26,11 @@ export type LinkedCardRef = {
 // A card as the board UI consumes it: its own applied labels, gallery
 // images, and linked-card references are all attached.
 export type BoardCard = Card & { labels: Label[]; images: CardImage[]; links: LinkedCardRef[] };
-export type BoardList = List & { cards: BoardCard[] };
-export type BoardGroup = Group & { lists: BoardList[] };
+// A list/group's optional "note card" — the same BoardCard shape, just owned
+// via ownerListId/ownerGroupId instead of filed under a list (see schema.ts).
+// Null until the user promotes the plain-text note into a full card.
+export type BoardList = List & { cards: BoardCard[]; noteCard: BoardCard | null };
+export type BoardGroup = Group & { lists: BoardList[]; noteCard: BoardCard | null };
 
 // The project-wide label catalog, passed to pickers and the manager.
 export type LabelCatalog = {

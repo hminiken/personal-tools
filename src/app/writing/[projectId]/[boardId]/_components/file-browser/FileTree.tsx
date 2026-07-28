@@ -65,6 +65,10 @@ type TreeHelpers = {
   onPeekCard: (cardId: number) => void;
   onGroupNotes: (groupId: number, notes: string | null) => void;
   onListNotes: (listId: number, notes: string | null) => void;
+  onExpandGroupNote: (groupId: number) => void;
+  onPeekGroupNote: (groupId: number) => void;
+  onExpandListNote: (listId: number) => void;
+  onPeekListNote: (listId: number) => void;
   themeVars?: Record<string, string>;
   smartQuotes?: boolean | null;
 };
@@ -235,7 +239,10 @@ function SortableList({ list, h }: { list: BoardList; h: TreeHelpers }) {
             <Group gap={2} wrap="nowrap">
               <NotesPopover
                 notes={list.notes}
+                noteCard={list.noteCard}
                 onSave={(notes) => h.onListNotes(list.id, notes)}
+                onExpand={() => h.onExpandListNote(list.id)}
+                onPeek={() => h.onPeekListNote(list.id)}
                 smartQuotes={h.smartQuotes}
                 themeVars={h.themeVars}
               />
@@ -286,7 +293,10 @@ function SortableGroup({ group, h }: { group: BoardGroup; h: TreeHelpers }) {
             <Group gap={2} wrap="nowrap">
               <NotesPopover
                 notes={group.notes}
+                noteCard={group.noteCard}
                 onSave={(notes) => h.onGroupNotes(group.id, notes)}
+                onExpand={() => h.onExpandGroupNote(group.id)}
+                onPeek={() => h.onPeekGroupNote(group.id)}
                 smartQuotes={h.smartQuotes}
                 themeVars={h.themeVars}
               />
@@ -333,6 +343,10 @@ export default function FileTree({
   onGroupNotes,
   onListNotes,
   onPeekCard,
+  onExpandGroupNote,
+  onPeekGroupNote,
+  onExpandListNote,
+  onPeekListNote,
   themeVars,
   smartQuotes,
   dnd,
@@ -356,6 +370,10 @@ export default function FileTree({
   onGroupNotes: (groupId: number, notes: string | null) => void | Promise<void>;
   onListNotes: (listId: number, notes: string | null) => void | Promise<void>;
   onPeekCard: (cardId: number) => void;
+  onExpandGroupNote: (groupId: number) => void;
+  onPeekGroupNote: (groupId: number) => void;
+  onExpandListNote: (listId: number) => void;
+  onPeekListNote: (listId: number) => void;
   themeVars?: Record<string, string>;
   smartQuotes?: boolean | null;
   dnd: TreeDnd;
@@ -467,6 +485,10 @@ export default function FileTree({
     onPeekCard,
     onGroupNotes,
     onListNotes,
+    onExpandGroupNote,
+    onPeekGroupNote,
+    onExpandListNote,
+    onPeekListNote,
     themeVars,
     smartQuotes,
   };

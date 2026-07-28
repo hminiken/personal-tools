@@ -13,7 +13,8 @@ import CardSectionEditor from '../CardSectionEditor';
 import { type CommentRecord, parseComments } from '@/utils/writingComments';
 import CardDetailSidebar from './CardDetailSidebar';
 import { useStackCardSidebar } from './useStackCardSidebar';
-import Pane, { stickyPaneStyle } from './Pane';
+import Pane from './Pane';
+import CardSidebarPane from './CardSidebarPane';
 import type { BoardCard, LabelCatalog } from '../../types';
 import { editorTextResetStyle } from './types';
 import { writingEditorStyles } from '@/utils/writingTheme';
@@ -62,6 +63,9 @@ export default function StackCompileView({
   onManageLabels,
   onNavigateToCard,
   onPeekCard,
+  sidebarCollapsed,
+  onToggleSidebar,
+  themeVars,
 }: {
   title: string;
   sections: CompileSection[];
@@ -73,6 +77,9 @@ export default function StackCompileView({
   onManageLabels: () => void;
   onNavigateToCard: (cardId: number) => void;
   onPeekCard: (cardId: number) => void;
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
+  themeVars?: Record<string, string>;
 }) {
   const [mode, setMode] = useState<'edit' | 'select'>('edit');
   const [active, setActive] = useState<{ cardId: number; editor: Editor } | null>(null);
@@ -209,9 +216,9 @@ export default function StackCompileView({
       </Pane>
 
       {showSidebar ? (
-        <Pane hasBg={hasBg} style={stickyPaneStyle}>
-          <CardDetailSidebar detail={sidebar} catalog={catalog} onManageLabels={onManageLabels} wcSettings={wcSettings} onPeekCard={onPeekCard} spacing={spacing} />
-        </Pane>
+        <CardSidebarPane hasBg={hasBg} collapsed={sidebarCollapsed} onToggle={onToggleSidebar}>
+          <CardDetailSidebar detail={sidebar} catalog={catalog} onManageLabels={onManageLabels} wcSettings={wcSettings} onPeekCard={onPeekCard} spacing={spacing} themeVars={themeVars} />
+        </CardSidebarPane>
       ) : (
         <div />
       )}
