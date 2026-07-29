@@ -99,7 +99,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <MantineProvider theme={theme} defaultColorScheme="auto">
-          <ModalsProvider>
+          {/* zIndex above any app modal's own override (ManageLabelsModal bumps
+              itself to 300 to beat CardEditorModal) — otherwise a
+              confirm/prompt/alert opened from inside an already-elevated
+              modal renders behind it instead of on top. */}
+          <ModalsProvider modalProps={{ zIndex: 400 }}>
             <PageTitleProvider>
               <NavigationShell>
                 {children}

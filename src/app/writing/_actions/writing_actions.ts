@@ -634,6 +634,12 @@ export async function deleteLabelCategory(categoryId: number) {
   revalidateBoards();
 }
 
+// Reorder a category (drag-and-drop in "Manage labels"). No revalidate —
+// same optimistic pattern as moveGroup/moveList/moveCard.
+export async function moveLabelCategory(categoryId: number, position: number) {
+  await writingDb.update(labelCategories).set({ position }).where(eq(labelCategories.id, categoryId));
+}
+
 // ==========================================
 // LABELS
 // ==========================================
@@ -676,6 +682,25 @@ export async function updateLabel(
 
 export async function deleteLabel(labelId: number) {
   await writingDb.delete(labels).where(eq(labels.id, labelId));
+  revalidateBoards();
+}
+
+// Reorder a label and/or move it into a (possibly different) category —
+// drag-and-drop in "Manage labels". No revalidate — same optimistic pattern
+// as moveCard/moveList (categoryId null = standalone).
+export async function moveLabel(labelId: number, categoryId: number | null, position: number) {
+  await writingDb.update(labels).set({ categoryId, position }).where(eq(labels.id, labelId));
+}
+
+// Bulk-reassigns sequential positions in alphabetical order — the "Sort A-Z"
+// button in "Manage labels". One-shot, not a persistent view mode: after this,
+// dragging still reorders normally starting from the new order.
+export async function sortLabelsAlphabetically(categoryId: number | null, projectId: number) {
+  const scoped = categoryId == null
+    ? await writingDb.select({ id: labels.id, name: labels.name }).from(labels).where(and(eq(labels.projectId, projectId), isNull(labels.categoryId))).all()
+    : await writingDb.select({ id: labels.id, name: labels.name }).from(labels).where(eq(labels.categoryId, categoryId)).all();
+  const sorted = [...scoped].sort((a, b) => a.name.localeCompare(b.name));
+  await Promise.all(sorted.map((l, i) => writingDb.update(labels).set({ position: i + 1 }).where(eq(labels.id, l.id))));
   revalidateBoards();
 }
 

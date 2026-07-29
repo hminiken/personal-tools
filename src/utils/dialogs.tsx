@@ -9,6 +9,53 @@ import { useState } from 'react';
 import { Button, Group, NumberInput, Stack, Text, TextInput } from '@mantine/core';
 import { modals } from '@mantine/modals';
 
+// These dialogs are shared app-wide (Writing Desk boards and Crafting alike),
+// but only Writing Desk boards carry a `--theme-*` palette. `modals.open*`
+// portals straight to document.body — outside the board wrapper that sets
+// those CSS vars — so a themed caller has to pass its own `themeVars` through
+// for the popup to pick up the board's colors (same portal-breakout fix as
+// NotesPopover/CardItem's dropdowns). Omitting it renders a plain Mantine
+// modal exactly as before, so unthemed callers (Crafting) are unaffected.
+type ThemeVars = Record<string, string>;
+
+function themedModalStyles(themeVars?: ThemeVars) {
+  if (!themeVars) return undefined;
+  return {
+    content: {
+      ...themeVars,
+      backgroundColor: 'var(--theme-group-bg, var(--theme-list-bg, var(--mantine-color-body)))',
+      color: 'var(--theme-heading, inherit)',
+    },
+    header: {
+      backgroundColor: 'var(--theme-group-bg, var(--theme-list-bg, var(--mantine-color-body)))',
+      color: 'var(--theme-heading, inherit)',
+    },
+  };
+}
+
+// A themed surface for the Cancel button — same editor-content surface used
+// for text-entry fields elsewhere (see ManageLabelsModal's themedFieldStyle).
+function themedCancelStyle(themeVars: ThemeVars) {
+  return {
+    ...themeVars,
+    backgroundColor: 'var(--theme-editor-bg, var(--mantine-color-body))',
+    color: 'var(--theme-editor-text, var(--mantine-color-text))',
+    borderColor: 'var(--theme-card-border, var(--mantine-color-default-border))',
+  };
+}
+
+// A themed danger surface — blends the theme's danger color into the current
+// surface via color-mix instead of Mantine's flat light-red (which assumes a
+// white page background and reads as a stray patch on a colored board theme).
+function themedDangerStyle(themeVars: ThemeVars) {
+  return {
+    ...themeVars,
+    color: 'var(--theme-danger, var(--mantine-color-red-6))',
+    backgroundColor: 'color-mix(in srgb, var(--theme-danger, var(--mantine-color-red-6)) 16%, transparent)',
+    borderColor: 'color-mix(in srgb, var(--theme-danger, var(--mantine-color-red-6)) 45%, transparent)',
+  };
+}
+
 // ---------- confirm ----------
 
 type ConfirmOptions = {
@@ -17,6 +64,7 @@ type ConfirmOptions = {
   confirmLabel?: string;
   /** Defaults to true — red confirm button for destructive actions. */
   danger?: boolean;
+  themeVars?: ThemeVars;
 };
 
 export function confirmAction(opts: ConfirmOptions): Promise<boolean> {
@@ -24,9 +72,13 @@ export function confirmAction(opts: ConfirmOptions): Promise<boolean> {
     modals.openConfirmModal({
       title: opts.title ?? 'Are you sure?',
       centered: true,
+      styles: themedModalStyles(opts.themeVars),
       children: <Text size="sm">{opts.message}</Text>,
       labels: { confirm: opts.confirmLabel ?? 'Delete', cancel: 'Cancel' },
-      confirmProps: { color: opts.danger === false ? undefined : 'red' },
+      cancelProps: opts.themeVars ? { variant: 'default', style: themedCancelStyle(opts.themeVars) } : undefined,
+      confirmProps: opts.danger === false
+        ? undefined
+        : { color: opts.themeVars ? undefined : 'red', style: opts.themeVars ? themedDangerStyle(opts.themeVars) : undefined },
       onCancel: () => resolve(false),
       onConfirm: () => resolve(true),
     });

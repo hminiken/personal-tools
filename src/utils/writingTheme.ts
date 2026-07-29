@@ -61,6 +61,11 @@ export const THEME_TOKENS: TokenSpec[] = [
   { key: 'headingColor', cssVar: '--theme-heading', kind: 'color', label: 'Headings/titles + default text color' },
   { key: 'mutedText', cssVar: '--theme-muted-text', kind: 'color', label: 'General secondary/dimmed text' },
   { key: 'accentColor', cssVar: '--theme-accent', kind: 'color', label: 'Buttons/active-state accent' },
+  // Generic destructive-action color (delete buttons/icons, delete
+  // confirmations) — kept separate from accentColor since a theme's accent
+  // is rarely red and delete actions should stay recognizably "danger"
+  // regardless of the board's palette.
+  { key: 'dangerColor', cssVar: '--theme-danger', kind: 'color', label: 'Destructive action (delete) color' },
 
   // These two double as overrides of Mantine's own --mantine-color-gray-light(-color)
   // vars (see themeVars() below) — every "gray" light/subtle Button and ActionIcon in
