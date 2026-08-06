@@ -42,6 +42,9 @@ COPY --from=builder /app/public ./public
 # Standalone mode only needs the output from the builder
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Not traced by the standalone build (only spawned as subprocesses, never
+# imported), so it must be copied in explicitly for the Misc Tools page.
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 
 USER nextjs
 EXPOSE 3000
