@@ -1,4 +1,4 @@
-// Send all unshelved BookLore books to the Kindles.
+// Send all unshelved GRIMMORY books to the Kindles.
 //
 // For each unshelved book: emails it to every configured recipient, adds a
 // "Sent to kindle" tag, and files it on the "Sent to Kindle" shelf so it
@@ -8,9 +8,9 @@
 // Misc Tools page). Standalone:
 //   node --env-file=.env.local scripts/send-to-kindle.mjs
 
-const BASE_URL = process.env.BOOKLORE_URL;
-const USERNAME = process.env.BOOKLORE_USER;
-const PASSWORD = process.env.BOOKLORE_PASS;
+const BASE_URL = process.env.GRIMMORY_URL;
+const USERNAME = process.env.GRIMMORY_USER;
+const PASSWORD = process.env.GRIMMORY_PASS;
 
 const SENT_TO_KINDLE_SHELF_ID = 5;
 const EMAIL_PROVIDER_ID = 1;
@@ -18,7 +18,7 @@ const RECIPIENT_IDS = [1, 2];
 const TAG_TO_ADD = 'Sent to kindle';
 
 if (!BASE_URL || !USERNAME || !PASSWORD) {
-  console.error('Missing BOOKLORE_URL / BOOKLORE_USER / BOOKLORE_PASS env vars.');
+  console.error('Missing GRIMMORY_URL / GRIMMORY_USER / GRIMMORY_PASS env vars.');
   process.exit(1);
 }
 

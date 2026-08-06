@@ -18,7 +18,7 @@ export const SCRIPTS: ScriptDef[] = [
     id: 'send-to-kindle',
     label: 'Send new books to Kindle',
     description:
-      'Emails every unshelved BookLore book to both Kindles, tags it "Sent to kindle", and files it on the Sent to Kindle shelf.',
+      'Emails every unshelved GRIMMORY book to both Kindles, tags it "Sent to kindle", and files it on the Sent to Kindle shelf.',
     command: process.execPath,
     args: ['scripts/send-to-kindle.mjs'],
   },
