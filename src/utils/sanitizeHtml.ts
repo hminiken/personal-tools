@@ -8,13 +8,17 @@
 // (the following paragraphs) until it finds the next `"`. That makes large
 // chunks of content silently disappear when rendered.
 //
-// We strip the broken containerstyle/wrapperstyle attribute blocks (everything
-// from the attribute up to the tag's closing `>`), leaving a clean <img>. These
-// attributes aren't needed for display; the editor re-adds well-formed ones on
-// the next save.
+// containerstyle/wrapperstyle came from the old tiptap-extension-resize-image
+// extension, which the editor no longer uses. Well-formed containerstyle
+// values carry the image's saved width, so we convert that into a plain
+// width="N" attribute first (the current Image extension reads it). Then we
+// drop any remaining well-formed values, and finally strip broken attribute
+// blocks (everything from the attribute up to the tag's closing `>`).
 export function sanitizePatternHtml<T extends string | null | undefined>(html: T): T {
   if (!html) return html;
   return html
+    .replace(/\s+containerstyle="[^"=]*?\bwidth:\s*([\d.]+)px[^"=]*"/gi, ' width="$1"')
+    .replace(/\s+(?:containerstyle|wrapperstyle)="[^"=]*"/gi, '')
     .replace(/\s+containerstyle="[^>]*>/gi, '>')
     .replace(/\s+wrapperstyle="[^>]*>/gi, '>') as T;
 }

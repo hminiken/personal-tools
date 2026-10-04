@@ -89,9 +89,6 @@ importers:
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
-      tiptap-extension-resize-image:
-        specifier: ^1.4.0
-        version: 1.4.0(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))(@tiptap/extension-image@3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6)))(@tiptap/pm@3.23.6)
     devDependencies:
       '@types/node':
         specifier: ^20
@@ -2980,13 +2977,6 @@ packages:
   tinyglobby@0.2.16:
     resolution: {integrity: sha512-pn99VhoACYR8nFHhxqix+uvsbXineAasWm5ojXoN8xEwK5Kd3/TrhNn1wByuD52UxWRLy8pu+kRMniEi6Eq9Zg==}
     engines: {node: '>=12.0.0'}
-
-  tiptap-extension-resize-image@1.4.0:
-    resolution: {integrity: sha512-4CbzgJyY0xyRGGXUa1JmC9KQwdFN5OgFahbvnn+5IRpbLH1yfbDVEHZ6WSLA42qiwtxOoa6XUSqkTS/QMULQYQ==}
-    peerDependencies:
-      '@tiptap/core': ^2.0.0 || ^3.0.0
-      '@tiptap/extension-image': ^2.0.0 || ^3.0.0
-      '@tiptap/pm': ^2.0.0 || ^3.0.0
 
   to-regex-range@5.0.1:
     resolution: {integrity: sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==}
@@ -6117,12 +6107,6 @@ snapshots:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
-
-  tiptap-extension-resize-image@1.4.0(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))(@tiptap/extension-image@3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6)))(@tiptap/pm@3.23.6):
-    dependencies:
-      '@tiptap/core': 3.23.6(@tiptap/pm@3.23.6)
-      '@tiptap/extension-image': 3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))
-      '@tiptap/pm': 3.23.6
 
   to-regex-range@5.0.1:
     dependencies:
