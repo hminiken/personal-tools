@@ -12,6 +12,7 @@ import { countWords } from '@/utils/writingWordCount';
 import { parseThemeDefinition } from '@/utils/writingTheme';
 import { serializeComments, type CommentRecord } from '@/utils/writingComments';
 import { decodeHtmlEntities } from '@/utils/htmlEntities';
+import { cardListJoin, cardGroupJoin } from '@/db/writing/cardBoardJoin';
 
 // Revalidate every board page (covers all dynamic [projectId]/[boardId] instances).
 function revalidateBoards() {
@@ -33,6 +34,44 @@ async function nextPosition(
   return (row?.m ?? 0) + 1;
 }
 
+// "Touch" helpers for getBoardActivityStamp. The poll compares the newest
+// updatedAt on the board/groups/lists/cards, so a change that leaves no
+// updated row behind (a delete, or a label/link/image change, whose tables
+// have no updatedAt) must bump the nearest surviving parent instead or other
+// tabs never notice it.
+async function touchCards(cardIds: number[]) {
+  if (!cardIds.length) return;
+  await writingDb.update(cards).set({ updatedAt: new Date() }).where(inArray(cards.id, cardIds));
+}
+
+// Bumps whatever a card hangs off: its list, or its owning list/group for
+// note cards. Call before deleting the card.
+async function touchCardParent(cardId: number) {
+  const c = await writingDb
+    .select({ listId: cards.listId, ownerListId: cards.ownerListId, ownerGroupId: cards.ownerGroupId })
+    .from(cards)
+    .where(eq(cards.id, cardId))
+    .get();
+  if (!c) return;
+  const listId = c.listId ?? c.ownerListId;
+  if (listId != null) await writingDb.update(lists).set({ updatedAt: new Date() }).where(eq(lists.id, listId));
+  else if (c.ownerGroupId != null) await writingDb.update(groups).set({ updatedAt: new Date() }).where(eq(groups.id, c.ownerGroupId));
+}
+
+// Labels are project-scoped, so a catalog change can affect every board.
+async function touchProjectBoards(projectId: number | null | undefined) {
+  if (projectId == null) return;
+  await writingDb.update(boards).set({ updatedAt: new Date() }).where(eq(boards.projectId, projectId));
+}
+
+async function labelProjectId(labelId: number) {
+  return (await writingDb.select({ projectId: labels.projectId }).from(labels).where(eq(labels.id, labelId)).get())?.projectId;
+}
+
+async function categoryProjectId(categoryId: number) {
+  return (await writingDb.select({ projectId: labelCategories.projectId }).from(labelCategories).where(eq(labelCategories.id, categoryId)).get())?.projectId;
+}
+
 // Revalidate the gallery + every folder page (covers all [folderId] instances).
 function revalidateGallery() {
   revalidatePath('/writing');
@@ -45,7 +84,13 @@ async function storeUploadedImage(imageFile: File): Promise<string> {
   const originalBuffer = Buffer.from(await imageFile.arrayBuffer());
   const buffer = await compressImage(originalBuffer);
 
-  const baseName = imageFile.name.replaceAll(' ', '_').replace(/\.[^.]+$/, '');
+  // The client controls imageFile.name, so keep only a safe basename —
+  // otherwise "../" segments could write outside public/uploads.
+  const baseName = path
+    .basename(imageFile.name.replaceAll('\\', '/'))
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^A-Za-z0-9_-]+/g, '_')
+    .slice(0, 80) || 'image';
   const filename = `${Date.now()}-${baseName}.webp`;
   const filepath = path.join(process.cwd(), 'public/uploads', filename);
   await writeFile(filepath, buffer);
@@ -268,8 +313,8 @@ export async function getBoardActivityStamp(boardId: number): Promise<number> {
     writingDb
       .select({ updatedAt: cards.updatedAt })
       .from(cards)
-      .innerJoin(lists, eq(cards.listId, lists.id))
-      .innerJoin(groups, eq(lists.groupId, groups.id))
+      .leftJoin(lists, cardListJoin)
+      .innerJoin(groups, cardGroupJoin)
       .where(eq(groups.boardId, boardId))
       .orderBy(desc(cards.updatedAt))
       .limit(1)
@@ -343,6 +388,8 @@ export async function setGroupBackground(
 }
 
 export async function deleteGroup(groupId: number) {
+  const g = await writingDb.select({ boardId: groups.boardId }).from(groups).where(eq(groups.id, groupId)).get();
+  if (g) await writingDb.update(boards).set({ updatedAt: new Date() }).where(eq(boards.id, g.boardId));
   await writingDb.delete(groups).where(eq(groups.id, groupId));
   revalidateBoards();
 }
@@ -369,6 +416,8 @@ export async function renameList(listId: number, title: string) {
 }
 
 export async function deleteList(listId: number) {
+  const l = await writingDb.select({ groupId: lists.groupId }).from(lists).where(eq(lists.id, listId)).get();
+  if (l) await writingDb.update(groups).set({ updatedAt: new Date() }).where(eq(groups.id, l.groupId));
   await writingDb.delete(lists).where(eq(lists.id, listId));
   revalidateBoards();
 }
@@ -441,6 +490,8 @@ export async function addCardImage(formData: FormData): Promise<{ id: number; pa
   const card = await writingDb.select({ coverImage: cards.coverImage }).from(cards).where(eq(cards.id, cardId)).get();
   if (card && !card.coverImage) {
     await writingDb.update(cards).set({ coverImage: newImagePath }).where(eq(cards.id, cardId));
+  } else {
+    await touchCards([cardId]);
   }
 
   revalidateBoards();
@@ -456,6 +507,8 @@ export async function deleteCardImage(imageId: number) {
   const card = await writingDb.select({ coverImage: cards.coverImage }).from(cards).where(eq(cards.id, img.cardId)).get();
   if (card?.coverImage === img.path) {
     await writingDb.update(cards).set({ coverImage: null }).where(eq(cards.id, img.cardId));
+  } else {
+    await touchCards([img.cardId]);
   }
   revalidateBoards();
 }
@@ -469,6 +522,7 @@ export async function setCardCover(cardId: number, imagePath: string | null) {
 }
 
 export async function deleteCard(cardId: number) {
+  await touchCardParent(cardId);
   await writingDb.delete(cards).where(eq(cards.id, cardId));
   revalidateBoards();
 }
@@ -624,12 +678,14 @@ export async function updateLabelCategory(
   if (data.singleSelect !== undefined) patch.singleSelect = data.singleSelect;
   if (Object.keys(patch).length > 0) {
     await writingDb.update(labelCategories).set(patch).where(eq(labelCategories.id, categoryId));
+    await touchProjectBoards(await categoryProjectId(categoryId));
   }
   revalidateBoards();
 }
 
 // Deleting a category cascades to its labels (and their card assignments).
 export async function deleteLabelCategory(categoryId: number) {
+  await touchProjectBoards(await categoryProjectId(categoryId));
   await writingDb.delete(labelCategories).where(eq(labelCategories.id, categoryId));
   revalidateBoards();
 }
@@ -676,11 +732,13 @@ export async function updateLabel(
   if (data.drivesCardColor !== undefined) patch.drivesCardColor = data.drivesCardColor;
   if (Object.keys(patch).length > 0) {
     await writingDb.update(labels).set(patch).where(eq(labels.id, labelId));
+    await touchProjectBoards(await labelProjectId(labelId));
   }
   revalidateBoards();
 }
 
 export async function deleteLabel(labelId: number) {
+  await touchProjectBoards(await labelProjectId(labelId));
   await writingDb.delete(labels).where(eq(labels.id, labelId));
   revalidateBoards();
 }
@@ -746,6 +804,7 @@ export async function addCardLabel(cardId: number, labelId: number) {
   }
 
   await writingDb.insert(cardLabels).values({ cardId, labelId }).onConflictDoNothing();
+  await touchCards([cardId]);
   revalidateBoards();
 }
 
@@ -753,6 +812,7 @@ export async function removeCardLabel(cardId: number, labelId: number) {
   await writingDb
     .delete(cardLabels)
     .where(and(eq(cardLabels.cardId, cardId), eq(cardLabels.labelId, labelId)));
+  await touchCards([cardId]);
   revalidateBoards();
 }
 
@@ -774,12 +834,15 @@ export async function addCardLink(cardIdA: number, cardIdB: number) {
     .insert(cardLinks)
     .values({ sourceCardId: src, targetCardId: tgt, createdAt: new Date() })
     .onConflictDoNothing();
+  await touchCards([src, tgt]);
   revalidateBoards();
 }
 
 export async function removeCardLink(linkId: number) {
   if (!linkId) return;
+  const link = await writingDb.select().from(cardLinks).where(eq(cardLinks.id, linkId)).get();
   await writingDb.delete(cardLinks).where(eq(cardLinks.id, linkId));
+  if (link) await touchCards([link.sourceCardId, link.targetCardId]);
   revalidateBoards();
 }
 
@@ -895,8 +958,8 @@ export async function getCardById(cardId: number) {
     ? await writingDb
         .select({ id: cards.id, title: cards.title, content: cards.content, color: cards.color, boardTitle: boards.title, cardType: cards.cardType })
         .from(cards)
-        .innerJoin(lists, eq(cards.listId, lists.id))
-        .innerJoin(groups, eq(lists.groupId, groups.id))
+        .leftJoin(lists, cardListJoin)
+        .innerJoin(groups, cardGroupJoin)
         .innerJoin(boards, eq(groups.boardId, boards.id))
         .where(inArray(cards.id, otherIds))
         .all()

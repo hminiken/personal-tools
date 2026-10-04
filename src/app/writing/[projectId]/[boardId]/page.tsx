@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import BoardView from './_components/BoardView';
 import { getWritingSettings, listThemes, getCardById } from '../../_actions/writing_actions';
 import { decodeHtmlEntities } from '@/utils/htmlEntities';
+import { cardListJoin, cardGroupJoin } from '@/db/writing/cardBoardJoin';
 import type { BoardGroup, LabelCatalog } from './types';
 
 export const dynamic = 'force-dynamic';
@@ -164,8 +165,8 @@ export default async function BoardPage({ params }: PageProps) {
     ? await writingDb
         .select({ id: cards.id, title: cards.title, content: cards.content, color: cards.color, boardTitle: boards.title, cardType: cards.cardType })
         .from(cards)
-        .innerJoin(lists, eq(cards.listId, lists.id))
-        .innerJoin(groups, eq(lists.groupId, groups.id))
+        .leftJoin(lists, cardListJoin)
+        .innerJoin(groups, cardGroupJoin)
         .innerJoin(boards, eq(groups.boardId, boards.id))
         .where(inArray(cards.id, [...externalLinkedIds]))
         .all()

@@ -8,6 +8,8 @@
 
 import { deflateRawSync } from 'zlib';
 import type { EpubBook, EpubSettings, NumberStyle, HeadingContent } from './epub';
+import { toWords } from './epub';
+import { decodeHtmlEntities } from './htmlEntities';
 
 // ─── ZIP builder (mirrors epub.ts) ───────────────────────────────────────────
 
@@ -95,14 +97,6 @@ function toRoman(n: number): string {
   ROMAN_VALS.forEach((v, i) => { while (n >= v) { r += ROMAN_SYMS[i]; n -= v; } });
   return r;
 }
-const ONES = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
-const TENS = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
-function toWords(n: number): string {
-  if (n < 20) return ONES[n] || 'Zero';
-  const t = TENS[Math.floor(n / 10)];
-  const o = ONES[n % 10];
-  return o ? `${t}-${o.toLowerCase()}` : t;
-}
 function formatNum(n: number, style: NumberStyle): string {
   if (style === 'numeral') return String(n);
   if (style === 'roman') return toRoman(n);
@@ -126,15 +120,9 @@ function xmlEsc(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+// decodeHtmlEntities decodes &amp; last, so "&amp;lt;" stays a literal "&lt;".
 function decodeEntities(s: string): string {
-  return s
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#160;/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(parseInt(n, 10)));
+  return decodeHtmlEntities(s).replace(/ /g, ' ');
 }
 
 // ─── HTML → inline runs ───────────────────────────────────────────────────────

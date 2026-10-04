@@ -74,9 +74,20 @@ function buildLabelName(label: RawTrelloLabel): string {
   return 'Label';
 }
 
-// Renders a checklist as plain text: its name (if any) on the first line,
-// then one "☑ "/"☐ " line per check item, sorted by position.
-function renderChecklistText(checklist: RawTrelloChecklist): string {
+// Comment text is rendered as HTML by the card sidebars, so everything we
+// store must be HTML: escape plain text, and render Markdown (Trello's comment
+// format) the same way card descriptions are.
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function markdownToHtml(text: string): string {
+  return marked.parse(text, { async: false, gfm: true, breaks: true }) as string;
+}
+
+// Renders a checklist as HTML: its name (if any) on the first line, then one
+// "☑ "/"☐ " line per check item, sorted by position.
+function renderChecklistHtml(checklist: RawTrelloChecklist): string {
   const lines: string[] = [];
   const name = typeof checklist.name === 'string' ? decodeTrelloEntities(checklist.name.trim()) : '';
   if (name) lines.push(name);
@@ -89,7 +100,7 @@ function renderChecklistText(checklist: RawTrelloChecklist): string {
     lines.push((item.state === 'complete' ? '☑ ' : '☐ ') + itemName);
   }
 
-  return lines.join('\n');
+  return `<p>${lines.map(escapeHtml).join('<br>')}</p>`;
 }
 
 export function parseTrelloExport(jsonText: string): ParsedTrelloBoard {
@@ -119,6 +130,10 @@ export function parseTrelloExport(jsonText: string): ParsedTrelloBoard {
   }
   const parsedLabels = Array.from(labelMap.values());
 
+  // Fallback timestamp for comments/checklists Trello didn't date — an empty
+  // createdAt renders as "Invalid Date".
+  const importedAt = new Date().toISOString();
+
   // ---- Comments: actions of type commentCard, grouped by card id. ----
   const commentsByCardId = new Map<string, ParsedTrelloComment[]>();
   if (Array.isArray(raw.actions)) {
@@ -130,8 +145,8 @@ export function parseTrelloExport(jsonText: string): ParsedTrelloBoard {
       const cardId = a.data?.card?.id;
       if (typeof text !== 'string' || typeof cardId !== 'string') continue;
       const key = (typeof a.id === 'string' && a.id) || `commentCard-${actionIndex}`;
-      const createdAt = typeof a.date === 'string' ? a.date : '';
-      const comment: ParsedTrelloComment = { key, text: decodeTrelloEntities(text), createdAt };
+      const createdAt = typeof a.date === 'string' && a.date ? a.date : importedAt;
+      const comment: ParsedTrelloComment = { key, text: markdownToHtml(decodeTrelloEntities(text)), createdAt };
       const bucket = commentsByCardId.get(cardId);
       if (bucket) bucket.push(comment);
       else commentsByCardId.set(cardId, [comment]);
@@ -196,8 +211,8 @@ export function parseTrelloExport(jsonText: string): ParsedTrelloBoard {
         const realComments = commentsByCardId.get(c.id) ?? [];
         const checklistComments: ParsedTrelloComment[] = (checklistsByCardId.get(c.id) ?? []).map((cl) => ({
           key: `checklist-${cl.id ?? ''}`,
-          text: renderChecklistText(cl),
-          createdAt: (typeof c.dateLastActivity === 'string' && c.dateLastActivity) || realComments[0]?.createdAt || '',
+          text: renderChecklistHtml(cl),
+          createdAt: (typeof c.dateLastActivity === 'string' && c.dateLastActivity) || realComments[0]?.createdAt || importedAt,
         }));
         const comments = [...realComments, ...checklistComments];
         commentCount += comments.length;

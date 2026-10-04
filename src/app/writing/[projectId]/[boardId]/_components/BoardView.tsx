@@ -46,8 +46,10 @@ function latestActivityStamp(board: Board | undefined, groups: BoardGroup[]): nu
   let max = board?.updatedAt ? new Date(board.updatedAt).getTime() : 0;
   for (const g of groups) {
     if (g.updatedAt) max = Math.max(max, new Date(g.updatedAt).getTime());
+    if (g.noteCard?.updatedAt) max = Math.max(max, new Date(g.noteCard.updatedAt).getTime());
     for (const l of g.lists) {
       if (l.updatedAt) max = Math.max(max, new Date(l.updatedAt).getTime());
+      if (l.noteCard?.updatedAt) max = Math.max(max, new Date(l.noteCard.updatedAt).getTime());
       for (const c of l.cards) {
         if (c.updatedAt) max = Math.max(max, new Date(c.updatedAt).getTime());
       }

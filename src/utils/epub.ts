@@ -167,8 +167,16 @@ const ONES = [
 ];
 const TENS = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
 
-function toWords(n: number): string {
+export function toWords(n: number): string {
   if (n <= 0) return 'Zero';
+  if (n >= 1000) {
+    const rest = n % 1000;
+    return `${toWords(Math.floor(n / 1000))} Thousand${rest ? ` ${toWords(rest)}` : ''}`;
+  }
+  if (n >= 100) {
+    const rest = n % 100;
+    return `${ONES[Math.floor(n / 100)]} Hundred${rest ? ` ${toWords(rest)}` : ''}`;
+  }
   if (n < 20) return ONES[n];
   const t = TENS[Math.floor(n / 10)];
   const o = ONES[n % 10];
@@ -220,14 +228,16 @@ function pad3(n: number): string { return String(n).padStart(3, '0'); }
 
 // ─── XHTML document builder ───────────────────────────────────────────────────
 
-function makeXhtml(lang: string, title: string, bodyClass: string, body: string): string {
+// cssHref is relative to the document: content files live in EPUB/content/,
+// but nav.xhtml sits at EPUB/ and must pass 'css/styles.css'.
+function makeXhtml(lang: string, title: string, bodyClass: string, body: string, cssHref = '../css/styles.css'): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="${lang}">
 <head>
   <meta charset="UTF-8" />
   <title>${xmlEsc(title)}</title>
-  <link rel="stylesheet" type="text/css" href="../css/styles.css" />
+  <link rel="stylesheet" type="text/css" href="${cssHref}" />
 </head>
 <body class="${bodyClass}">
 ${body}
@@ -423,6 +433,7 @@ function buildNav(s: EpubSettings, entries: SpineEntry[]): string {
 <h1>Contents</h1>
 ${tocList}
 </nav>`,
+    'css/styles.css',
   );
 }
 
