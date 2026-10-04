@@ -7,7 +7,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
   IconNeedleThread,
-  IconBook,
   IconHome,
   IconCurrencyDollar,
   IconChevronLeft,
@@ -40,7 +39,6 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     if (pathname.includes('/crafting/stash')) return 'Yarn Stash'; // Just in case you add this later!
     if (pathname.includes('/crafting/media')) return 'Manage Media'; // Just in case you add this later!
     if (pathname.includes('/crafting/references')) return 'References';
-    if (pathname.startsWith('/writing')) return 'Writing Desk';
     if (pathname.startsWith('/misc')) return 'Misc Tools';
 
     return 'Command Center'; // A safe fallback
@@ -164,14 +162,6 @@ useEffect(() => {
               active={pathname.includes('/references')}
             />
           </NavLink>
-
-          <NavLink 
-            component={Link} 
-            href="/writing" 
-            label="Writing Desk" 
-            leftSection={<IconBook size="1rem" stroke={1.5} />} 
-            active={pathname.startsWith('/writing')}
-          />
 
           <NavLink
             component={Link}

@@ -8,15 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@dnd-kit/core':
-        specifier: ^6.3.1
-        version: 6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@dnd-kit/sortable':
-        specifier: ^10.0.0
-        version: 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)
-      '@dnd-kit/utilities':
-        specifier: ^3.2.2
-        version: 3.2.2(react@19.2.4)
       '@google/generative-ai':
         specifier: ^0.24.1
         version: 0.24.1
@@ -38,29 +29,14 @@ importers:
       '@tiptap/extension-color':
         specifier: ^3.23.6
         version: 3.23.6(@tiptap/extension-text-style@3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6)))
-      '@tiptap/extension-file-handler':
-        specifier: 3.23.6
-        version: 3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))(@tiptap/extension-text-style@3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6)))(@tiptap/pm@3.23.6)
-      '@tiptap/extension-heading':
-        specifier: 3.23.6
-        version: 3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))
       '@tiptap/extension-highlight':
         specifier: ^3.23.6
         version: 3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))
       '@tiptap/extension-image':
         specifier: 3.23.6
         version: 3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))
-      '@tiptap/extension-paragraph':
-        specifier: 3.23.6
-        version: 3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))
-      '@tiptap/extension-text-align':
-        specifier: 3.23.6
-        version: 3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))
       '@tiptap/extension-text-style':
         specifier: ^3.23.6
-        version: 3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))
-      '@tiptap/extension-typography':
-        specifier: 3.23.6
         version: 3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))
       '@tiptap/pm':
         specifier: ^3.23.6
@@ -189,28 +165,6 @@ packages:
   '@babel/types@7.29.7':
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
-
-  '@dnd-kit/accessibility@3.1.1':
-    resolution: {integrity: sha512-2P+YgaXF+gRsIihwwY1gCsQSYnu9Zyj2py8kY5fFvUM1qm2WA2u639R6YNVfU4GWr+ZM5mqEsfHZZLoRONbemw==}
-    peerDependencies:
-      react: '>=16.8.0'
-
-  '@dnd-kit/core@6.3.1':
-    resolution: {integrity: sha512-xkGBRQQab4RLwgXxoqETICr6S5JlogafbhNsidmrkVv2YRs5MLwpjoF2qpiGjQt8S9AoxtIV603s0GIUpY5eYQ==}
-    peerDependencies:
-      react: '>=16.8.0'
-      react-dom: '>=16.8.0'
-
-  '@dnd-kit/sortable@10.0.0':
-    resolution: {integrity: sha512-+xqhmIIzvAYMGfBYYnbKuNicfSsk4RksY2XdmJhT+HAC01nix6fHCztU68jooFiMUB01Ky3F0FyOvhG/BZrWkg==}
-    peerDependencies:
-      '@dnd-kit/core': ^6.3.0
-      react: '>=16.8.0'
-
-  '@dnd-kit/utilities@3.2.2':
-    resolution: {integrity: sha512-+MKAJEOfaBe5SmV6t34p80MMKhjvUz0vRrvVJbPT0WElzaOJ/1xs+D+KDv+tD/NE5ujfrChEcshd4fLn0wpiqg==}
-    peerDependencies:
-      react: '>=16.8.0'
 
   '@drizzle-team/brocli@0.10.2':
     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==}
@@ -1136,13 +1090,6 @@ packages:
     peerDependencies:
       '@tiptap/extensions': 3.23.6
 
-  '@tiptap/extension-file-handler@3.23.6':
-    resolution: {integrity: sha512-KB5x4UNurQOOojJzRH/q1jE8Dxeu2C3LPo3iQHPA8mcuiCjLV7NjCJNQuGYAhlO/Tagt71AKM6uUMgo5bpvyZQ==}
-    peerDependencies:
-      '@tiptap/core': 3.23.6
-      '@tiptap/extension-text-style': 3.23.6
-      '@tiptap/pm': 3.23.6
-
   '@tiptap/extension-floating-menu@3.23.6':
     resolution: {integrity: sha512-2kjuDcEq69lEcECl75xqY5MyzUSh2zcC5aLrpwP1WwhJz5bxsIFHiaps5AP6h9R4A+ZBj5b2haay2Y1wDUU3VA==}
     peerDependencies:
@@ -1223,11 +1170,6 @@ packages:
     peerDependencies:
       '@tiptap/core': 3.23.6
 
-  '@tiptap/extension-text-align@3.23.6':
-    resolution: {integrity: sha512-pE+gDmvnrSMWHADDnDSzaO7YUi9kOywQkyrqZ9bEPLddZred7ICoJ4NtD2DqLjDSur+HijaJuByResWb78c6FA==}
-    peerDependencies:
-      '@tiptap/core': 3.23.6
-
   '@tiptap/extension-text-style@3.23.6':
     resolution: {integrity: sha512-Auasgj469wkQ5ip+Zi2gaRzvqxx9qKG58+1mkT8yPE3QAGnOIg/AaKyQ7pTV77UyL3FHvLnU+KsWCad+qcobww==}
     peerDependencies:
@@ -1235,11 +1177,6 @@ packages:
 
   '@tiptap/extension-text@3.23.6':
     resolution: {integrity: sha512-ipoC2TkIAIOTiF5ByiGgvQB1DqDyfP90wrUB3mohBcgvp7lQnwHszCDGv8dNnmcUek8uXV/uoLu2VXeVQlxjPA==}
-    peerDependencies:
-      '@tiptap/core': 3.23.6
-
-  '@tiptap/extension-typography@3.23.6':
-    resolution: {integrity: sha512-eo/+e5TJ4cPfkk6ugMaoW+UVfTC3CEU97EH2g72H+L90qywnOJalrRNXTkdSEbYxGtLs9xthTAHpy2YImf4r1A==}
     peerDependencies:
       '@tiptap/core': 3.23.6
 
@@ -3259,31 +3196,6 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@dnd-kit/accessibility@3.1.1(react@19.2.4)':
-    dependencies:
-      react: 19.2.4
-      tslib: 2.8.1
-
-  '@dnd-kit/core@6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
-    dependencies:
-      '@dnd-kit/accessibility': 3.1.1(react@19.2.4)
-      '@dnd-kit/utilities': 3.2.2(react@19.2.4)
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
-      tslib: 2.8.1
-
-  '@dnd-kit/sortable@10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)':
-    dependencies:
-      '@dnd-kit/core': 6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@dnd-kit/utilities': 3.2.2(react@19.2.4)
-      react: 19.2.4
-      tslib: 2.8.1
-
-  '@dnd-kit/utilities@3.2.2(react@19.2.4)':
-    dependencies:
-      react: 19.2.4
-      tslib: 2.8.1
-
   '@drizzle-team/brocli@0.10.2': {}
 
   '@emnapi/core@1.10.0':
@@ -3932,12 +3844,6 @@ snapshots:
     dependencies:
       '@tiptap/extensions': 3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))(@tiptap/pm@3.23.6)
 
-  '@tiptap/extension-file-handler@3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))(@tiptap/extension-text-style@3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6)))(@tiptap/pm@3.23.6)':
-    dependencies:
-      '@tiptap/core': 3.23.6(@tiptap/pm@3.23.6)
-      '@tiptap/extension-text-style': 3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))
-      '@tiptap/pm': 3.23.6
-
   '@tiptap/extension-floating-menu@3.23.6(@floating-ui/dom@1.7.6)(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))(@tiptap/pm@3.23.6)':
     dependencies:
       '@floating-ui/dom': 1.7.6
@@ -4005,19 +3911,11 @@ snapshots:
     dependencies:
       '@tiptap/core': 3.23.6(@tiptap/pm@3.23.6)
 
-  '@tiptap/extension-text-align@3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))':
-    dependencies:
-      '@tiptap/core': 3.23.6(@tiptap/pm@3.23.6)
-
   '@tiptap/extension-text-style@3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))':
     dependencies:
       '@tiptap/core': 3.23.6(@tiptap/pm@3.23.6)
 
   '@tiptap/extension-text@3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))':
-    dependencies:
-      '@tiptap/core': 3.23.6(@tiptap/pm@3.23.6)
-
-  '@tiptap/extension-typography@3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))':
     dependencies:
       '@tiptap/core': 3.23.6(@tiptap/pm@3.23.6)
 
