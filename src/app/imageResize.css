@@ -1,0 +1,58 @@
+/* Resizable images in Tiptap editors (@tiptap/extension-image resize).
+   Tiptap's node view only positions the handles (no size, no look), so
+   without this they're zero-size and can't be grabbed. Handles only exist
+   while the editor is editable, so these grips never show in read mode. */
+[data-resize-container][data-node="image"] {
+  max-width: 100%;
+}
+
+[data-resize-container][data-node="image"] img {
+  display: block;
+  max-width: 100%;
+}
+
+[data-resize-handle] {
+  z-index: 2;
+}
+
+/* Edges: invisible strips you can drag. */
+[data-resize-handle="left"],
+[data-resize-handle="right"] {
+  width: 10px;
+  cursor: ew-resize;
+}
+[data-resize-handle="left"] { left: -5px !important; }
+[data-resize-handle="right"] { right: -5px !important; }
+
+[data-resize-handle="top"],
+[data-resize-handle="bottom"] {
+  height: 10px;
+  cursor: ns-resize;
+}
+[data-resize-handle="top"] { top: -5px !important; }
+[data-resize-handle="bottom"] { bottom: -5px !important; }
+
+/* Corners: always-visible square grips. */
+[data-resize-handle="top-left"],
+[data-resize-handle="top-right"],
+[data-resize-handle="bottom-left"],
+[data-resize-handle="bottom-right"] {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--mantine-primary-color-filled, #228be6);
+  border: 2px solid var(--mantine-color-body, #fff);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+  z-index: 3;
+}
+[data-resize-handle="top-left"] { top: -6px !important; left: -6px !important; cursor: nwse-resize; }
+[data-resize-handle="top-right"] { top: -6px !important; right: -6px !important; cursor: nesw-resize; }
+[data-resize-handle="bottom-left"] { bottom: -6px !important; left: -6px !important; cursor: nesw-resize; }
+[data-resize-handle="bottom-right"] { bottom: -6px !important; right: -6px !important; cursor: nwse-resize; }
+
+/* Outline the image while hovering/resizing in edit mode. */
+[data-resize-wrapper]:has([data-resize-handle]):hover > img,
+[data-resize-state="true"] img {
+  outline: 2px solid var(--mantine-primary-color-filled, #228be6);
+  outline-offset: 1px;
+}

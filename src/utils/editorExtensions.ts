@@ -12,7 +12,7 @@ const ResizableImage = Image.configure({
     allowBase64: true,
     resize: {
         enabled: true,
-        directions: ['right', 'bottom', 'bottom-right', 'left', 'bottom-left'],
+        directions: ['top', 'right', 'bottom', 'left', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
         minWidth: 40,
         minHeight: 40,
         alwaysPreserveAspectRatio: false,

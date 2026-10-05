@@ -42,64 +42,6 @@ a {
   text-decoration: none;
 }
 
-/* Resizable images in Tiptap editors (@tiptap/extension-image resize).
-   The core node view only positions the handles; give them a size and
-   a visible grip on hover. */
-[data-resize-container][data-node="image"] {
-  max-width: 100%;
-}
-
-[data-resize-container][data-node="image"] img {
-  display: block;
-  max-width: 100%;
-}
-
-[data-resize-handle] {
-  z-index: 1;
-}
-
-[data-resize-handle="left"],
-[data-resize-handle="right"] {
-  width: 8px;
-  cursor: ew-resize;
-}
-
-[data-resize-handle="left"] { left: -4px !important; }
-[data-resize-handle="right"] { right: -4px !important; }
-
-[data-resize-handle="bottom"] {
-  height: 8px;
-  bottom: -4px !important;
-  cursor: ns-resize;
-}
-
-[data-resize-handle="bottom-right"],
-[data-resize-handle="bottom-left"] {
-  width: 12px;
-  height: 12px;
-  bottom: -6px !important;
-  border-radius: 2px;
-  background: var(--mantine-primary-color-filled, #228be6);
-  border: 2px solid var(--mantine-color-body, #fff);
-  opacity: 0;
-  transition: opacity 120ms ease;
-}
-
-[data-resize-handle="bottom-right"] { right: -6px !important; cursor: nwse-resize; }
-[data-resize-handle="bottom-left"] { left: -6px !important; cursor: nesw-resize; }
-
-[data-resize-wrapper]:hover [data-resize-handle="bottom-right"],
-[data-resize-wrapper]:hover [data-resize-handle="bottom-left"],
-[data-resize-state="true"] [data-resize-handle] {
-  opacity: 1;
-}
-
-[data-resize-wrapper]:has([data-resize-handle]):hover > img,
-[data-resize-state="true"] img {
-  outline: 2px solid var(--mantine-primary-color-filled, #228be6);
-  outline-offset: 1px;
-}
-
 @media (prefers-color-scheme: dark) {
   html {
     color-scheme: dark;
