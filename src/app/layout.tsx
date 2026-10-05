@@ -2,6 +2,7 @@
 
 import '@mantine/core/styles.css';
 import './imageResize.css';
+import './callouts.css';
 import { MantineProvider, ColorSchemeScript } from '@mantine/core';
 import NavigationShell from '@/components/NavigationShell';
 import { theme } from '@/theme';

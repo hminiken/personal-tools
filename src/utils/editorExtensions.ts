@@ -3,6 +3,7 @@ import { Color } from '@tiptap/extension-color';
 import { TextStyle } from '@tiptap/extension-text-style';
 import Highlight from '@tiptap/extension-highlight';
 import Image from '@tiptap/extension-image';
+import { Callout } from './calloutExtension';
 
 // Tiptap's built-in resizable image. Unlike tiptap-extension-resize-image
 // (width-only, height forced to auto), this lets width and height be dragged
@@ -23,11 +24,12 @@ export const craftingEditorExtensions = [
     StarterKit.configure({
         // Configure the heading extension bundled in StarterKit
         heading: {
-            levels: [1, 2, 3],
+            levels: [1, 2, 3, 4], // AI imports use <h4> for subheadings
         },
     }),
     TextStyle,
     Color,
     Highlight,
     ResizableImage,
+    Callout,
 ];

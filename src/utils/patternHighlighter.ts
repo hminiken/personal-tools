@@ -135,7 +135,10 @@ export function processWholePattern(multilinePattern: string, colorScheme: 'ligh
   const doc = new DOMParser().parseFromString(`<body>${multilinePattern}</body>`, 'text/html');
 
   // Innermost blocks only (a <li> wrapping a <p> is handled via the <p>).
-  const blocks = Array.from(doc.body.querySelectorAll(BLOCK_SELECTOR)).filter((el) => !el.querySelector(BLOCK_SELECTOR));
+  // Callout boxes (tips, notes...) are prose, so they're left uncolored.
+  const blocks = Array.from(doc.body.querySelectorAll(BLOCK_SELECTOR)).filter(
+    (el) => !el.querySelector(BLOCK_SELECTOR) && !el.closest('[data-callout]'),
+  );
 
   let previousWasLabelOnly = false;
   for (const block of blocks) {

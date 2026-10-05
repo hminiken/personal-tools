@@ -50,6 +50,7 @@ type ContentResult = { content?: string; junkImages?: (string | number)[] };
 const HTML_RULES = `
 Formatting rules for HTML fields:
 - Use <p> for normal text, <strong> for emphasis/counts/sizes, <ul>/<ol>/<li> for lists, <h4> for subheadings, <table> for tables.
+- Put asides in a callout box: <div data-callout="TYPE"><p>…</p></div>. TYPE is "tip" for tips, hints and tricks; "info" for notes and good-to-know remarks ("Note:", "Pattern note:"); "example" for worked examples; "warning" for warnings, cautions and "Important:" remarks. Copy the text inside verbatim, but leave off the leading label word itself ("Tip:", "Note:", "Example:", "Important:") because the box already shows it. Keep the box where the aside appears. Never put rows, rounds or steps of the instructions in a box.
 - Images appear as tokens like [[IMG_7]]. Copy each token exactly, in the same position, as its own <p>[[IMG_7]]</p>.`;
 
 const IMAGE_RULES = `

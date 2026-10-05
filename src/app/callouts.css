@@ -1,0 +1,87 @@
+/* Callout boxes in pattern text: <div data-callout="tip">…</div>
+   (see src/utils/calloutExtension.ts). Applies both inside the editor and in
+   the read-only views. Each type sets an accent color and a label. */
+[data-callout] {
+  --callout-accent: var(--mantine-color-blue-6);
+  --callout-bg: var(--mantine-color-blue-0);
+  --callout-label: 'Note';
+
+  margin: 0.75em 0;
+  padding: 0.6em 0.9em;
+  border-left: 4px solid var(--callout-accent);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--callout-bg);
+}
+
+[data-callout]::before {
+  content: var(--callout-label);
+  display: block;
+  margin-bottom: 0.2em;
+  font-size: 0.75em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--callout-accent);
+}
+
+/* Tighten the paragraphs inside so the box doesn't look padded twice. */
+[data-callout] > :first-child { margin-top: 0; }
+[data-callout] > :last-child { margin-bottom: 0; }
+
+[data-callout="tip"] {
+  --callout-accent: var(--mantine-color-mustard-7);
+  --callout-bg: var(--mantine-color-mustard-0);
+  --callout-label: 'Tip';
+}
+[data-callout="example"] {
+  --callout-accent: var(--mantine-color-neutrals-7);
+  --callout-bg: var(--mantine-color-neutrals-0);
+  --callout-label: 'Example';
+}
+[data-callout="warning"] {
+  --callout-accent: var(--mantine-color-rust-7);
+  --callout-bg: var(--mantine-color-rust-0);
+  --callout-label: 'Warning';
+}
+[data-callout="success"] {
+  --callout-accent: var(--mantine-color-olive-7);
+  --callout-bg: var(--mantine-color-olive-0);
+  --callout-label: 'Success';
+}
+
+/* Dark mode: lighter accents, faint tinted backgrounds. */
+[data-mantine-color-scheme="dark"] [data-callout] {
+  --callout-accent: var(--mantine-color-blue-4);
+  --callout-bg: rgba(34, 139, 230, 0.12);
+}
+[data-mantine-color-scheme="dark"] [data-callout="tip"] {
+  --callout-accent: var(--mantine-color-mustard-4);
+  --callout-bg: rgba(197, 158, 83, 0.14);
+}
+[data-mantine-color-scheme="dark"] [data-callout="example"] {
+  --callout-accent: var(--mantine-color-neutrals-3);
+  --callout-bg: rgba(164, 138, 118, 0.14);
+}
+[data-mantine-color-scheme="dark"] [data-callout="warning"] {
+  --callout-accent: var(--mantine-color-rust-4);
+  --callout-bg: rgba(198, 110, 81, 0.15);
+}
+[data-mantine-color-scheme="dark"] [data-callout="success"] {
+  --callout-accent: var(--mantine-color-olive-4);
+  --callout-bg: rgba(140, 163, 108, 0.15);
+}
+
+/* Color dot next to each type in the toolbar's callout menu. */
+[data-callout-swatch] {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+[data-callout-swatch="info"] { background: var(--mantine-color-blue-6); }
+[data-callout-swatch="tip"] { background: var(--mantine-color-mustard-6); }
+[data-callout-swatch="example"] { background: var(--mantine-color-neutrals-6); }
+[data-callout-swatch="warning"] { background: var(--mantine-color-rust-6); }
+[data-callout-swatch="success"] { background: var(--mantine-color-olive-6); }
