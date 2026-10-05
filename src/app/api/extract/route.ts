@@ -6,26 +6,29 @@ import {
   chunkBlocks,
   restoreImages,
   tokensIn,
-  reduceSizeLists,
   imageList,
   parseJunk,
   rescueImages,
   type SourceImage,
 } from '@/lib/patternAi/prepareSource';
-import { planImport, pruneSections, headingTrails, NO_PLAN } from '@/lib/patternAi/planning';
+import { planImport, applyPlan, headingTrails, NO_PLAN } from '@/lib/patternAi/planning';
 
 // How the import works:
 //   1. The page (or pasted text) is cleaned down to content-only HTML with
 //      images swapped for short [[IMG_n]] tokens (prepareSource.ts).
 //   2. One call extracts the summary fields (title, materials, sizing, ...)
 //      from the whole page.
-//   3. The instructions are extracted chunk by chunk (~15k chars each, split
+//   3. The instructions are extracted chunk by chunk (~25k chars each, split
 //      on block boundaries) so long patterns don't get truncated, and each
 //      call only has to copy a manageable amount of text verbatim.
 //   4. Tokens are swapped back to <img> tags. Any token the model dropped
 //      without flagging it as junk is re-inserted near where it was.
 
-const CHUNK_CHARS = 15000;
+// ~25k chars per call balances the request count (the free tier allows 20
+// requests/model/day) against fidelity: at ~40k the model started dropping
+// section headings and connecting lines. A chunk that gets cut off is split
+// and retried.
+const CHUNK_CHARS = 25000;
 const CONCURRENCY = 4;
 const PDF_PAGES_PER_CALL = 5;
 const BROWSER_UA =
@@ -87,6 +90,7 @@ function contentPrompt(part: number, total: number, sourceNote: string, instruct
 This is part ${part} of ${total}. Extract ONLY the step-by-step pattern instructions found in this part.${context}
 Return a JSON object: { "content": HTML string, "junkImages": array of tokens you left out }.
 - Copy every row, round, step and stitch count VERBATIM, in order. Never summarize, shorten, merge or skip rows — a missing row ruins the pattern.
+- Keep every heading and subheading inside the instructions (e.g. "Back Panel – X-Large", "Seaming the Shoulders", "Sleeves") as <h4>, and keep the short connecting lines between rows ("Do not fasten off.", "Continue on to …", "Your piece should measure …", "Tie off.").
 - Include special-stitch tutorials and instruction tables/charts found in this part.
 - Leave out materials, abbreviations, sizing and general notes (extracted separately), plus blog intros, ads, comments, "related patterns" lists and social-media plugs.
 - If this part contains no instructions at all, return "content": "".
@@ -252,7 +256,7 @@ export async function POST(req: Request) {
       const usedInMetadata = new Set(
         tokensIn([metadata.materials, metadata.sizing, metadata.abbreviations, metadata.notes].join(' ')),
       );
-      const kept = pruneSections(prepared.blocks, plan.drop).map((b) => reduceSizeLists(b, plan.sizeCount, plan.sizeIndex));
+      const kept = applyPlan(prepared.blocks, plan);
       const chunks = chunkBlocks(kept, CHUNK_CHARS);
       const trails = headingTrails(chunks);
       const parts = await mapLimit(chunks, CONCURRENCY, (blocks, i) =>
@@ -288,12 +292,9 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error: error.overloaded
-            ? 'Gemini is busy right now (every model tier was overloaded). Please try again in a minute.'
+            ? 'Every Gemini model from the one you picked down is busy or out of quota. Try again in a minute, or pick a different model.'
             : error.message,
           overloaded: error.overloaded,
-          canRetryLower: false,
-          nextTier: null,
-          nextModelLabel: null,
         },
         { status: error.overloaded ? 503 : 502 },
       );

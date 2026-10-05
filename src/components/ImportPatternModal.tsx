@@ -5,12 +5,11 @@ import { useState } from 'react';
 import { Modal, Textarea, TextInput, Button, Group, Box, Loader, Text, FileInput, Alert } from '@mantine/core';
 import { IconFileTypePdf, IconAlertTriangle } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
+import { GeminiModelSelect } from '@/components/GeminiModelSelect';
 
 interface ImportError {
   message: string;
   overloaded: boolean;
-  nextTier: number | null;
-  nextModelLabel: string | null;
 }
 
 export function ImportPatternModal({ opened, close }: { opened: boolean; close: () => void }) {
@@ -19,12 +18,13 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
   const [rawText, setRawText] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [instructions, setInstructions] = useState('');
+  // Which Gemini model to start with (index into the server's model list).
+  const [modelTier, setModelTier] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<ImportError | null>(null);
 
-  // `tier` selects which Gemini model to use (0 = standard, higher = lighter).
-  // A failed run can offer a one-click retry at the next tier down.
-  const handleImport = async (tier = 0) => {
+  const handleImport = async () => {
+    const tier = modelTier ?? 0;
     if (!sourceUrl && !rawText && !pdfFile) return;
     setIsProcessing(true);
     setError(null);
@@ -54,13 +54,10 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        // Show the real reason (e.g. Gemini overloaded) and, when available,
-        // offer to retry on a lighter model tier.
+        // Show the real reason (e.g. every model busy or out of quota).
         setError({
           message: data.error || 'Failed to parse pattern. Please try again.',
           overloaded: !!data.overloaded,
-          nextTier: data.canRetryLower ? data.nextTier : null,
-          nextModelLabel: data.nextModelLabel ?? null,
         });
         return;
       }
@@ -77,8 +74,6 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
       setError({
         message: 'Could not reach the server. Check your connection and try again.',
         overloaded: false,
-        nextTier: null,
-        nextModelLabel: null,
       });
     } finally {
       setIsProcessing(false);
@@ -138,8 +133,15 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
           autosize
           minRows={2}
           maxRows={6}
-          mb="xl"
+          mb="md"
         />
+
+        {/* Mounted only while the modal is open, so availability is fresh. */}
+        {opened && (
+          <Box mb="xl">
+            <GeminiModelSelect value={modelTier} onChange={setModelTier} disabled={isProcessing} />
+          </Box>
+        )}
 
         {error && (
           <Alert
@@ -151,17 +153,6 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
             mb="md"
           >
             <Text size="sm">{error.message}</Text>
-            {error.nextTier !== null && (
-              <Button
-                mt="sm"
-                size="xs"
-                color="olive"
-                loading={isProcessing}
-                onClick={() => handleImport(error.nextTier!)}
-              >
-                Try a lighter model ({error.nextModelLabel})
-              </Button>
-            )}
           </Alert>
         )}
 

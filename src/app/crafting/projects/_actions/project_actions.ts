@@ -17,6 +17,7 @@ import { GeminiError, GeminiOutputError } from '@/lib/patternAi/gemini';
 export async function tailorProjectPattern(
   projectId: number,
   instructions: string,
+  modelTier = 0,
 ): Promise<{ html: string } | { error: string }> {
   const prompt = instructions.trim().slice(0, 2000);
   if (!prompt) return { error: 'Tell Gemini what to change.' };
@@ -28,13 +29,13 @@ export async function tailorProjectPattern(
   if (!source.trim()) return { error: 'This project has no pattern text to change.' };
 
   try {
-    const html = await tailorPatternHtml(source, prompt, [pattern?.sizing ?? '', pattern?.materials ?? '', pattern?.notes ?? '']);
+    const html = await tailorPatternHtml(source, prompt, [pattern?.sizing ?? '', pattern?.materials ?? '', pattern?.notes ?? ''], modelTier);
     if (!html.trim()) return { error: 'Gemini returned an empty pattern, so nothing was changed. Try rewording the request.' };
     return { html };
   } catch (err) {
     console.error('tailorProjectPattern failed:', err);
     if (err instanceof GeminiError) {
-      return { error: err.overloaded ? 'Gemini is busy right now. Please try again in a minute.' : err.message };
+      return { error: err.overloaded ? 'Every Gemini model from the one you picked down is busy or out of quota. Try again in a minute, or pick a different model.' : err.message };
     }
     if (err instanceof GeminiOutputError) return { error: `Gemini returned a response we couldn't read. ${err.message}` };
     return { error: err instanceof Error ? err.message : 'Something went wrong.' };

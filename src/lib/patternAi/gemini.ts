@@ -33,9 +33,41 @@ export class GeminiOutputError extends Error {}
 const isOverloaded = (message: string) =>
   /\b(429|503)\b|overloaded|high demand|service unavailable|unavailable|resource.?exhausted|rate limit/i.test(message);
 
+// Models whose quota is used up (e.g. the free tier's 20 requests/day), with
+// when to try them again. Without this every call in a multi-chunk import
+// re-tries a dead model first, which made imports take minutes. Aliases share
+// quota ("gemini-flash-latest" is really e.g. gemini-3.8-flash), so the model
+// named in the error is marked too.
+const exhaustedUntil = new Map<string, number>();
+
+function noteQuotaExhausted(tierId: string, message: string) {
+  if (!/quota|exceeded/i.test(message)) return; // plain overload: worth retrying next call
+  const seconds = Number(message.match(/"retryDelay":"(\d+)s"/)?.[1] ?? message.match(/retry in (\d+)s/i)?.[1] ?? 3600);
+  const until = Date.now() + Math.min(seconds, 24 * 3600) * 1000;
+  exhaustedUntil.set(tierId, until);
+  for (const m of message.matchAll(/model[":\s]+(gemini-[\w.-]+)/gi)) exhaustedUntil.set(m[1], until);
+}
+
+const isExhausted = (id: string) => (exhaustedUntil.get(id) ?? 0) > Date.now();
+
+export type ModelOption = { tier: number; id: string; label: string; availableAt: number | null };
+
+// The model list for the UI's model picker, with when any model whose quota
+// ran out becomes usable again (null = available now). Only knows about
+// quota errors this server process has seen since it started.
+export function getModelOptions(): ModelOption[] {
+  return MODEL_TIERS.map((m, tier) => ({
+    tier,
+    id: m.id,
+    label: m.label,
+    availableAt: isExhausted(m.id) ? (exhaustedUntil.get(m.id) ?? null) : null,
+  }));
+}
+
 export async function generateJson<T>(parts: (string | Part)[], startTier = 0): Promise<T> {
   let lastMessage = '';
   for (let tier = Math.max(0, startTier); tier < MODEL_TIERS.length; tier++) {
+    if (isExhausted(MODEL_TIERS[tier].id)) continue;
     const model = getClient().getGenerativeModel({
       model: MODEL_TIERS[tier].id,
       generationConfig: {
@@ -55,8 +87,11 @@ export async function generateJson<T>(parts: (string | Part)[], startTier = 0): 
       text = result.response.text();
     } catch (err) {
       lastMessage = err instanceof Error ? err.message : String(err);
-      console.error(`Gemini ${MODEL_TIERS[tier].id} error:`, lastMessage);
-      if (isOverloaded(lastMessage)) continue;
+      console.error(`Gemini ${MODEL_TIERS[tier].id} error:`, lastMessage.slice(0, 300));
+      if (isOverloaded(lastMessage)) {
+        noteQuotaExhausted(MODEL_TIERS[tier].id, lastMessage);
+        continue;
+      }
       throw new GeminiError(lastMessage, false);
     }
 
@@ -67,7 +102,10 @@ export async function generateJson<T>(parts: (string | Part)[], startTier = 0): 
       throw new GeminiOutputError('Response was not valid JSON.');
     }
   }
-  throw new GeminiError(lastMessage || 'All Gemini models are busy right now.', true);
+  throw new GeminiError(
+    lastMessage || 'Every Gemini model is busy or out of quota right now. Free-tier quotas reset daily.',
+    true,
+  );
 }
 
 // Runs async tasks with a concurrency cap, preserving result order.

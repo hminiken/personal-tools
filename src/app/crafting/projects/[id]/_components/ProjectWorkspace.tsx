@@ -31,6 +31,7 @@ import { useCraftingEditor } from '@hooks/useCraftingEditor';
 import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
 import type { CraftType } from '@/utils/knittingNeedles';
 import { sanitizePatternHtml } from '@/utils/sanitizeHtml';
+import { GeminiModelSelect } from '@/components/GeminiModelSelect';
 function ReadOnlyHTML({ html, fallback }: { html: string | null, fallback: string }) {
     return (
         <Typography p={0}>
@@ -84,6 +85,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
     const [tailorPrompt, setTailorPrompt] = useState('');
     const [isTailoring, setIsTailoring] = useState(false);
     const [tailorError, setTailorError] = useState<string | null>(null);
+    const [tailorModelTier, setTailorModelTier] = useState<number | null>(null);
     const [showTailoredNotice, setShowTailoredNotice] = useState(false);
     // Held in a ref until the editor has been rebuilt in edit mode (toggling
     // edit mode recreates the editor, which would wipe content set earlier).
@@ -100,8 +102,15 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
         if (!tailorPrompt.trim()) return;
         setIsTailoring(true);
         setTailorError(null);
-        const result = await tailorProjectPattern(project.id, tailorPrompt);
-        setIsTailoring(false);
+        let result: Awaited<ReturnType<typeof tailorProjectPattern>>;
+        try {
+            result = await tailorProjectPattern(project.id, tailorPrompt, tailorModelTier ?? 0);
+        } catch {
+            // Network drop / server restart: don't leave the button spinning.
+            result = { error: 'Could not reach the server. Check your connection and try again.' };
+        } finally {
+            setIsTailoring(false);
+        }
         if ('error' in result) {
             setTailorError(result.error);
             return;
@@ -530,6 +539,8 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                         disabled={isTailoring}
                         data-autofocus
                     />
+                    {/* Mounted only while the modal is open, so availability is fresh. */}
+                    {tailorOpened && <GeminiModelSelect value={tailorModelTier} onChange={setTailorModelTier} disabled={isTailoring} />}
                     {tailorError && <Alert color="red" title="Couldn't tailor the pattern">{tailorError}</Alert>}
                     <Group justify="space-between">
                         <Text size="xs" c="dimmed">{isTailoring ? 'Working through the pattern section by section — long patterns can take a minute.' : ''}</Text>

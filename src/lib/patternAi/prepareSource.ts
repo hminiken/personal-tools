@@ -332,15 +332,31 @@ export function restoreImages(html: string, images: SourceImage[]): string {
 // anything else is left as the full list so no number is ever guessed.
 export function reduceSizeLists(html: string, sizeCount: number, sizeIndex: number): string {
   if (sizeCount < 2 || sizeIndex < 0) return html;
+  // Some patterns put the stitch name inside the list's bracket and close
+  // only once: "(38(42,46,…,70 Hdc)". `open` catches the "(" before the first
+  // value and `tail` the trailing word(s), so that becomes "(54 Hdc)".
   const listOf = (value: string) =>
     new RegExp(
-      String.raw`(${value})(\s*["″']?\s*)\(\s*(${value}(?:\s*["″']?\s*,\s*${value}){${sizeCount - 2}})\s*["″']?\s*\)`,
+      String.raw`(\()?(${value})(\s*["″']?\s*)\(\s*(${value}(?:\s*["″']?\s*,\s*${value}){${sizeCount - 2}})\s*["″']?(?:\s+([A-Za-z][\w-]*(?:\s+[A-Za-z][\w-]*)?))?\s*\)`,
       'gi',
     );
-  const pick = (match: string, first: string, unit: string, rest: string) => {
+  const pick = (
+    match: string,
+    open: string | undefined,
+    first: string,
+    unit: string,
+    rest: string,
+    tail: string | undefined,
+    offset: number,
+    whole: string,
+  ) => {
     const values = [first, ...rest.split(/\s*["″']?\s*,\s*/)];
     if (values.length !== sizeCount) return match;
-    return `${values[sizeIndex].trim()}${unit.trim()}`;
+    const picked = values[sizeIndex].trim();
+    if (!tail) return `${open ?? ''}${picked}${unit.trim()}`;
+    // The list's ")" also closed the outer "(" unless another ")" follows.
+    const closesOuter = open && whole[offset + match.length] !== ')';
+    return `${open ?? ''}${picked} ${tail}${closesOuter ? ')' : ''}`;
   };
   // Lists of ranges first ("Rows 2-24 (2-26, 2-28, 2-30)"). Only when EVERY
   // value is a range — in "Rows 2 – 85 (91, …)" the "2 –" is part of the

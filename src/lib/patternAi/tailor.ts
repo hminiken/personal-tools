@@ -3,14 +3,13 @@ import {
   prepareEditorHtml,
   chunkBlocks,
   restoreImages,
-  reduceSizeLists,
   tokensIn,
   imageList,
   parseJunk,
   rescueImages,
   type SourceImage,
 } from './prepareSource';
-import { planImport, pruneSections, headingTrails } from './planning';
+import { planImport, applyPlan, headingTrails } from './planning';
 
 // Rewrites a project's pattern copy according to free-form instructions,
 // e.g. "only show size XL". Same safety model as the import:
@@ -22,7 +21,7 @@ import { planImport, pruneSections, headingTrails } from './planning';
 //   3. Image tokens are restored to the original <img> tags, so resized
 //      images keep their size.
 
-const CHUNK_CHARS = 15000;
+const CHUNK_CHARS = 25000; // see the note in the extract route
 const CONCURRENCY = 4;
 
 type TailorResult = { html?: string; removedImages?: (string | number)[] };
@@ -48,6 +47,7 @@ async function tailorChunk(
   label: { part: number; total: number; trail: string },
   images: SourceImage[],
   instructions: string,
+  startTier: number,
 ): Promise<string> {
   const html = blocks.join('\n');
   const inputTokens = tokensIn(html);
@@ -55,7 +55,7 @@ async function tailorChunk(
     const result = await generateJson<TailorResult>([
       tailorPrompt(label.part, label.total, instructions, label.trail),
       `Pattern HTML (part ${label.part}):\n${html}${imageList(inputTokens, images)}`,
-    ]);
+    ], startTier);
     const out = (result.html ?? '').trim();
     if (!out) return '';
     return rescueImages(out, inputTokens, parseJunk(result.removedImages));
@@ -65,8 +65,8 @@ async function tailorChunk(
       const firstHalf = blocks.slice(0, mid);
       const secondTrail = [label.trail, headingTrails([firstHalf, []])[1]].filter(Boolean).join(' > ');
       const [a, b] = await Promise.all([
-        tailorChunk(firstHalf, label, images, instructions),
-        tailorChunk(blocks.slice(mid), { ...label, trail: secondTrail }, images, instructions),
+        tailorChunk(firstHalf, label, images, instructions, startTier),
+        tailorChunk(blocks.slice(mid), { ...label, trail: secondTrail }, images, instructions, startTier),
       ]);
       return [a, b].filter(Boolean).join('\n');
     }
@@ -79,19 +79,25 @@ async function tailorChunk(
  * @param instructions  What to do, e.g. 'Only show size "XL"'.
  * @param context       Extra HTML that may declare the size order (the
  *                      master pattern's sizing/materials/notes). Read-only.
+ * @param startTier     Which Gemini model to start with (falls back down).
  */
-export async function tailorPatternHtml(html: string, instructions: string, context: string[] = []): Promise<string> {
+export async function tailorPatternHtml(
+  html: string,
+  instructions: string,
+  context: string[] = [],
+  startTier = 0,
+): Promise<string> {
   const { blocks, images } = prepareEditorHtml(html);
   if (!blocks.length) return html;
 
   const contextBlocks = context.filter(Boolean).flatMap((c) => prepareEditorHtml(c).blocks);
-  const plan = await planImport(blocks, instructions, 0, contextBlocks);
-  const kept = pruneSections(blocks, plan.drop).map((b) => reduceSizeLists(b, plan.sizeCount, plan.sizeIndex));
+  const plan = await planImport(blocks, instructions, startTier, contextBlocks);
+  const kept = applyPlan(blocks, plan);
 
   const chunks = chunkBlocks(kept, CHUNK_CHARS);
   const trails = headingTrails(chunks);
   const parts = await mapLimit(chunks, CONCURRENCY, (chunk, i) =>
-    tailorChunk(chunk, { part: i + 1, total: chunks.length, trail: trails[i] }, images, instructions),
+    tailorChunk(chunk, { part: i + 1, total: chunks.length, trail: trails[i] }, images, instructions, startTier),
   );
   return restoreImages(parts.filter(Boolean).join('\n'), images);
 }

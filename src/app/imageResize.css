@@ -15,6 +15,13 @@
   z-index: 2;
 }
 
+/* Tiptap 3.23 attaches handles when an image's view is created, even in a
+   read-only editor, and only removes them after the next document update.
+   Never show (or allow dragging) them outside edit mode. */
+.ProseMirror[contenteditable="false"] [data-resize-handle] {
+  display: none;
+}
+
 /* Edges: invisible strips you can drag. */
 [data-resize-handle="left"],
 [data-resize-handle="right"] {
@@ -51,8 +58,8 @@
 [data-resize-handle="bottom-right"] { bottom: -6px !important; right: -6px !important; cursor: nwse-resize; }
 
 /* Outline the image while hovering/resizing in edit mode. */
-[data-resize-wrapper]:has([data-resize-handle]):hover > img,
-[data-resize-state="true"] img {
+.ProseMirror[contenteditable="true"] [data-resize-wrapper]:has([data-resize-handle]):hover > img,
+.ProseMirror[contenteditable="true"] [data-resize-state="true"] img {
   outline: 2px solid var(--mantine-primary-color-filled, #228be6);
   outline-offset: 1px;
 }
