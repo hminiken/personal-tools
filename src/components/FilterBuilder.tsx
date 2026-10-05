@@ -29,12 +29,11 @@ interface FilterBuilderProps {
   // filter chip so several filters can be combined.
   onDraftChange?: (draft: Filter | null) => void;
   placeholder?: string;
-  universalInputStyles?: object;
 }
 
 export function FilterBuilder({
   fields, getSuggestions, filters, onAdd, onRemove, onClear, onDraftChange,
-  placeholder = 'Search...', universalInputStyles,
+  placeholder = 'Search...',
 }: FilterBuilderProps) {
   const [field, setField] = useState<string>(fields[0]?.value ?? '__all__');
   const [value, setValue] = useState('');
@@ -65,8 +64,7 @@ export function FilterBuilder({
       <Group wrap="nowrap" w="100%" gap="xs">
         <Select
           aria-label="Search by"
-          leftSection={<IconFilter size={16} color="var(--mantine-color-neutrals-9)" />}
-          styles={universalInputStyles}
+          leftSection={<IconFilter size={16} />}
           data={fields}
           value={field}
           onChange={(val) => setField(val || '__all__')}
@@ -75,7 +73,6 @@ export function FilterBuilder({
           style={{ flexShrink: 0 }}
         />
         <Autocomplete
-          styles={universalInputStyles}
           data={suggestions}
           value={value}
           onChange={setValue}
@@ -92,7 +89,6 @@ export function FilterBuilder({
           <ActionIcon
             size="input-sm"
             variant="light"
-            color="olive"
             aria-label="Keep as filter"
             onClick={commit}
             disabled={!value.trim()}

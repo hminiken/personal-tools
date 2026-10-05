@@ -4,10 +4,10 @@ import ItemGallery from '@/components/ItemGallery';
 import { TagBadges, BadgeRow } from '@components/TagBadges';
 import { deleteYarn } from '../_actions/stash_actions';
 import YarnForm from './YarnForm';
+import type { yarnStash } from '@app/crafting/projects/[id]/types';
 
-// Define the shape of the data we expect from the server
 interface StashClientProps {
-  stashItems: any[]; // You can type this more strictly if you exported the YarnStash type!
+  stashItems: yarnStash[];
 }
 
 export default function StashClient({ stashItems }: StashClientProps) {

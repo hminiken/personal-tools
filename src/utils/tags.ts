@@ -11,8 +11,12 @@ export function splitTags(value: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
-// Pattern statuses (Not Started / WIP / Completed / On Hold / Did Not Like)
-// and project statuses (WIP / Complete / On Hold / Frogged) share one palette.
+// Status dropdown options. These strings are what's stored in the DB, so
+// changing one means migrating existing rows.
+export const PATTERN_STATUSES = ['Not Started', 'WIP', 'Completed', 'On Hold', 'Did Not Like'];
+export const PROJECT_STATUSES = ['WIP', 'Complete', 'On Hold', 'Frogged'];
+
+// Pattern and project statuses share one palette.
 const STATUS_COLORS: Record<string, string> = {
   'not started': 'gray',
   planned: 'gray',

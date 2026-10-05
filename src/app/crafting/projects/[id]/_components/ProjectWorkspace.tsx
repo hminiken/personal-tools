@@ -1,97 +1,65 @@
-/* eslint-disable react/no-unescaped-entities */
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import {
-    Title, Text, Group, Paper, Switch, Tabs, Divider, Box, Button,
-    TextInput, Stack, Typography, Anchor, Modal, useComputedColorScheme, ActionIcon, Card, Image, Collapse,
-    Textarea, Alert
-} from '@mantine/core';
-import { IconArrowLeft, IconPlus, IconUnlink, IconChevronDown, IconChevronRight, IconSparkles } from '@tabler/icons-react';
+import { Text, Group, Paper, Switch, Tabs, Divider, Box, Button, Anchor, Collapse, Alert } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import Link from 'next/link';
-
-// Tiptap Imports
-import { RichTextEditor } from '@mantine/tiptap';
-import '@mantine/tiptap/styles.css';
-
-// Actions & Components
-import { saveRulerPosition, updateProject, updateProjectStatus, addQuickNote, deleteProject, unlinkYarnFromProject, tailorProjectPattern } from '../../_actions/project_actions';
-import { processWholePattern } from '@/utils/patternHighlighter';
-import ImageGallery from '@/components/PatternImageGallery';
-import { Project, Pattern, PatternImage, yarnStash } from '../types';
-import { CraftingMetadataForm } from '@/components/CraftingMetadataForm';
+import { IconPlus, IconSparkles } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
-import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
+
+import { saveRulerPosition, updateProject, updateProjectStatus, deleteProject } from '../../_actions/project_actions';
+import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
+import { Project, Pattern, PatternImage, yarnStash } from '../types';
+import ImageGallery from '@/components/PatternImageGallery';
+import { CraftingMetadataForm } from '@/components/CraftingMetadataForm';
+import { BackButton } from '@components/BackButton';
+import { ConfirmDeleteModal } from '@components/ConfirmDeleteModal';
 import { ScrollToTopButton } from '@components/ScrollToTopButton';
 import { FloatingEditActions } from '@components/FloatingEditActions';
-import { StashBrowserModal } from './StashBrowserModal';
-import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
+import { CollapsibleHeader, PatternText, ReadOnlyHtml, TabContent, contentTabsStyles } from '@components/PatternContent';
 import { useCraftingEditor } from '@hooks/useCraftingEditor';
-import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
+import { useOptimisticStatus } from '@hooks/useOptimisticStatus';
+import { splitTags, PROJECT_STATUSES } from '@/utils/tags';
 import type { CraftType } from '@/utils/knittingNeedles';
-import { sanitizePatternHtml } from '@/utils/sanitizeHtml';
-import { GeminiModelSelect } from '@/components/GeminiModelSelect';
-import { PLACEHOLDER_IMAGE } from '@/utils/placeholders';
-import { TagBadges } from '@components/TagBadges';
-function ReadOnlyHTML({ html, fallback }: { html: string | null, fallback: string }) {
-    return (
-        <Typography p={0}>
-            <div dangerouslySetInnerHTML={{ __html: sanitizePatternHtml(html) || `<p>${fallback}</p>` }} />
-        </Typography>
-    );
-}
+import { ReadingRuler } from './ReadingRuler';
+import { QuickNoteModal } from './QuickNoteModal';
+import { TailorModal } from './TailorModal';
+import { LinkedYarnSection, type LinkedYarn } from './LinkedYarnSection';
 
-export interface LinkedYarn {
-    id: number;
-    yarnId: number;
-    title: string;
-    brand: string | null;
-    weight: string | null;
-    color_tags: string | null;
-    fiber_tags: string | null;
-    coverImagePath: string | null;
-}
-
-export default function ProjectWorkspace({ project, pattern, images, linkedYarns, availableStash }: { project: Project & { categories?: string | null }, pattern: Pattern, images: PatternImage[], linkedYarns: LinkedYarn[], availableStash: yarnStash[] }) {
-    // const [rulerEnabled, setRulerEnabled] = useState(true);
-    // const [rulerY, setRulerY] = useState(project.rulerPosition || 0);
-    const [rulerEnabled, setRulerEnabled] = useState(true);
-    const [rulerY, setRulerY] = useState(project.ruler || 0);
-    const [isDraggingRuler, setIsDraggingRuler] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
+export default function ProjectWorkspace({ project, pattern, images, linkedYarns, availableStash }: {
+    project: Project;
+    pattern: Pattern;
+    images: PatternImage[];
+    linkedYarns: LinkedYarn[];
+    availableStash: yarnStash[];
+}) {
+    const router = useRouter();
 
     const [isEditingDetails, setIsEditingDetails] = useState(false);
     const [isEditingTabs, setIsEditingTabs] = useState(false);
     const [rainbowEnabled, setRainbowEnabled] = useState(false);
-    const computedColorScheme = useComputedColorScheme('light');
-
-    const [noteModalOpened, { open: openNote, close: closeNote }] = useDisclosure(false);
-    const [quickNote, setQuickNote] = useState('');
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    // States
-    const [hookTags, setHookTags] = useState<string[]>(project.hooks ? project.hooks.split(',') : []);
-    const [weightTags, setWeightTags] = useState<string[]>(project.weights ? project.weights.split(',') : []);
-    const [categoryTags, setCategoryTags] = useState<string[]>(project.categories ? project.categories.split(',') : []);
-    const [status, setStatus] = useState<string>(project.status || '');
-    const [craftType, setCraftType] = useState<CraftType>((project.craftType as CraftType) || 'crochet');
-
-    const notesEditor = useCraftingEditor(project.notes, isEditingTabs);
-    const patternEditor = useCraftingEditor(project.content || pattern.content, isEditingTabs);
-
-    // "Tailor with AI": Gemini rewrites the pattern copy (e.g. only size XL).
-    // The result is loaded into the editor in edit mode, NOT saved — the user
-    // reviews it, then Save Text keeps it or Cancel Editing throws it away.
+    const [rulerEnabled, setRulerEnabled] = useState(true);
+    const [contentOpened, { toggle: toggleContent, open: openContent }] = useDisclosure(true);
+    const [noteOpened, { open: openNote, close: closeNote }] = useDisclosure(false);
     const [tailorOpened, { open: openTailor, close: closeTailor }] = useDisclosure(false);
-    const [tailorPrompt, setTailorPrompt] = useState('');
-    const [isTailoring, setIsTailoring] = useState(false);
-    const [tailorError, setTailorError] = useState<string | null>(null);
-    const [tailorModelTier, setTailorModelTier] = useState<number | null>(null);
-    const [showTailoredNotice, setShowTailoredNotice] = useState(false);
-    // Held in a ref until the editor has been rebuilt in edit mode (toggling
-    // edit mode recreates the editor, which would wipe content set earlier).
+
+    // Metadata
+    const [hookTags, setHookTags] = useState(splitTags(project.hooks));
+    const [weightTags, setWeightTags] = useState(splitTags(project.weights));
+    const [categoryTags, setCategoryTags] = useState(splitTags(project.categories));
+    const [craftType, setCraftType] = useState<CraftType>((project.craftType as CraftType) || 'crochet');
+    const [status, updateStatus] = useOptimisticStatus(project.status, (s) => updateProjectStatus(project.id, s));
+
+    // The project's own copy of the pattern, plus its notes. Materials etc.
+    // are read straight from the master pattern.
+    const patternEditor = useCraftingEditor(project.content || pattern.content, isEditingTabs);
+    const notesEditor = useCraftingEditor(project.notes, isEditingTabs);
+
+    // An AI-tailored version waits here until the editor has been rebuilt in
+    // edit mode (toggling edit mode recreates the editor, which would wipe
+    // content set earlier). It's loaded but NOT saved: Save Text keeps it,
+    // Cancel Editing throws it away.
     const pendingTailoredHtml = useRef<string | null>(null);
+    const [showTailoredNotice, setShowTailoredNotice] = useState(false);
 
     useEffect(() => {
         if (pendingTailoredHtml.current && patternEditor?.isEditable) {
@@ -100,28 +68,16 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
         }
     }, [patternEditor, isEditingTabs]);
 
-    const handleTailor = async () => {
-        if (!tailorPrompt.trim()) return;
-        setIsTailoring(true);
-        setTailorError(null);
-        let result: Awaited<ReturnType<typeof tailorProjectPattern>>;
-        try {
-            result = await tailorProjectPattern(project.id, tailorPrompt, tailorModelTier ?? 0);
-        } catch {
-            // Network drop / server restart: don't leave the button spinning.
-            result = { error: 'Could not reach the server. Check your connection and try again.' };
-        } finally {
-            setIsTailoring(false);
-        }
-        if ('error' in result) {
-            setTailorError(result.error);
-            return;
-        }
-        pendingTailoredHtml.current = result.html;
+    const loadTailored = (html: string) => {
+        pendingTailoredHtml.current = html;
         setShowTailoredNotice(true);
         openContent();
         setIsEditingTabs(true);
-        closeTailor();
+    };
+
+    const startEditingTabs = () => {
+        openContent();
+        setIsEditingTabs(true);
     };
 
     const stopEditingTabs = () => {
@@ -129,69 +85,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
         setShowTailoredNotice(false);
     };
 
-
-
-
-    const handleTextClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!rulerEnabled || !project?.id) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const yPosition = e.clientY - rect.top;
-        setRulerY(yPosition);
-        saveRulerPosition(Number(project.id), Math.round(yPosition));
-    };
-
-    const handleSaveNote = async () => {
-        if (!quickNote.trim()) return;
-        await addQuickNote(project.id, quickNote);
-        setQuickNote('');
-        closeNote();
-    };
-
-    const handleUpdateStatus = async (newStatus: string) => {
-        const previousStatus = status ?? project.status ?? '';
-        setStatus(newStatus);
-        try {
-            const result = await updateProjectStatus(project.id, newStatus);
-            if (!result.success) throw new Error('Database update failed');
-        } catch {
-            setStatus(previousStatus);
-            alert('Failed to save status. Reverting...');
-        }
-    };
-
-    const [stashModalOpened, { open: openStashModal, close: closeStashModal }] = useDisclosure(false);
-    const [contentOpened, { toggle: toggleContent, open: openContent }] = useDisclosure(true);
-
-    const handleUnlinkYarn = async (yarnId: number) => {
-        if (confirm("Remove this yarn from the project?")) {
-            await unlinkYarnFromProject(project.id, yarnId);
-        }
-    };
-
-    const handleRulerPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-        setIsDraggingRuler(true);
-        e.currentTarget.setPointerCapture(e.pointerId); // Locks the touch to the ruler even if your finger slips off the edge
-        e.stopPropagation(); // Prevents the box underneath from thinking you clicked it
-    };
-
-    const handleRulerPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-        if (!isDraggingRuler || !containerRef.current) return;
-
-        const rect = containerRef.current.getBoundingClientRect();
-        let newY = e.clientY - rect.top;
-
-        // Keep it clamped inside the box
-        newY = Math.max(0, Math.min(newY, rect.height));
-        setRulerY(newY);
-    };
-
-    const handleRulerPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-        setIsDraggingRuler(false);
-        e.currentTarget.releasePointerCapture(e.pointerId);
-        saveRulerPosition(Number(project.id), Math.round(rulerY));
-    };
-
-    const router = useRouter();
+    // Delete
     const [deleteModalOpened, { open: openDelete, close: closeDelete }] = useDisclosure(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -203,28 +97,33 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
         router.push('/crafting/projects');
     };
 
+    const saveContent = async (formData: FormData) => {
+        formData.set('projectNotes', notesEditor?.getHTML() || '');
+        formData.set('annotatedPattern', patternEditor?.getHTML() || '');
+
+        await updateProject(formData);
+        router.refresh(); // Pull fresh server props so the editors re-sync
+        stopEditingTabs();
+    };
+
+    const tabPadding = { base: 'xs', sm: 'md' };
+
     return (
         <Paper pl={{ base: '0', sm: 'xl' }} pr={{ base: 'xs', sm: 'xl' }} radius="md">
-            <Button component={Link} href="/crafting/projects" variant="subtle" color="gray" leftSection={<IconArrowLeft size={16} />} mb="md" pl={0}>
-                Back to Projects
-            </Button>
+            <BackButton href="/crafting/projects" label="Back to Projects" />
 
-            {/* ABSTRACTION: Metadata Form */}
+            {/* updateProject only writes the fields it receives, so saving
+                details leaves the pattern copy and notes alone. */}
             <CraftingMetadataForm
                 idName="projectId"
                 idValue={project.id}
                 title={project.title}
                 sourceUrl={project.sourceUrl}
-                yarnUsed={project.yarn} // Project specific
-                colors={project.colors}     // Project specific
+                yarnUsed={project.yarn}
+                colors={project.colors}
                 status={status}
-                statusOptions={[
-                    { value: 'WIP', label: 'WIP' },
-                    { value: 'Complete', label: 'Complete' },
-                    { value: 'On Hold', label: 'On Hold' },
-                    { value: 'Frogged', label: 'Frogged' },
-                ]}
-                onUpdateStatus={handleUpdateStatus}
+                statusOptions={PROJECT_STATUSES}
+                onUpdateStatus={updateStatus}
                 craftType={craftType}
                 setCraftType={setCraftType}
                 tags={{ hookTags, setHookTags, weightTags, setWeightTags, categoryTags, setCategoryTags }}
@@ -232,7 +131,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                 setIsEditing={setIsEditingDetails}
                 onDeleteClick={openDelete}
                 actionButtons={
-                    <Button variant="filled" color="olive.6" onClick={openNote} leftSection={<IconPlus size={14} />}>
+                    <Button onClick={openNote} leftSection={<IconPlus size={14} />}>
                         Quick Note
                     </Button>
                 }
@@ -241,165 +140,72 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                         <Anchor fw={500} href={`/crafting/patterns/${pattern.id}`} ml={4}>{pattern.title}</Anchor>
                     </Text>
                 }
-                // We wrap the standard updateProject action so it preserves the rich text blocks
-                formAction={async (formData) => {
-                    formData.set('projectNotes', project.notes || '');
-                    formData.set('annotatedPattern', project.content || '');
-                    await updateProject(formData);
-                }}
+                formAction={updateProject}
             />
 
             <Divider my="sm" />
 
-            {/* TABS FORM */}
-            <form id="project-content-form" action={async (formData) => {
-                formData.set('projectNotes', notesEditor?.getHTML() || '');
-                formData.set('annotatedPattern', patternEditor?.getHTML() || '');
-
-                // Preserve metadata
-                formData.set('title', project.title);
-                formData.set('yarnUsed', project.yarn || '');
-                formData.set('colors', project.colors || '');
-                formData.set('hookSizes', hookTags.join(','));
-                formData.set('yarnWeights', weightTags.join(','));
-                formData.set('categories', categoryTags.join(','));
-
-                await updateProject(formData);
-                router.refresh(); // Pull fresh server props so the editors re-sync
-                stopEditingTabs();
-            }}>
+            <form id="project-content-form" action={saveContent}>
                 <input type="hidden" name="projectId" value={project.id} />
 
-                <Group justify="space-between" mb="sm">
-                    <Group gap={6} onClick={toggleContent} style={{ cursor: 'pointer' }}>
-                        <ActionIcon variant="subtle" color="gray" aria-label={contentOpened ? 'Collapse content' : 'Expand content'}>
-                            {contentOpened ? <IconChevronDown size={20} /> : <IconChevronRight size={20} />}
-                        </ActionIcon>
-                        <Title order={4}>Project Content</Title>
-                    </Group>
-                    <Group>
-                        {!isEditingTabs && (
-                            <Button variant="light" color="grape" leftSection={<IconSparkles size={16} />} onClick={() => { setTailorError(null); openTailor(); }}>
-                                Tailor with AI
-                            </Button>
-                        )}
-                        <Button variant="light" onClick={() => { if (isEditingTabs) { stopEditingTabs(); } else { openContent(); setIsEditingTabs(true); } }}>
-                            {isEditingTabs ? 'Cancel Editing' : 'Edit Text'}
+                <CollapsibleHeader title="Project Content" opened={contentOpened} onToggle={toggleContent}>
+                    {!isEditingTabs && (
+                        <Button variant="light" color="grape" leftSection={<IconSparkles size={16} />} onClick={openTailor}>
+                            Tailor with AI
                         </Button>
-                        {isEditingTabs && <Button type="submit" color="olive.5">Save Text</Button>}
-                    </Group>
-                </Group>
+                    )}
+                    <Button variant="light" onClick={isEditingTabs ? stopEditingTabs : startEditingTabs}>
+                        {isEditingTabs ? 'Cancel Editing' : 'Edit Text'}
+                    </Button>
+                    {isEditingTabs && <Button type="submit">Save Text</Button>}
+                </CollapsibleHeader>
 
                 <Collapse expanded={contentOpened} keepMounted>
-                <Tabs
-                    defaultValue="pattern"
-                    variant="outline"
-                    keepMounted
-                    styles={{
-                        list: {
-                            flexWrap: 'nowrap',
-                            overflowX: 'auto',
-                            // Keep the tab bar in reach while scrolling a long pattern.
-                            // Disabled while editing so it doesn't collide with the
-                            // editor's own sticky toolbar (which sits at the same offset).
-                            ...(!isEditingTabs && {
-                                position: 'sticky',
-                                top: 60,
-                                zIndex: 3,
-                                backgroundColor: 'var(--mantine-color-body)',
-                            }),
-                        },
-                    }}
-                >
-                    <Tabs.List>
-                        <Tabs.Tab value="pattern">Pattern</Tabs.Tab>
-                        <Tabs.Tab value="projectNotes" color="blue">My Project Notes</Tabs.Tab>
-                        <Tabs.Tab value="materials">Materials</Tabs.Tab>
-                        <Tabs.Tab value="abbreviations">Abbreviations</Tabs.Tab>
-                        <Tabs.Tab value="sizing">Sizing</Tabs.Tab>
-                        <Tabs.Tab value="patternNotes">Pattern Notes</Tabs.Tab>
-                    </Tabs.List>
+                    <Tabs defaultValue="pattern" variant="outline" keepMounted styles={contentTabsStyles(isEditingTabs)}>
+                        <Tabs.List>
+                            <Tabs.Tab value="pattern">Pattern</Tabs.Tab>
+                            <Tabs.Tab value="projectNotes">My Project Notes</Tabs.Tab>
+                            <Tabs.Tab value="materials">Materials</Tabs.Tab>
+                            <Tabs.Tab value="abbreviations">Abbreviations</Tabs.Tab>
+                            <Tabs.Tab value="sizing">Sizing</Tabs.Tab>
+                            <Tabs.Tab value="patternNotes">Pattern Notes</Tabs.Tab>
+                        </Tabs.List>
 
-                    <Tabs.Panel value="pattern" p={{ base: 'xs', sm: 'md' }}>
-                        <Group justify="space-between" mb="sm">
-                            <Text size="sm" c="dimmed" fs="italic">This is your project's clone of the pattern. Mark it up!</Text>
-                        </Group>
-                        {showTailoredNotice && isEditingTabs && (
-                            <Alert color="grape" icon={<IconSparkles size={18} />} title="AI-tailored version loaded" mb="sm">
-                                Review the changes below. <strong>Save Text</strong> keeps them; <strong>Cancel Editing</strong> discards them and restores your saved copy.
-                            </Alert>
-                        )}
-                        <Group mb="sm">
-                            <Switch checked={rainbowEnabled} onChange={(event) => setRainbowEnabled(event.currentTarget.checked)} label="Rainbow Steps" color="grape" />
-                            <Switch checked={rulerEnabled} onChange={(event) => setRulerEnabled(event.currentTarget.checked)} label="Reading Ruler" />
-                        </Group>
+                        <Tabs.Panel value="pattern" p={tabPadding}>
+                            <Text size="sm" c="dimmed" fs="italic" mb="sm">This is your project&apos;s copy of the pattern. Mark it up!</Text>
+                            {showTailoredNotice && isEditingTabs && (
+                                <Alert color="grape" icon={<IconSparkles size={18} />} title="AI-tailored version loaded" mb="sm">
+                                    Review the changes below. <strong>Save Text</strong> keeps them; <strong>Cancel Editing</strong> discards them and restores your saved copy.
+                                </Alert>
+                            )}
+                            {!isEditingTabs && (
+                                <Group mb="sm">
+                                    <Switch checked={rainbowEnabled} onChange={(e) => setRainbowEnabled(e.currentTarget.checked)} label="Rainbow Steps" color="grape" />
+                                    <Switch checked={rulerEnabled} onChange={(e) => setRulerEnabled(e.currentTarget.checked)} label="Reading Ruler" />
+                                </Group>
+                            )}
 
-                        <Box
-                            ref={containerRef}
-                            style={{ position: 'relative', cursor: rulerEnabled && !isEditingTabs ? 'crosshair' : 'auto' }}
-                            onClick={handleTextClick}
+                            <ReadingRuler
+                                enabled={rulerEnabled && !isEditingTabs}
+                                initialY={project.ruler || 0}
+                                onMove={(y) => saveRulerPosition(project.id, y)}
+                            >
+                                <PatternText editor={patternEditor} isEditing={isEditingTabs} rainbow={rainbowEnabled} fontSize="1.1rem" />
+                            </ReadingRuler>
+                        </Tabs.Panel>
+
+                        <Tabs.Panel
+                            value="projectNotes"
+                            p={tabPadding}
+                            bg={isEditingTabs ? 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))' : undefined}
                         >
-                            {rulerEnabled && !isEditingTabs && (
-                                <div style={{
-                                    // Clamped to the text box: at the saved default (0) it used to sit
-                                    // 15px above it, over the Rainbow/Ruler switches, and block clicks.
-                                    position: 'absolute', top: `${Math.max(0, rulerY - 15)}px`, left: -10, right: -10, height: '35px',
-                                    backgroundColor: 'rgba(255, 224, 102, 0.4)', borderLeft: '4px solid var(--mantine-color-yellow-filled)',
-                                    zIndex: 5, borderRadius: '4px',
-                                    pointerEvents: 'auto',
-                                    touchAction: 'none',
-                                    cursor: isDraggingRuler ? 'grabbing' : 'grab',
-                                    transition: isDraggingRuler ? 'none' : 'top 0.2s ease-out',
-                                }}
-                                    onPointerDown={handleRulerPointerDown}
-                                    onPointerMove={handleRulerPointerMove}
-                                    onPointerUp={handleRulerPointerUp}
-                                    onPointerCancel={handleRulerPointerUp}
-                                />
-                            )}
-
-                            {rainbowEnabled && !isEditingTabs ? (
-                                <Typography style={{ fontSize: '1.1rem', lineHeight: 1.8 }}>
-                                    <div dangerouslySetInnerHTML={{ __html: processWholePattern(patternEditor?.getHTML() || '', computedColorScheme) }} />
-                                </Typography>
-                            ) : (
-                                <RichTextEditor
-                                    editor={patternEditor}
-                                    style={{ border: isEditingTabs ? undefined : 'none' }}
-                                    styles={{
-                                        content: {
-                                            '& .ProseMirror': { overflowX: 'hidden' },
-                                            '& .ProseMirror img': { maxWidth: '100%', height: 'auto !important' },
-                                            '& .ProseMirror span.resizeCursor': { display: 'inline-block', maxWidth: '100%' }
-                                        }
-                                    }}
-                                >
-                                    {/* ✨ REPLACED THE ENTIRE TOOLBAR BLOCK WITH OUR SINGLE COMPONENT */}
-                                    {isEditingTabs && <CraftingEditorToolbar />}
-                                    <RichTextEditor.Content />
-                                </RichTextEditor>
-                            )}
-                        </Box>
-                    </Tabs.Panel>
-
-                    <Tabs.Panel value="materials" p={{ base: 'xs', sm: 'md' }}><ReadOnlyHTML html={pattern.materials} fallback="No materials listed in master pattern." /></Tabs.Panel>
-                    <Tabs.Panel value="abbreviations" p={{ base: 'xs', sm: 'md' }}><ReadOnlyHTML html={pattern.abbreviations} fallback="No abbreviations listed in master pattern." /></Tabs.Panel>
-                    <Tabs.Panel value="sizing" p={{ base: 'xs', sm: 'md' }}><ReadOnlyHTML html={pattern.sizing} fallback="No sizing info in master pattern." /></Tabs.Panel>
-                    <Tabs.Panel value="patternNotes" p={{ base: 'xs', sm: 'md' }}><ReadOnlyHTML html={pattern.notes} fallback="No master notes available." /></Tabs.Panel>
-
-                    {/* ✨ ADDED light-dark() FOR DARK MODE COMPATIBILITY */}
-                    <Tabs.Panel value="projectNotes" p={{ base: 'xs', sm: 'md' }} bg={isEditingTabs ? 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))' : 'transparent'}>
-                        {isEditingTabs ? (
-                            <RichTextEditor editor={notesEditor}>
-                                {/* ✨ REPLACED THE ENTIRE TOOLBAR BLOCK WITH OUR SINGLE COMPONENT */}
-                                <CraftingEditorToolbar />
-                                <RichTextEditor.Content />
-                            </RichTextEditor>
-                        ) : (
-                            <ReadOnlyHTML html={project.notes} fallback="Click 'Edit Text' to start adding notes!" />
-                        )}
-                    </Tabs.Panel>
-                </Tabs>
+                            <TabContent editor={notesEditor} isEditing={isEditingTabs} originalContent={project.notes} fallbackText="Click 'Edit Text' to start adding notes!" />
+                        </Tabs.Panel>
+                        <Tabs.Panel value="materials" p={tabPadding}><ReadOnlyHtml html={pattern.materials} fallback="No materials listed in master pattern." /></Tabs.Panel>
+                        <Tabs.Panel value="abbreviations" p={tabPadding}><ReadOnlyHtml html={pattern.abbreviations} fallback="No abbreviations listed in master pattern." /></Tabs.Panel>
+                        <Tabs.Panel value="sizing" p={tabPadding}><ReadOnlyHtml html={pattern.sizing} fallback="No sizing info in master pattern." /></Tabs.Panel>
+                        <Tabs.Panel value="patternNotes" p={tabPadding}><ReadOnlyHtml html={pattern.notes} fallback="No master notes available." /></Tabs.Panel>
+                    </Tabs>
                 </Collapse>
             </form>
 
@@ -418,127 +224,10 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                 />
             </Box>
 
+            <LinkedYarnSection projectId={project.id} linkedYarns={linkedYarns} availableStash={availableStash} />
 
-
-            <Box mb="xl" mt="xl">
-                <Group justify="space-between" mb="md">
-                    <Title order={4}>Project Yarn</Title>
-                    <Button variant="light" size="sm" leftSection={<IconPlus size={16} />} onClick={openStashModal}>
-                        Browse Stash
-                    </Button>
-                </Group>
-
-                {linkedYarns.map((yarn: LinkedYarn) => (
-                    <Card
-                        // eslint-disable-next-line react-hooks/purity
-                        key={yarn.yarnId || yarn.id || Math.random()} // <-- Bulletproof key!
-                        withBorder
-                        shadow="sm"
-                        radius="md"
-                        component={Link}
-                        href={`/crafting/stash/${yarn.yarnId || yarn.id}`}
-                        style={{ textDecoration: 'none', color: 'inherit' }}
-                    >
-                        <Group wrap="nowrap" align="flex-start">
-
-                            {/* 1. THE IMAGE (Uncommented the sizing so it renders!) */}
-                            <Image
-                                src={yarn.coverImagePath || PLACEHOLDER_IMAGE}
-                                h={60}
-                                w={60}
-                                radius="md"
-                                fit="cover"
-                                alt={yarn.title}
-                                fallbackSrc={PLACEHOLDER_IMAGE}
-                            />
-
-                            {/* 2. THE DETAILS & BADGES */}
-                            <Box style={{ flex: 1 }}>
-                                <Text fw={500} lineClamp={1}>{yarn.title}</Text>
-                                <Text size="xs" c="dimmed" mb={6}>
-                                    {yarn.brand || 'Unknown Brand'}
-                                </Text>
-
-                                <Group gap={4}>
-                                    <TagBadges value={yarn.weight} color="mustard" size="xs" />
-                                    <TagBadges value={yarn.fiber_tags} color="rust" size="xs" />
-                                    <TagBadges value={yarn.color_tags} color="olive" variant="outline" size="xs" />
-                                </Group>
-                            </Box>
-
-                            {/* 3. THE UNLINK BUTTON (With preventDefault added!) */}
-                            <ActionIcon
-                                variant="subtle"
-                                color="red"
-                                onClick={(e) => {
-                                    e.preventDefault(); // <--- Stops the card from linking when you click the trash icon
-                                    handleUnlinkYarn(yarn.yarnId || yarn.id);
-                                }}
-                            >
-                                <IconUnlink size={16} />
-                            </ActionIcon>
-
-                        </Group>
-                    </Card>
-                ))}
-            </Box>
-
-
-            {/* Quick Note Modal */}
-            <Modal opened={noteModalOpened} onClose={closeNote} title="Quick Note" centered transitionProps={{ onEntered: () => inputRef.current?.focus() }}>
-                <Stack>
-                    <TextInput
-                        ref={inputRef}
-                        value={quickNote}
-                        onChange={(e) => setQuickNote(e.currentTarget.value)}
-                        placeholder="What did you just finish?"
-                        onKeyDown={async (e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                await handleSaveNote();
-                            }
-                        }}
-                    />
-                    <Button onClick={handleSaveNote}>Save Note</Button>
-                </Stack>
-            </Modal>
-            <Modal opened={tailorOpened} onClose={() => { if (!isTailoring) closeTailor(); }} title="Tailor pattern with AI" centered size="lg">
-                <Stack>
-                    <Text size="sm" c="dimmed">
-                        Gemini rewrites this project's copy of the pattern. Nothing is saved until you review it and click Save Text.
-                    </Text>
-                    <Textarea
-                        label="What should change?"
-                        placeholder={'e.g. Only show size "XL" — remove the other sizes\' stitch counts and any sections for other sizes.'}
-                        value={tailorPrompt}
-                        onChange={(e) => setTailorPrompt(e.currentTarget.value)}
-                        autosize
-                        minRows={3}
-                        maxRows={8}
-                        disabled={isTailoring}
-                        data-autofocus
-                    />
-                    {/* Mounted only while the modal is open, so availability is fresh. */}
-                    {tailorOpened && <GeminiModelSelect value={tailorModelTier} onChange={setTailorModelTier} disabled={isTailoring} />}
-                    {tailorError && <Alert color="red" title="Couldn't tailor the pattern">{tailorError}</Alert>}
-                    <Group justify="space-between">
-                        <Text size="xs" c="dimmed">{isTailoring ? 'Working through the pattern section by section — long patterns can take a minute.' : ''}</Text>
-                        <Group>
-                            <Button variant="default" onClick={closeTailor} disabled={isTailoring}>Cancel</Button>
-                            <Button color="grape" leftSection={<IconSparkles size={16} />} onClick={handleTailor} loading={isTailoring} disabled={!tailorPrompt.trim()}>
-                                Tailor
-                            </Button>
-                        </Group>
-                    </Group>
-                </Stack>
-            </Modal>
-            <StashBrowserModal
-                opened={stashModalOpened}
-                close={closeStashModal}
-                projectId={project.id}
-                availableStash={availableStash}
-                linkedYarns={linkedYarns}
-            />
+            <QuickNoteModal projectId={project.id} opened={noteOpened} close={closeNote} />
+            <TailorModal projectId={project.id} opened={tailorOpened} close={closeTailor} onTailored={loadTailored} />
             <ConfirmDeleteModal
                 opened={deleteModalOpened}
                 close={closeDelete}

@@ -6,35 +6,36 @@ import { images } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { unlink } from 'fs/promises';
-import path from 'path';
+import { resolveUploadPath } from '@/utils/uploads';
 
-export async function deleteMediaPermanently(imageId: number, imagePath: string) {
-    // 1. Delete from DB (CASCADE will handle removing the image record)
+// Deletes the image record, and the file on disk once nothing else uses it.
+// (Starting a project copies the pattern's image records, so one file can
+// back several records.)
+export async function deleteMediaPermanently(imageId: number) {
+    const image = await db.select().from(images).where(eq(images.id, imageId)).get();
+    if (!image) return;
+
     await db.delete(images).where(eq(images.id, imageId));
 
-    // 2. Delete the actual file from disk
-    // imagePath is '/uploads/123-photo.png'
-    const absolutePath = path.join(process.cwd(), 'public', imagePath);
-    
-    try {
-        await unlink(absolutePath);
-    } catch (err) {
-        console.error("File not found on disk, but DB record deleted.", err);
+    const stillUsed = await db.select({ id: images.id }).from(images).where(eq(images.path, image.path)).get();
+    const filePath = image.path.startsWith('/uploads/') ? resolveUploadPath(image.path.slice('/uploads/'.length)) : null;
+    if (!stillUsed && filePath) {
+        try {
+            await unlink(filePath);
+        } catch (err) {
+            console.error('Image file was already gone; record deleted.', err);
+        }
     }
 
-    revalidatePath('/crafting/media'); // Refresh the gallery page
+    revalidatePath('/crafting/media');
 }
 
-// src/app/crafting/actions/MediaActions.ts
+// Detaches an image from one owner, keeping the record (it may become an orphan).
 export async function unlinkMedia(imageId: number, entityType: 'pattern' | 'project' | 'yarn') {
-    const updateData: any = {};
-    
-    if (entityType === 'pattern') updateData.patternId = null;
-    if (entityType === 'project') updateData.projectId = null;
-    if (entityType === 'yarn') updateData.yarnId = null;
+    const column = ({ pattern: 'patternId', project: 'projectId', yarn: 'yarnId' } as const)[entityType];
 
     await db.update(images)
-        .set(updateData)
+        .set({ [column]: null })
         .where(eq(images.id, imageId));
 
     revalidatePath('/crafting/media');

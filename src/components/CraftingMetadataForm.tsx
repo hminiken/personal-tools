@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Group, Stack, TextInput, TagsInput, MultiSelect, Box, Title,
     Anchor, Select, Button, Badge,
@@ -22,7 +22,7 @@ interface CraftingMetadataProps {
     title: string;
     sourceUrl?: string | null;
     status: string;
-    statusOptions: { value: string, label: string }[];
+    statusOptions: string[];
     onUpdateStatus: (val: string) => void;
 
     craftType: CraftType;
@@ -33,7 +33,7 @@ interface CraftingMetadataProps {
         weightTags: string[]; setWeightTags: (val: string[]) => void;
         categoryTags: string[]; setCategoryTags: (val: string[]) => void;
     };
-    
+
     yarnUsed?: string | null;
     colors?: string | null;
     isEditing: boolean;
@@ -46,20 +46,28 @@ interface CraftingMetadataProps {
 
 export function CraftingMetadataForm(props: CraftingMetadataProps) {
     const { tags } = props;
-    
-    // NEW: States to hold the database suggestions
-    const [suggestions, setSuggestions] = useState({
-        categories: [] as string[],
-        hooks: [] as string[],
-        weights: [] as string[]
-    });
 
-    // NEW: Fetch suggestions on mount
+    // Categories you've used before, offered as suggestions.
+    const [categorySuggestions, setCategorySuggestions] = useState<string[]>([]);
     useEffect(() => {
-        getTagSuggestions().then(data => {
-            setSuggestions(data);
-        });
+        getTagSuggestions().then((data) => setCategorySuggestions(data.categories));
     }, []);
+
+    // Tag/craft edits apply live to the parent's state, so remember the saved
+    // values when editing starts and put them back on Cancel.
+    const savedValues = useRef({ craftType: props.craftType, ...tags });
+    const startEditing = () => {
+        savedValues.current = { craftType: props.craftType, ...tags };
+        props.setIsEditing(true);
+    };
+    const cancelEditing = () => {
+        const saved = savedValues.current;
+        props.setCraftType(saved.craftType);
+        tags.setHookTags(saved.hookTags);
+        tags.setWeightTags(saved.weightTags);
+        tags.setCategoryTags(saved.categoryTags);
+        props.setIsEditing(false);
+    };
 
     // Weights now come from the shared canonical list (a fixed dropdown), with
     // any legacy free-text values already on this record merged in so they stay
@@ -100,7 +108,7 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
                    <Stack style={{ flexGrow: 1 }} w="100%">
                     <TextInput name="title" label="Title" defaultValue={props.title} required />
                     <TextInput name="sourceUrl" label="Source URL" defaultValue={props.sourceUrl ?? ''} />
-                    
+
                     {(props.yarnUsed !== undefined || props.colors !== undefined) && (
                         <SimpleGrid cols={{ base: 1, sm: 2 }}>
                             <TextInput name="yarnUsed" label="Yarn Brand/Line" defaultValue={props.yarnUsed || ''} />
@@ -117,7 +125,7 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
                         allowDeselect={false}
                     />
 
-                    {/* 1. Use SimpleGrid for tool size & weights so they stay perfectly even */}
+                    {/* Tool sizes and weights side by side */}
                     <SimpleGrid cols={{ base: 1, sm: 2 }}>
                         {isKnitting ? (
                             <MultiSelect
@@ -139,26 +147,26 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
                         />
                     </SimpleGrid>
 
-                    {/* 2. Give Categories its own full-width line so tags can wrap infinitely without breaking the layout */}
-                    <TagsInput 
-                        label="Categories" placeholder="e.g., Blanket" 
-                        value={tags.categoryTags} onChange={tags.setCategoryTags} 
-                        data={suggestions.categories} clearable 
+                    {/* Categories get a full-width row so long tag lists can wrap */}
+                    <TagsInput
+                        label="Categories" placeholder="e.g., Blanket"
+                        value={tags.categoryTags} onChange={tags.setCategoryTags}
+                        data={categorySuggestions} clearable
                     />
 
-                    {/* 3. A dedicated, standard form footer for the action buttons */}
+                    {/* Footer: delete on the left, cancel/save on the right */}
                     <Group justify="space-between" mt="md" pt="md" style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
                         {props.onDeleteClick ? (
                             <Button color="rust.9" variant="subtle" onClick={props.onDeleteClick}>
                                 Delete {props.idName === 'patternId' ? 'Pattern' : 'Project'}
                             </Button>
-                        ) : <div></div>}
-                        
+                        ) : <span />}
+
                         <Group>
-                            <Button variant="outline" onClick={() => props.setIsEditing(false)}>
+                            <Button variant="outline" onClick={cancelEditing}>
                                 Cancel
                             </Button>
-                            <Button type="submit" color="olive.7">
+                            <Button type="submit">
                                 Save Details
                             </Button>
                         </Group>
@@ -187,7 +195,7 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
                             onChange={(val) => val && props.onUpdateStatus(val)}
                         />
                         {props.actionButtons}
-                        <Button color="olive.6" variant="default" leftSection={<IconEdit size={16} />} onClick={() => props.setIsEditing(true)}>
+                        <Button variant="default" leftSection={<IconEdit size={16} />} onClick={startEditing}>
                             Edit Details
                         </Button>
                     </Group>

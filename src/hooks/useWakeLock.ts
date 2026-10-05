@@ -1,58 +1,43 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useSyncExternalStore } from 'react';
 
+const noopSubscribe = () => () => {};
+
+/** Keeps the screen on while `isAwake` is true (where the browser supports it). */
 export function useWakeLock() {
   const [isAwake, setIsAwake] = useState(false);
-  const [isSupported, setIsSupported] = useState(true);
+  // false during SSR, then the real answer on the client
+  const isSupported = useSyncExternalStore(noopSubscribe, () => 'wakeLock' in navigator, () => false);
 
   useEffect(() => {
-    // Check if the browser actually supports this feature (most modern ones do)
-    setIsSupported('wakeLock' in navigator);
-  }, []);
-
-  useEffect(() => {
-    let wakeLock: any = null;
+    if (!isSupported || !isAwake) return;
+    let wakeLock: WakeLockSentinel | null = null;
+    let cancelled = false;
 
     const requestWakeLock = async () => {
-      if (!isSupported || !isAwake) return;
       try {
-        wakeLock = await navigator.wakeLock.request('screen');
-      } catch (err: any) {
-        console.error(`Wake Lock error: ${err.name}, ${err.message}`);
-        setIsAwake(false); // Turn toggle off if it failed
+        const lock = await navigator.wakeLock.request('screen');
+        // Toggled off while the request was in flight: let it go right away.
+        if (cancelled) lock.release().catch(() => {});
+        else wakeLock = lock;
+      } catch (err) {
+        console.error('Wake Lock error:', err);
+        setIsAwake(false); // turn the toggle back off
       }
     };
 
-    const releaseWakeLock = async () => {
-      if (wakeLock !== null) {
-        await wakeLock.release().catch(() => {});
-        wakeLock = null;
-      }
-    };
-
-    // If the toggle is ON, request the lock. If OFF, release it.
-    if (isAwake) {
-      requestWakeLock();
-    } else {
-      releaseWakeLock();
-    }
-
-    // THE MAGIC TRICK:
-    // Browsers automatically release the wake lock if the user switches tabs.
-    // This listener re-acquires the lock automatically when they return to your app!
+    // Browsers drop the lock when you switch tabs; take it again on return.
     const handleVisibilityChange = () => {
-      if (isAwake && document.visibilityState === 'visible') {
-        requestWakeLock();
-      }
+      if (document.visibilityState === 'visible') requestWakeLock();
     };
 
+    requestWakeLock();
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Cleanup function when the component unmounts
     return () => {
-      releaseWakeLock();
+      cancelled = true;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      wakeLock?.release().catch(() => {});
     };
   }, [isAwake, isSupported]);
 

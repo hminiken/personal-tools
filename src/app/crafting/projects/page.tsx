@@ -1,24 +1,18 @@
-// src/app/crafting/patterns/page.tsx
+// src/app/crafting/projects/page.tsx
 import { db } from '@/db';
 import { projects } from '@/db/schema';
 import { desc } from 'drizzle-orm';
-import ProjectGallery from '../patterns/_components/ProjectGallery';
+import ProjectGallery from './_components/ProjectGallery';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PatternsPage() {
-  // Fetch all patterns from the database, ordering by the newest first
+export default async function ProjectsPage() {
+  // Newest first
   const allProjects = await db.select().from(projects).orderBy(desc(projects.createdAt));
-
-  // Ensure fields that the PatternGallery expects as non-nullable are provided
-  const normalizedPatterns = allProjects.map(p => ({
-    ...p,
-    coverImagePath: p.coverImage ?? '',
-  }));
 
   return (
     <main>
-      <ProjectGallery initialProjects={normalizedPatterns} />
+      <ProjectGallery initialProjects={allProjects} />
     </main>
   );
 }

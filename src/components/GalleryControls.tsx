@@ -17,7 +17,6 @@ interface GalleryControlsProps {
   groupLabel?: string;
   sortOption: string | null;
   setSortOption: (val: string | null) => void;
-  universalInputStyles?: object;
   // Page-level buttons (New Pattern, Smart Import, Add Yarn, ...).
   actions?: React.ReactNode;
 }
@@ -27,7 +26,7 @@ interface GalleryControlsProps {
 export function GalleryControls({
   fields, getSuggestions, filters, onAddFilter, onRemoveFilter, onClearFilters, onDraftChange,
   searchPlaceholder, isGrouped, setIsGrouped, groupLabel = 'Group by category', sortOption, setSortOption,
-  universalInputStyles, actions,
+  actions,
 }: GalleryControlsProps) {
   return (
     <Box
@@ -45,15 +44,13 @@ export function GalleryControls({
             onClear={onClearFilters}
             onDraftChange={onDraftChange}
             placeholder={searchPlaceholder}
-            universalInputStyles={universalInputStyles}
           />
         </Box>
 
         <Group gap="sm" wrap="wrap" style={{ flex: '1 1 auto' }} justify="flex-end">
           <Select
             aria-label="Sort by"
-            leftSection={<IconSortAscending size={16} color="var(--mantine-color-neutrals-9)" />}
-            styles={universalInputStyles}
+            leftSection={<IconSortAscending size={16} />}
             placeholder="Sort by"
             value={sortOption}
             onChange={setSortOption}
@@ -67,7 +64,7 @@ export function GalleryControls({
             w={{ base: '100%', xs: 190 }}
           />
           <Switch
-            color="olive.6" label={groupLabel} checked={isGrouped}
+            label={groupLabel} checked={isGrouped}
             onChange={(e) => setIsGrouped(e.currentTarget.checked)}
           />
           {actions && (

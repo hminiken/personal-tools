@@ -1,7 +1,7 @@
 import { SimpleGrid, Card, ActionIcon, Image, Text, Center, Tooltip } from "@mantine/core";
 import { IconPhoto, IconTrash } from "@tabler/icons-react";
 import Link from "next/link";
-import { BaseGalleryItem } from "./ItemGallery";
+import type { BaseGalleryItem, DeleteAction } from "./ItemGallery";
 import { sourceHost } from "@/utils/tags";
 
 const COVER_HEIGHT = { base: 150, sm: 170 };
@@ -30,7 +30,7 @@ export default function GalleryGrid<T extends BaseGalleryItem>({
 }: {
   items: T[];
   basePath: string;
-  deleteAction?: (id: number) => Promise<void>;
+  deleteAction?: DeleteAction;
   setItemToDelete: (item: T) => void;
   renderBadges?: (item: T) => React.ReactNode;
 }) {

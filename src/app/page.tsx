@@ -17,7 +17,7 @@ export default async function Home() {
             <>
               <Text mt="md" fw={500}>{latestProject.title}</Text>
               
-                <Button component="a" mt="md" fullWidth bg={"olive.6"}  href={`/crafting/projects/${latestProject.id}`}>
+                <Button component="a" mt="md" fullWidth href={`/crafting/projects/${latestProject.id}`}>
                   Continue Project
                 </Button>
             </>
@@ -33,8 +33,7 @@ export default async function Home() {
             <>
               <Text mt="md" fw={500}>{latestPattern.title}</Text>
               
-              {/* THE FIX: Wrap the button with Link and use legacyBehavior */}
-                <Button component="a" mt="md" fullWidth variant="light" bg={"olive.2"} href={`/crafting/patterns/${latestPattern.id}`}>
+                <Button component="a" mt="md" fullWidth variant="light" href={`/crafting/patterns/${latestPattern.id}`}>
                   View Pattern
                 </Button>
             </>

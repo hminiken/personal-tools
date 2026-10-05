@@ -1,137 +1,120 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react'; // Added useTransition
-import { SimpleGrid, Box, Image, Paper, Badge, ActionIcon, Group, Title } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
-import { IconTrash, IconX } from '@tabler/icons-react';
+import { useMemo, useState } from 'react';
+import { SimpleGrid, Box, Title, Text } from '@mantine/core';
 import { ConfirmDeleteModal } from '@components/ConfirmDeleteModal';
-import { deleteMediaPermanently, unlinkMedia } from '@app/crafting/actions/MediaActions';
-import Link from 'next/link';
+import { deleteMediaPermanently } from '@app/crafting/actions/MediaActions';
 import { GalleryControls } from '@components/GalleryControls';
 import { Filter } from '@components/FilterBuilder';
+import type { PatternImage, Pattern, Project, yarnStash } from '@app/crafting/projects/[id]/types';
 import MediaCard from './MediaCard';
 
-export function MediaGrid({ media }: { media: any[] }) {
-    const [opened, { open, close }] = useDisclosure(false);
+export type MediaItem = PatternImage & {
+    pattern: Pattern | null;
+    project: Project | null;
+    yarn: yarnStash | null;
+};
+
+// Media items only have a "source" (the pattern/project/yarn they're attached
+// to), so the single filter searches across those titles.
+const MEDIA_FIELDS = [{ value: '__all__', label: 'Source' }];
+const GROUP_ORDER = ['Patterns', 'Projects', 'Yarn Stash', 'Orphaned'];
+
+const sourceTitle = (item: MediaItem) =>
+    [item.pattern?.title, item.project?.title, item.yarn?.title].filter(Boolean).join(' ');
+
+function groupName(item: MediaItem) {
+    if (item.pattern) return 'Patterns';
+    if (item.project) return 'Projects';
+    if (item.yarn) return 'Yarn Stash';
+    return 'Orphaned';
+}
+
+function sortMedia(items: MediaItem[], sortOption: string | null) {
+    const sorted = [...items];
+    if (sortOption === 'title-asc') return sorted.sort((a, b) => sourceTitle(a).localeCompare(sourceTitle(b)));
+    if (sortOption === 'title-desc') return sorted.sort((a, b) => sourceTitle(b).localeCompare(sourceTitle(a)));
+    // Newest first. Images are never edited, so "recently updated" is the same.
+    return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export function MediaGrid({ media }: { media: MediaItem[] }) {
+    const [toDelete, setToDelete] = useState<MediaItem | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [selectedMedia, setSelectedMedia] = useState<{id: number, path: string} | null>(null);
-    const [isPending, startTransition] = useTransition(); // Hook for smooth updates
-
-    const handleConfirmDelete = async () => {
-        if (!selectedMedia) return;
-        setIsDeleting(true);
-        try {
-            await deleteMediaPermanently(selectedMedia.id, selectedMedia.path);
-            close();
-        } finally {
-            setIsDeleting(false);
-            setSelectedMedia(null);
-        }
-    };
-
     const [filters, setFilters] = useState<Filter[]>([]);
+    const [draftFilter, setDraftFilter] = useState<Filter | null>(null);
     const [isGrouped, setIsGrouped] = useState(false);
     const [sortOption, setSortOption] = useState<string | null>('created-desc');
 
-    const addFilter = (f: Filter) => setFilters((prev) => [...prev, f]);
-    const removeFilter = (index: number) => setFilters((prev) => prev.filter((_, i) => i !== index));
-    const clearFilters = () => setFilters([]);
+    const visibleMedia = useMemo(() => {
+        const needles = [...filters, ...(draftFilter ? [draftFilter] : [])]
+            .map((f) => f.value.trim().toLowerCase())
+            .filter(Boolean);
+        const filtered = media.filter((item) => needles.every((n) => sourceTitle(item).toLowerCase().includes(n)));
+        return sortMedia(filtered, sortOption);
+    }, [media, filters, draftFilter, sortOption]);
 
-    // Media items only have a "source" (the pattern/project/yarn they're attached
-    // to), so the single "Anything" filter searches across all those titles.
-    // Filters stack with AND, matching the behavior of the other grids.
-    const sourceTitle = (item: { pattern?: { title?: string | null }; project?: { title?: string | null }; yarn?: { title?: string | null } }) =>
-        `${item.pattern?.title ?? ''} ${item.project?.title ?? ''} ${item.yarn?.title ?? ''}`.toLowerCase();
+    // [heading, items] pairs; a single unnamed group when not grouping.
+    const groups = useMemo<[string, MediaItem[]][]>(() => {
+        if (!isGrouped) return [['', visibleMedia]];
+        return GROUP_ORDER
+            .map((name): [string, MediaItem[]] => [name, visibleMedia.filter((item) => groupName(item) === name)])
+            .filter(([, items]) => items.length > 0);
+    }, [visibleMedia, isGrouped]);
 
-    const mediaFields = [{ value: '__all__', label: 'Source' }];
-
-    const filteredMedia = useMemo(() => {
-        const active = filters.filter((f) => f.value.trim());
-        if (active.length === 0) return media;
-        return media.filter((item) =>
-            active.every((f) => sourceTitle(item).includes(f.value.trim().toLowerCase()))
-        );
-    }, [media, filters]);
-
-    const groupedMedia = useMemo(() => {
-    if (!isGrouped) return { 'All Media': filteredMedia };
-    
-    const groups: Record<string, any[]> = {
-        'Patterns': [],
-        'Projects': [],
-        'Yarn Stash': [],
-        'Orphaned': []
+    const handleConfirmDelete = async () => {
+        if (!toDelete) return;
+        setIsDeleting(true);
+        try {
+            await deleteMediaPermanently(toDelete.id);
+            setToDelete(null);
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
-    filteredMedia.forEach(item => {
-        if (item.pattern) groups['Patterns'].push(item);
-        else if (item.project) groups['Projects'].push(item);
-        else if (item.yarn) groups['Yarn Stash'].push(item);
-        else groups['Orphaned'].push(item);
-    });
-
-    // Remove empty groups
-    return Object.fromEntries(Object.entries(groups).filter(([_, items]) => items.length > 0));
-}, [filteredMedia, isGrouped]);
-
     return (
-        <Box mt={'xs'}>
+        <Box mt="xs">
             <GalleryControls
-                fields={mediaFields}
+                fields={MEDIA_FIELDS}
                 getSuggestions={() => []}
                 filters={filters}
-                onAddFilter={addFilter}
-                onRemoveFilter={removeFilter}
-                onClearFilters={clearFilters}
+                onAddFilter={(f) => setFilters((prev) => [...prev, f])}
+                onRemoveFilter={(index) => setFilters((prev) => prev.filter((_, i) => i !== index))}
+                onClearFilters={() => setFilters([])}
+                onDraftChange={setDraftFilter}
                 searchPlaceholder="Search media by project or pattern..."
                 isGrouped={isGrouped}
                 setIsGrouped={setIsGrouped}
+                groupLabel="Group by type"
                 sortOption={sortOption}
                 setSortOption={setSortOption}
-                universalInputStyles={{}}
             />
-{isGrouped ? (
-            // ✨ IF GROUPED: Loop through the groups
-            Object.entries(groupedMedia).map(([groupName, items]) => (
-                <Box key={groupName} mb="xl">
-                    <Title order={3} mb="sm">{groupName} ({items.length})</Title>
-                    <SimpleGrid cols={{ base: 2, sm: 2, md: 4 }}>
-                        {items.map((item: any) => (
-                            <MediaCard 
-                                key={item.id} 
-                                item={item} 
-                                onDelete={() => {
-                                    setSelectedMedia({ id: item.id, path: item.path });
-                                    open();
-                                }} 
-                            />
+
+            {visibleMedia.length === 0 && (
+                <Text c="dimmed" ta="center" mt="xl">
+                    {media.length === 0 ? 'No images yet.' : 'Nothing matches your search.'}
+                </Text>
+            )}
+
+            {groups.map(([name, items]) => (
+                <Box key={name} mt="lg">
+                    {name && <Title order={3} mb="sm">{name} ({items.length})</Title>}
+                    <SimpleGrid cols={{ base: 2, md: 3, lg: 4 }} spacing="md">
+                        {items.map((item) => (
+                            <MediaCard key={item.id} item={item} onDelete={() => setToDelete(item)} />
                         ))}
                     </SimpleGrid>
                 </Box>
-            ))
-        ) : (
-            // ✨ IF NOT GROUPED: Just show the flat grid
-            <SimpleGrid cols={{ base: 2, sm: 2, md: 4 }}>
-                {filteredMedia.map((item) => (
-                    <MediaCard 
-                        key={item.id} 
-                        item={item} 
-                        onDelete={() => {
-                            setSelectedMedia({ id: item.id, path: item.path });
-                            open();
-                        }} 
-                    />
-                ))}
-            </SimpleGrid>
-        )}
+            ))}
 
-        <ConfirmDeleteModal 
-            opened={opened}
-            close={close}
-            onConfirm={handleConfirmDelete}
-            itemName="this image"
-            isDeleting={isDeleting}
-        />
-    </Box>
+            <ConfirmDeleteModal
+                opened={!!toDelete}
+                close={() => setToDelete(null)}
+                onConfirm={handleConfirmDelete}
+                itemName="this image"
+                isDeleting={isDeleting}
+            />
+        </Box>
     );
 }

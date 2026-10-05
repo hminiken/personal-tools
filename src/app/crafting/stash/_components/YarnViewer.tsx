@@ -1,58 +1,32 @@
-/* eslint-disable react/no-unescaped-entities */
 'use client';
 
 import { useState } from 'react';
 import { Title, Group, Paper, Divider, Box, Button, TextInput, Stack, Select, TagsInput, Text, SimpleGrid, Card, ActionIcon, Image, Tooltip } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
-import { IconArrowLeft, IconEdit, IconCheck, IconUnlink } from '@tabler/icons-react';
-import { TagBadges, StatusBadge } from '@components/TagBadges';
-import { splitTags } from '@/utils/tags';
 import { useRouter } from 'next/navigation';
-
-// Tiptap Imports
+import { IconEdit, IconCheck, IconUnlink } from '@tabler/icons-react';
 import { RichTextEditor } from '@mantine/tiptap';
 import '@mantine/tiptap/styles.css';
 
-// Components & Actions (You will need to create these actions similar to your pattern actions!)
-import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
-import ImageGallery from '@/components/PatternImageGallery'; // Reusing your gallery!
 import { updateYarn, deleteYarn, unlinkProjectFromYarn } from '../_actions/stash_actions';
 import { deleteImage, setCoverImage, uploadImage } from '@app/crafting/actions/ImageActions';
-import { useCraftingEditor } from '@hooks/useCraftingEditor';
+import type { yarnStash, PatternImage } from '@app/crafting/projects/[id]/types';
+import ImageGallery from '@/components/PatternImageGallery';
+import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
+import { BackButton } from '@components/BackButton';
 import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
+import { TagBadges, StatusBadge } from '@components/TagBadges';
+import { useCraftingEditor } from '@hooks/useCraftingEditor';
+import { splitTags } from '@/utils/tags';
 import { YARN_WEIGHTS } from '@/utils/yarnWeights';
-
-// Interfaces — field names match the yarns table (the page passes the row
-// straight through). They used to be weight/fiber_tags/color_tags, which
-// never matched, so the tags never showed AND every save (even just notes)
-// wrote empty weight/fibers/colors back over the real values.
-interface Yarn {
-    id: number;
-    title: string;
-    brand?: string | null;
-    weights?: string | null;
-    fibers?: string | null;
-    colors?: string | null;
-    notes?: string | null;
-    coverImage?: string | null;
-}
 
 interface LinkedProject {
     id: number;
     title: string;
-    status?: string | null;
-    hooks?: string | null;
-    categories?: string | null;
-}
-
-interface YarnImage {
-    id: number;
-    createdAt: Date;
-    patternId: number | null;
-    projectId: number | null;
-    yarnId: number | null;
-    path: string;
+    status: string | null;
+    hooks: string | null;
+    categories: string | null;
 }
 
 export default function YarnViewer({
@@ -60,8 +34,8 @@ export default function YarnViewer({
     images,
     linkedProjects
 }: {
-    yarn: Yarn;
-    images: YarnImage[];
+    yarn: yarnStash;
+    images: PatternImage[];
     linkedProjects: LinkedProject[]
 }) {
     const router = useRouter();
@@ -83,43 +57,39 @@ export default function YarnViewer({
 
     const notesEditor = useCraftingEditor(yarn.notes, isEditingNotes);
 
-    // --- Handlers ---
-    const handleUpdateMetadata = async () => {
-        setIsSaving(true);
-        const formData = new FormData();
-        formData.append('id', yarn.id.toString());
-        formData.append('title', title);
-        formData.append('brand', brand);
-        formData.append('weight', weight);
-        formData.append('fiberTags', fiberTags.join(','));
-        formData.append('colorTags', colorTags.join(','));
-
-        // Preserve existing notes during metadata update
-        formData.append('notes', notesEditor?.getHTML() || '');
-
-        await updateYarn(formData);
-        router.refresh(); // Pull fresh server props so the editor re-syncs
-        setIsSaving(false);
+    // Throw away unsaved detail edits. Otherwise they'd linger in state and
+    // get written by the next notes save.
+    const cancelDetails = () => {
+        setTitle(yarn.title);
+        setBrand(yarn.brand || '');
+        setWeight(yarn.weights || '');
+        setFiberTags(splitTags(yarn.fibers));
+        setColorTags(splitTags(yarn.colors));
         setIsEditingDetails(false);
     };
 
-    const handleUpdateNotes = async () => {
-        setIsSaving(true);
+    // updateYarn writes every field, so each save sends the details and the
+    // notes together (whichever one wasn't being edited is sent unchanged).
+    const saveYarn = async (onSaved: () => void) => {
         const formData = new FormData();
         formData.append('id', yarn.id.toString());
-        // Preserve existing metadata during notes update
         formData.append('title', title);
         formData.append('brand', brand);
         formData.append('weight', weight);
         formData.append('fiberTags', fiberTags.join(','));
         formData.append('colorTags', colorTags.join(','));
-
         formData.append('notes', notesEditor?.getHTML() || '');
 
-        await updateYarn(formData);
-        router.refresh(); // Pull fresh server props so the editor re-syncs
-        setIsSaving(false);
-        setIsEditingNotes(false);
+        setIsSaving(true);
+        try {
+            await updateYarn(formData);
+            router.refresh(); // Pull fresh server props so the editor re-syncs
+            onSaved();
+        } catch {
+            alert('Could not save. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleDelete = async () => {
@@ -131,16 +101,15 @@ export default function YarnViewer({
     };
 
     const handleUnlinkProject = async (e: React.MouseEvent, projectId: number) => {
-        e.preventDefault();
-        if (confirm("Are you sure you want to unlink this project?")) {
-            await unlinkProjectFromYarn(yarn.id, projectId); // Passes yarnId, then projectId
+        e.preventDefault(); // the card is a link
+        if (confirm('Unlink this project from the yarn?')) {
+            await unlinkProjectFromYarn(yarn.id, projectId);
         }
     };
+
     return (
         <Paper pl={{ base: '0', sm: 'xl' }} pr={{ base: 'xs', sm: 'xl' }} radius="md">
-            <Button component={Link} href="/crafting/stash" variant="subtle" color="gray" leftSection={<IconArrowLeft size={16} />} mb="md" pl={0}>
-                Back to Stash
-            </Button>
+            <BackButton href="/crafting/stash" label="Back to Stash" />
 
             {/* --- METADATA SECTION --- */}
             <Box mb="xl">
@@ -163,8 +132,8 @@ export default function YarnViewer({
                                 <Group justify="space-between" mt="md" pt="md" style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
                                     <Button color="rust.9" variant="subtle" onClick={openDelete} disabled={isSaving}>Delete Yarn</Button>
                                     <Group>
-                                        <Button variant="outline" onClick={() => setIsEditingDetails(false)} disabled={isSaving}>Cancel</Button>
-                                        <Button onClick={handleUpdateMetadata} loading={isSaving} color="olive.7" leftSection={<IconCheck size={16} />}>Save Details</Button>
+                                        <Button variant="outline" onClick={cancelDetails} disabled={isSaving}>Cancel</Button>
+                                        <Button onClick={() => saveYarn(() => setIsEditingDetails(false))} loading={isSaving} leftSection={<IconCheck size={16} />}>Save Details</Button>
                                     </Group>
                                 </Group>
                             </Stack>
@@ -187,7 +156,7 @@ export default function YarnViewer({
                     </Box>
 
                     {!isEditingDetails && (
-                        <Button color="olive.6" variant="default" onClick={() => setIsEditingDetails(true)} leftSection={<IconEdit size={16} />}>
+                        <Button variant="default" onClick={() => setIsEditingDetails(true)} leftSection={<IconEdit size={16} />}>
                             Edit Details
                         </Button>
                     )}
@@ -196,16 +165,16 @@ export default function YarnViewer({
 
             <Divider my="lg" />
 
-            {/* --- NOTES SECTION (The single Tiptap box) --- */}
+            {/* --- NOTES --- */}
             <Box mb="xl">
                 <Group justify="space-between" mb="sm">
                     <Title order={4}>Ideas & Notes</Title>
                     <Group gap="xs">
-                        <Button variant="light" color="olive" onClick={() => setIsEditingNotes(!isEditingNotes)} disabled={isSaving}>
+                        <Button variant="light" onClick={() => setIsEditingNotes(!isEditingNotes)} disabled={isSaving}>
                             {isEditingNotes ? 'Cancel' : 'Edit Notes'}
                         </Button>
                         {isEditingNotes && (
-                            <Button color="olive.7" onClick={handleUpdateNotes} loading={isSaving}>Save Notes</Button>
+                            <Button onClick={() => saveYarn(() => setIsEditingNotes(false))} loading={isSaving}>Save Notes</Button>
                         )}
                     </Group>
                 </Group>
@@ -214,7 +183,6 @@ export default function YarnViewer({
                     editor={notesEditor}
                     style={{ border: isEditingNotes ? undefined : 'none' }}
                 >
-                    {/* ✨ REPLACED THE ENTIRE TOOLBAR BLOCK WITH OUR SINGLE COMPONENT */}
                     {isEditingNotes && <CraftingEditorToolbar />}
 
                     <RichTextEditor.Content />
@@ -227,7 +195,7 @@ export default function YarnViewer({
             <Box mb="xl">
                 <Title order={4} mb="md">Projects Using This Yarn</Title>
                 {linkedProjects.length === 0 ? (
-                    <Text c="dimmed">This yarn isn't linked to any projects yet.</Text>
+                    <Text c="dimmed">This yarn isn&apos;t linked to any projects yet.</Text>
                 ) : (
                     <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
                         {linkedProjects.map((project) => (
@@ -266,7 +234,6 @@ export default function YarnViewer({
                                 </Group>
                             </Card>
 
-
                         ))}
                     </SimpleGrid>
                 )}
@@ -280,7 +247,7 @@ export default function YarnViewer({
                     images={images}
                     title="Yarn Photos"
                     targetId={yarn.id}
-                    idFieldName="yarnId" // Crucial for making your reusable component save to the right table
+                    idFieldName="yarnId"
                     revalidateUrl={`/crafting/stash/${yarn.id}`}
                     uploadAction={uploadImage}
                     deleteAction={deleteImage}

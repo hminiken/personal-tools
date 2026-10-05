@@ -35,10 +35,13 @@ export default function PatternPreviewPage() {
   const notesEditor = useCraftingEditor('', true);
   const contentEditor = useCraftingEditor('', true);
 
+  // The import modal leaves its result in sessionStorage, which only exists
+  // in the browser, so it has to be read after mount.
   useEffect(() => {
     const stored = sessionStorage.getItem('patternImportPreview');
     if (stored) {
       const parsed = JSON.parse(stored);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time load from sessionStorage
       setFormData(parsed);
 
       // Normalize the AI's free-text weights ("Worsted, DK, 4 ply") down to our

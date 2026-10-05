@@ -19,7 +19,7 @@ export function ConfirmDeleteModal({ opened, close, onConfirm, itemName, isDelet
                 <Button variant="default" onClick={close} disabled={isDeleting}>
                     Cancel
                 </Button>
-                <Button color="red" onClick={onConfirm} loading={isDeleting}>
+                <Button color="rust.7" onClick={onConfirm} loading={isDeleting}>
                     Yes, Delete
                 </Button>
             </Group>

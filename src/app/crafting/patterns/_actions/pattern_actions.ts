@@ -130,6 +130,9 @@ export async function updatePatternStatus(patternId: number, status: string) {
       .set({ status: status })
       .where(eq(patterns.id, patternId));
 
+    // The gallery card shows the status badge, so refresh it too.
+    revalidatePath('/crafting/patterns');
+    revalidatePath(`/crafting/patterns/${patternId}`);
     return { success: true };
   } catch (error) {
     console.error('Database update failed:', error);
@@ -141,16 +144,35 @@ export async function updatePatternStatus(patternId: number, status: string) {
 // DELETE
 // ==========================================
 
-export async function deletePattern(patternId: number) {
-  // Since you have cascading deletes setup on your images table now, 
-  // deleting the pattern will cleanly wipe its associated images too!
+// Returns an error message instead of throwing: server action errors are
+// replaced with a generic message in production, so the UI couldn't say why.
+export async function deletePattern(patternId: number): Promise<{ error: string } | void> {
+  // Projects reference their pattern (and read its materials/sizing/notes),
+  // and foreign keys are enforced, so the delete would fail anyway.
+  const linked = await db.select({ title: projects.title }).from(projects).where(eq(projects.patternId, patternId)).all();
+  if (linked.length > 0) {
+    const names = linked.map((p) => `"${p.title}"`).join(', ');
+    return {
+      error: `This pattern is used by ${linked.length === 1 ? 'a project' : `${linked.length} projects`} (${names}). Delete ${linked.length === 1 ? 'it' : 'them'} first.`,
+    };
+  }
+
+  // Images cascade with the pattern.
   await db.delete(patterns).where(eq(patterns.id, patternId));
   revalidatePath('/crafting/patterns');
 }
 
 
 
-export async function createPatternFromImport(data: any) {
+// What the Smart Import review page sends back (all fields optional: the AI
+// may not have found them).
+type ImportedPattern = Partial<Record<
+  'title' | 'sourceUrl' | 'materials' | 'sizing' | 'abbreviations' | 'notes' | 'content' |
+  'categories' | 'craftType' | 'hooks' | 'weights',
+  string | null
+>>;
+
+export async function createPatternFromImport(data: ImportedPattern) {
   // Copy imported images into our own uploads (compressed) instead of
   // hotlinking the source site.
   const html = await localizeImages(

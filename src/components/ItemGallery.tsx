@@ -15,12 +15,14 @@ import { Filter, FieldOption } from './FilterBuilder';
 export interface BaseGalleryItem {
   id: number;
   title: string;
-  coverImagePath?: string | null;
+  coverImage?: string | null;
   sourceUrl?: string | null;
   createdAt?: string | Date | null;
   updatedAt?: string | Date | null;
-  [key: string]: any;
+  [key: string]: unknown;
 }
+
+export type DeleteAction = (id: number) => Promise<void | { error: string }>;
 
 interface ItemGalleryProps<T extends BaseGalleryItem> {
   title: string;
@@ -34,35 +36,15 @@ interface ItemGalleryProps<T extends BaseGalleryItem> {
   groupLabel?: string;
   // Extra page buttons shown next to the "new item" button (e.g. Smart Import).
   extraActions?: React.ReactNode;
-  deleteAction?: (id: number) => Promise<void>;
+  // May return { error } to explain why the item can't be deleted.
+  deleteAction?: DeleteAction;
   renderBadges?: (item: T) => React.ReactNode;
   renderCreateForm?: (closeModal: () => void) => React.ReactNode;
 }
 
 // ==========================================
-// 2. SHARED STYLES & HELPERS
+// 2. HELPERS
 // ==========================================
-const universalInputStyles = {
-  input: {
-    // Light text in dark mode, dark text in light mode
-    color: 'light-dark(var(--mantine-color-neutrals-9), var(--mantine-color-dark-0))',
-    
-    // Subtle borders that match the current theme
-    borderColor: 'light-dark(var(--mantine-color-neutrals-2), var(--mantine-color-dark-4))',
-    
-    // Ensure the input background matches the theme
-    backgroundColor: 'light-dark(var(--mantine-color-white), var(--mantine-color-dark-6))',
-    
-    '&:focusWithin': { 
-      borderColor: 'var(--mantine-color-neutrals-6)' 
-    },
-    '&::placeholder': { 
-      color: 'var(--mantine-color-neutrals-5)', 
-      opacity: 1 
-    },
-  },
-};
-
 // Friendly labels for the fields users can filter by. Only the keys that
 // actually exist on the items show up in the "Search by..." dropdown, so this
 // one map serves patterns, projects, and yarn without per-page config.
@@ -207,7 +189,11 @@ export default function ItemGallery<T extends BaseGalleryItem>({
     if (!itemToDelete || !deleteAction) return;
     setIsDeleting(true);
     try {
-      await deleteAction(itemToDelete.id);
+      const result = await deleteAction(itemToDelete.id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       setItemToDelete(null);
     } catch (error) {
       console.error("Failed to delete item", error);
@@ -220,7 +206,7 @@ export default function ItemGallery<T extends BaseGalleryItem>({
   return (
     <div>
       {/* CONTROLS BAR */}
-        <GalleryControls
+      <GalleryControls
         fields={fieldOptions}
         getSuggestions={getSuggestions}
         filters={filters}
@@ -236,7 +222,7 @@ export default function ItemGallery<T extends BaseGalleryItem>({
           <>
             {extraActions}
             {renderCreateForm && (
-              <Button color="olive.6" leftSection={<IconPlus size={16} />} onClick={openCreate}>
+              <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
                 {newItemText}
               </Button>
             )}
@@ -244,7 +230,6 @@ export default function ItemGallery<T extends BaseGalleryItem>({
         )}
         sortOption={sortOption}
         setSortOption={setSortOption}
-        universalInputStyles={universalInputStyles}
       />
 
       {/* GALLERY GRID */}
@@ -277,7 +262,3 @@ export default function ItemGallery<T extends BaseGalleryItem>({
     </div>
   );
 }
-
-// ==========================================
-// 4. SUB-COMPONENTS
-// ==========================================

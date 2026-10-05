@@ -9,6 +9,10 @@ import { revalidatePath } from 'next/cache';
 import { tailorPatternHtml } from '@/lib/patternAi/tailor';
 import { GeminiError, GeminiOutputError } from '@/lib/patternAi/gemini';
 
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // Rewrites the project's pattern copy with Gemini (e.g. "only show size XL").
 // Does NOT save: the client loads the result into the editor so the user can
 // review it and Save Text, or Cancel Editing to discard. Works from the saved
@@ -107,17 +111,19 @@ export async function addQuickNote(projectId: number, newNote: string) {
     .get();
 
   // 2. Append the new note with a timestamp
-const timestamp = new Date().toLocaleDateString('en-US', {
-  year: '2-digit',
-  month: 'numeric',
-  day: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-  hour12: true
-}).replace(',', '').toLowerCase();
+  const timestamp = new Date().toLocaleDateString('en-US', {
+    year: '2-digit',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  }).replace(',', '').toLowerCase();
 
-const formattedNote = `<p><strong>[${timestamp}]</strong> ${newNote}</p>`;
-const updatedNotes = (project?.notes || '') + formattedNote;
+  // The note is plain text going into HTML: escape it so "dec <3 sts" or
+  // "R5 & R6" don't get swallowed as markup.
+  const formattedNote = `<p><strong>[${timestamp}]</strong> ${escapeHtml(newNote.trim())}</p>`;
+  const updatedNotes = (project?.notes || '') + formattedNote;
 
 
   // 3. Save
@@ -135,7 +141,10 @@ export async function updateProjectStatus(projectId: number, status: string ) {
       .update(projects)
       .set({ status: status })
       .where(eq(projects.id, projectId));
-      
+
+    // The gallery card shows the status badge, so refresh it too.
+    revalidatePath('/crafting/projects');
+    revalidatePath(`/crafting/projects/${projectId}`);
     return { success: true };
   } catch (error) {
     console.error('Database update failed:', error);

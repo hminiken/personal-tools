@@ -7,23 +7,27 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconTrash, IconPhotoStar, IconPlus, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
-import { UploadModal } from './UploadModal';
+import { UploadModal, type IdFieldName } from './UploadModal';
 import { PatternImage } from '@app/crafting/patterns/types';
+import { PLACEHOLDER_IMAGE } from '@/utils/placeholders';
 
 interface ImageGalleryProps {
     images: PatternImage[];
     title?: string;
     targetId: number;
-    idFieldName: string;
+    idFieldName: IdFieldName;
     revalidateUrl: string;
     uploadAction: (formData: FormData) => Promise<void>;
     deleteAction: (imageId: number, url: string) => Promise<void>;
-    libraryImages?: PatternImage[];
-    linkLibraryImageAction?: (imageUrl: string, targetId: number) => Promise<void>;
     coverImagePath?: string | null;
     setCoverAction?: (id: number, imagePath: string) => Promise<void>;
 }
 
+// Overlay buttons on each thumbnail
+const OVERLAY_BUTTON_STYLE = { position: 'absolute', zIndex: 10, boxShadow: 'var(--mantine-shadow-xs)' } as const;
+
+// Photo grid for a pattern, project or yarn, with upload, delete, "use as
+// cover", and a full-size viewer (arrow keys / buttons to page through).
 export default function ImageGallery({
     images,
     title = "Reference Photos",
@@ -32,54 +36,34 @@ export default function ImageGallery({
     revalidateUrl,
     uploadAction,
     deleteAction,
-    linkLibraryImageAction,
     coverImagePath,
     setCoverAction
 }: ImageGalleryProps) {
-
     const [uploadModalOpened, { open: openUpload, close: closeUpload }] = useDisclosure(false);
-    const [imageViewerOpened, { open: openImageViewer, close: closeImageViewer }] = useDisclosure(false);
-
-    // ✨ CHANGED: Track the index instead of the URL
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+    const viewerOpened = selectedIndex !== null;
 
-    const [libraryModalOpened, { open: openLibrary, close: closeLibrary }] = useDisclosure(false);
-    const [isLinking, setIsLinking] = useState(false);
+    const count = images.length;
+    const goToPrevious = () => setSelectedIndex((i) => (i === null ? null : (i - 1 + count) % count));
+    const goToNext = () => setSelectedIndex((i) => (i === null ? null : (i + 1) % count));
 
-    const handleLinkImage = async (imageUrl: string) => {
-        if (!linkLibraryImageAction) return;
-        setIsLinking(true);
-        try {
-            await linkLibraryImageAction(imageUrl, targetId);
-            closeLibrary();
-        } catch (error) {
-            console.error("Failed to link image", error);
-        } finally {
-            setIsLinking(false);
-        }
-    }
-
-    // ✨ NEW: Navigation handlers
-    const goToPrevious = () => {
-        setSelectedIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : images.length - 1));
-    };
-
-    const goToNext = () => {
-        setSelectedIndex((prev) => (prev !== null && prev < images.length - 1 ? prev + 1 : 0));
-    };
-
-    // ✨ NEW: Keyboard listener for arrow keys
     useEffect(() => {
-        if (!imageViewerOpened) return;
-
+        if (!viewerOpened) return;
+        const step = (delta: number) => setSelectedIndex((i) => (i === null ? null : (i + delta + count) % count));
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'ArrowLeft') goToPrevious();
-            if (event.key === 'ArrowRight') goToNext();
+            if (event.key === 'ArrowLeft') step(-1);
+            if (event.key === 'ArrowRight') step(1);
         };
-
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [imageViewerOpened, images.length]); // Re-bind if modal opens or image count changes
+    }, [viewerOpened, count]);
+
+    const handleDelete = (imageId: number) => {
+        if (!confirm('Delete this photo?')) return;
+        startTransition(async () => {
+            await deleteAction(imageId, revalidateUrl);
+        });
+    };
 
     return (
         <Box>
@@ -89,10 +73,10 @@ export default function ImageGallery({
                         (a button can't be nested in the accordion's toggle button). */}
                     <Group wrap="nowrap" gap={0} align="center">
                         <Accordion.Control style={{ flex: 1 }}>
-                            <Title order={5}>{title} ({images?.length || 0})</Title>
+                            <Title order={5}>{title} ({count})</Title>
                         </Accordion.Control>
                         <Button
-                            size="xs" variant="light" color="olive" mr="md"
+                            size="xs" variant="light" mr="md"
                             leftSection={<IconPlus size={14} />}
                             onClick={openUpload}
                         >
@@ -100,72 +84,62 @@ export default function ImageGallery({
                         </Button>
                     </Group>
                     <Accordion.Panel>
-                        {images?.length > 0 ? (
+                        {count > 0 ? (
                             <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }} spacing="sm">
-                                {/* ✨ NOTE: Added 'index' to the map function */}
-                                {images.map((img, index) => (
-                                    <Box key={img.id} style={{ position: 'relative' }}>
-                                        <Image
-                                            src={img.path}
-                                            alt="Reference"
-                                            radius="md"
-                                            h={120}
-                                            fit="cover"
-                                            style={{
-                                                cursor: 'pointer',
-                                                transition: 'transform 0.2s',
-                                                outline: coverImagePath === img.path ? '2px solid var(--mantine-color-olive-6)' : 'none'
-                                            }}
-                                            onClick={() => {
-                                                // ✨ CHANGED: Set index instead of URL
-                                                setSelectedIndex(index);
-                                                openImageViewer();
-                                            }}
-                                            fallbackSrc={'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#e9ecef"/></svg>')}
-                                        />
-
-                                        <Tooltip label="Delete photo" withArrow openDelay={300}>
-                                            <ActionIcon
-                                                variant="white" color="rust.7" size="sm" radius="xl"
-                                                aria-label="Delete photo"
-                                                style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, boxShadow: 'var(--mantine-shadow-xs)' }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    // One tap used to delete instantly with no undo.
-                                                    if (!confirm('Delete this photo?')) return;
-                                                    startTransition(async () => {
-                                                        await deleteAction(img.id, revalidateUrl);
-                                                    });
+                                {images.map((img, index) => {
+                                    const isCover = coverImagePath === img.path;
+                                    return (
+                                        <Box key={img.id} style={{ position: 'relative' }}>
+                                            <Image
+                                                src={img.path}
+                                                alt={`${title} ${index + 1}`}
+                                                radius="md"
+                                                h={120}
+                                                fit="cover"
+                                                style={{
+                                                    cursor: 'pointer',
+                                                    outline: isCover ? '2px solid var(--mantine-color-olive-6)' : 'none'
                                                 }}
-                                            >
-                                                <IconTrash size={14} />
-                                            </ActionIcon>
-                                        </Tooltip>
+                                                onClick={() => setSelectedIndex(index)}
+                                                fallbackSrc={PLACEHOLDER_IMAGE}
+                                            />
 
-                                        {setCoverAction && coverImagePath === img.path && (
-                                            <Badge size="xs" color="olive.6" variant="filled" style={{ position: 'absolute', bottom: 6, left: 6, zIndex: 10 }}>
-                                                Cover
-                                            </Badge>
-                                        )}
-                                        {setCoverAction && coverImagePath !== img.path && (
-                                            <Tooltip label="Use as cover photo" withArrow openDelay={300}>
+                                            <Tooltip label="Delete photo" withArrow openDelay={300}>
                                                 <ActionIcon
-                                                    variant="white" color="olive.7" size="sm" radius="xl"
-                                                    aria-label="Use as cover photo"
-                                                    style={{ position: 'absolute', top: 6, left: 6, zIndex: 10, boxShadow: 'var(--mantine-shadow-xs)' }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        startTransition(async () => {
-                                                            await setCoverAction(targetId, img.path);
-                                                        });
-                                                    }}
+                                                    variant="white" color="rust.7" size="sm" radius="xl"
+                                                    aria-label="Delete photo"
+                                                    style={{ ...OVERLAY_BUTTON_STYLE, top: 6, right: 6 }}
+                                                    onClick={(e) => { e.stopPropagation(); handleDelete(img.id); }}
                                                 >
-                                                    <IconPhotoStar size={14} />
+                                                    <IconTrash size={14} />
                                                 </ActionIcon>
                                             </Tooltip>
-                                        )}
-                                    </Box>
-                                ))}
+
+                                            {setCoverAction && isCover && (
+                                                <Badge size="xs" color="olive.6" variant="filled" style={{ position: 'absolute', bottom: 6, left: 6, zIndex: 10 }}>
+                                                    Cover
+                                                </Badge>
+                                            )}
+                                            {setCoverAction && !isCover && (
+                                                <Tooltip label="Use as cover photo" withArrow openDelay={300}>
+                                                    <ActionIcon
+                                                        variant="white" color="olive.7" size="sm" radius="xl"
+                                                        aria-label="Use as cover photo"
+                                                        style={{ ...OVERLAY_BUTTON_STYLE, top: 6, left: 6 }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            startTransition(async () => {
+                                                                await setCoverAction(targetId, img.path);
+                                                            });
+                                                        }}
+                                                    >
+                                                        <IconPhotoStar size={14} />
+                                                    </ActionIcon>
+                                                </Tooltip>
+                                            )}
+                                        </Box>
+                                    );
+                                })}
                             </SimpleGrid>
                         ) : (
                             <Text c="dimmed" size="sm">No photos uploaded yet.</Text>
@@ -183,23 +157,21 @@ export default function ImageGallery({
                 revalidateUrl={revalidateUrl}
             />
 
-            {/* ✨ UPDATED: FULL SIZE VIEWER WITH CONTROLS */}
+            {/* Full-size viewer */}
             <Modal
-                opened={imageViewerOpened}
-                onClose={closeImageViewer}
+                opened={viewerOpened}
+                onClose={() => setSelectedIndex(null)}
                 withCloseButton={false}
                 size="auto"
                 centered
                 padding={0}
-                styles={{ content: { backgroundColor: 'transparent', boxShadow: 'none' } }} // Removes the white box behind the image
+                styles={{ content: { backgroundColor: 'transparent', boxShadow: 'none' } }}
             >
                 {selectedIndex !== null && images[selectedIndex] && (
                     <Box style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-
-                        {/* Only show arrows if there is more than 1 image */}
-                        {images.length > 1 && (
+                        {count > 1 && (
                             <ActionIcon
-                                variant="filled" color="dark" size="xl" radius="xl"
+                                variant="filled" color="dark" size="xl" radius="xl" aria-label="Previous photo"
                                 style={{ position: 'absolute', left: 10, zIndex: 10, opacity: 0.7 }}
                                 onClick={goToPrevious}
                             >
@@ -209,13 +181,13 @@ export default function ImageGallery({
 
                         <Image
                             src={images[selectedIndex].path}
-                            alt="Full size"
+                            alt={`${title} ${selectedIndex + 1}`}
                             style={{ maxHeight: '90vh', maxWidth: '90vw', objectFit: 'contain' }}
                         />
 
-                        {images.length > 1 && (
+                        {count > 1 && (
                             <ActionIcon
-                                variant="filled" color="dark" size="xl" radius="xl"
+                                variant="filled" color="dark" size="xl" radius="xl" aria-label="Next photo"
                                 style={{ position: 'absolute', right: 10, zIndex: 10, opacity: 0.7 }}
                                 onClick={goToNext}
                             >

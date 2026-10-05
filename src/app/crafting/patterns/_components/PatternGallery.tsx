@@ -20,7 +20,6 @@ export default function PatternGallery({ initialPatterns }: { initialPatterns: P
       searchPlaceholder="Search patterns..."
       newItemText="New Pattern"
       createModalTitle="Add a New Pattern"
-      // cardDescription="Click to view details and instructions."
       deleteAction={deletePattern}
       extraActions={
         <Button variant="light" color="mustard" leftSection={<IconSparkles size={16} />} onClick={openImport}>

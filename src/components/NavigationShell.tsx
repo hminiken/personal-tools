@@ -5,10 +5,9 @@ import { AppShell, Burger, Group, NavLink, Title, ActionIcon, ScrollArea, useCom
 import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
+import {
   IconNeedleThread,
   IconHome,
-  IconCurrencyDollar,
   IconChevronLeft,
   IconCategory,
   IconMoon,
@@ -20,65 +19,68 @@ import { useWakeLock } from '@hooks/useWakeLock';
 import { useEffect } from 'react';
 import { useMediaQuery } from '@mantine/hooks';
 
+// Header title for the current section. Matched by prefix so a detail page
+// (/crafting/patterns/12) shows its section's title.
+const PAGE_TITLES: [prefix: string, title: string][] = [
+  ['/crafting/patterns', 'Pattern Library'],
+  ['/crafting/projects', 'Active Projects'],
+  ['/crafting/stash', 'Yarn Stash'],
+  ['/crafting/media', 'Manage Media'],
+  ['/crafting/references', 'References'],
+  ['/misc', 'Misc Tools'],
+];
+
+const CRAFTING_LINKS = [
+  { href: '/crafting/patterns', label: 'Patterns' },
+  { href: '/crafting/projects', label: 'Projects' },
+  { href: '/crafting/stash', label: 'Yarn Stash' },
+  { href: '/crafting/media', label: 'Media' },
+  { href: '/crafting/references', label: 'References' },
+];
+
 export default function NavigationShell({ children }: { children: React.ReactNode }) {
-  // Start the sidebar closed by default
   const [opened, { toggle, close }] = useDisclosure(false);
   const pathname = usePathname();
 
   const { setColorScheme } = useMantineColorScheme();
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
 
-  const getPageTitle = () => {
-    // If the URL is exactly the root, or maybe a dashboard
-    if (pathname === '/') return 'Command Center';
-    
-    // We use .includes() so that both the gallery (/patterns) 
-    // AND the individual item (/patterns/1) show the correct category!
-    if (pathname.includes('/crafting/patterns')) return 'Pattern Library';
-    if (pathname.includes('/crafting/projects')) return 'Active Projects';
-    if (pathname.includes('/crafting/stash')) return 'Yarn Stash'; // Just in case you add this later!
-    if (pathname.includes('/crafting/media')) return 'Manage Media'; // Just in case you add this later!
-    if (pathname.includes('/crafting/references')) return 'References';
-    if (pathname.startsWith('/misc')) return 'Misc Tools';
+  const pageTitle = PAGE_TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? 'Command Center';
 
-    return 'Command Center'; // A safe fallback
-  };
-const isMobile = useMediaQuery('(max-width: 48em)'); // matches 'sm' breakpoint
+  // On phones the sidebar overlays the page, so close it after navigating.
+  const isMobile = useMediaQuery('(max-width: 48em)'); // Mantine's 'sm' breakpoint
+  useEffect(() => {
+    if (isMobile) close();
+  }, [pathname, close, isMobile]);
 
-useEffect(() => {
-  if (isMobile) {
-    close();
-  }
-}, [pathname, close, isMobile]);
-  
   const { isAwake, setIsAwake, isSupported } = useWakeLock();
 
   return (
     <AppShell
       header={{ height: 60 }}
-      navbar={{ 
-        width: 260, 
-        breakpoint: 'sm', 
-       collapsed: { desktop: !opened, mobile: !opened }
+      navbar={{
+        width: 260,
+        breakpoint: 'sm',
+        collapsed: { desktop: !opened, mobile: !opened }
       }}
-      pl={{ base: 'xs', sm: 'xl'}}
-      pr={{ base: 'xs', sm: 'xl'}}
+      pl={{ base: "xs", sm: "xl" }}
+      pr={{ base: "xs", sm: "xl" }}
     >
-     <AppShell.Header bg={"olive.8"}>
+      <AppShell.Header bg="olive.8">
         <Group h="100%" px="md" justify="space-between">
           <Group>
-            <Burger color={"neutrals.1"} opened={opened} onClick={toggle} size="sm" />
-            <Title c={"neutrals.1"} order={3}>{getPageTitle()}</Title>
+            <Burger color="neutrals.1" opened={opened} onClick={toggle} size="sm" />
+            <Title c="neutrals.1" order={3}>{pageTitle}</Title>
           </Group>
-          
+
           <Group>
-            {/* 3. Add the Keep Awake Toggle (Only renders if the browser supports it) */}
+            {/* Keep-awake toggle (only where the Wake Lock API exists) */}
             {isSupported && (
               <Tooltip label={isAwake ? "Allow screen to sleep" : "Keep screen awake"} withArrow>
                 <ActionIcon
                   onClick={() => setIsAwake(!isAwake)}
                   variant={isAwake ? "light" : "default"}
-                  color={isAwake ? "orange" : "gray"}
+                  color={isAwake ? "mustard" : "gray"}
                   size="lg"
                   aria-label="Toggle screen wake lock"
                 >
@@ -87,7 +89,6 @@ useEffect(() => {
               </Tooltip>
             )}
 
-            {/* Your Dark Mode Toggle */}
             <ActionIcon
               onClick={() => setColorScheme(computedColorScheme === 'light' ? 'dark' : 'light')}
               variant="default"
@@ -98,7 +99,7 @@ useEffect(() => {
               <IconMoon stroke={1.5} className="mantine-dark-hidden" />
             </ActionIcon>
           </Group>
-          
+
         </Group>
       </AppShell.Header>
 
@@ -106,8 +107,8 @@ useEffect(() => {
         {/* TOP BAR OF THE SIDEBAR (Logo and Close Button) */}
         <AppShell.Section>
           <Group justify="space-between" p="md">
-            <IconCategory size={28} stroke={1.5} color="olive" />
-            <ActionIcon onClick={close} variant="subtle" color="gray">
+            <IconCategory size={28} stroke={1.5} color="var(--mantine-color-olive-6)" />
+            <ActionIcon onClick={close} variant="subtle" color="gray" aria-label="Close menu">
               <IconChevronLeft size={20} />
             </ActionIcon>
           </Group>
@@ -115,61 +116,32 @@ useEffect(() => {
 
         {/* SCROLLABLE LINKS AREA */}
         <AppShell.Section grow component={ScrollArea} p="md">
-          <NavLink 
-            component={Link} 
-            href="/" 
-            label="Dashboard" 
-            leftSection={<IconHome size="1rem" stroke={1.5} />} 
-            active={pathname === '/'}
-          />
-          
-    {/* --- NESTED CRAFTING MENU --- */}
-          <NavLink 
-            label="Crochet & Crafting" 
-            leftSection={<IconNeedleThread size="1rem" stroke={1.5} />} 
-            childrenOffset={28} // This creates that nice indentation for the sub-links
-            // This keeps the folder open if you are currently on any page inside it
-            defaultOpened={pathname.startsWith('/crafting')} 
-          >
-            <NavLink 
-              component={Link} 
-              href="/crafting/patterns" 
-              label="Patterns" 
-              active={pathname.includes('/patterns')}
-            />
-            <NavLink 
-              component={Link} 
-              href="/crafting/projects" // You can create this route later!
-              label="Projects" 
-              active={pathname.includes('/projects')}
-            />
-            <NavLink 
-              component={Link} 
-              href="/crafting/stash" 
-              label="Yarn Stash" 
-              active={pathname.includes('/stash')}
-            />
-             <NavLink
-              component={Link}
-              href="/crafting/media"
-              label="Media"
-              active={pathname.includes('/media')}
-            />
-             <NavLink
-              component={Link}
-              href="/crafting/references"
-              label="References"
-              active={pathname.includes('/references')}
-            />
-          </NavLink>
-
           <NavLink
             component={Link}
-            href="/budget"
-            label="Budget"
-            leftSection={<IconCurrencyDollar size="1rem" stroke={1.5} />}
-            active={pathname.startsWith('/budget')}
+            href="/"
+            label="Dashboard"
+            leftSection={<IconHome size="1rem" stroke={1.5} />}
+            active={pathname === '/'}
           />
+
+          {/* Crafting submenu */}
+          <NavLink
+            label="Crochet & Crafting"
+            leftSection={<IconNeedleThread size="1rem" stroke={1.5} />}
+            childrenOffset={28}
+            // Start expanded when you're on a crafting page
+            defaultOpened={pathname.startsWith('/crafting')}
+          >
+            {CRAFTING_LINKS.map((link) => (
+              <NavLink
+                key={link.href}
+                component={Link}
+                href={link.href}
+                label={link.label}
+                active={pathname.startsWith(link.href)}
+              />
+            ))}
+          </NavLink>
 
           <NavLink
             component={Link}

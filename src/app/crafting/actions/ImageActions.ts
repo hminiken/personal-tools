@@ -3,10 +3,8 @@
 import { db } from "@/db";
 import { images, patterns, projects, yarns } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
-import { writeFile } from 'fs/promises';
 import { revalidatePath } from "next/cache";
-import path from "path";
-import { compressImage } from "@/utils/compressImage";
+import { saveUploadedImage } from "@/utils/uploads";
 
 // Reusable Type for knowing which entity to update
 type EntityTable = 'pattern' | 'project' | 'yarn';
@@ -44,23 +42,14 @@ export async function uploadImage(formData: FormData) {
   const patternId = formData.get('patternId') ? Number(formData.get('patternId')) : null;
   const projectId = formData.get('projectId') ? Number(formData.get('projectId')) : null;
   const yarnId = formData.get('yarnId') ? Number(formData.get('yarnId')) : null;
-  
+
   // Always look for 'file'
-  const imageFile = formData.get('file') as File | null; 
-  
+  const imageFile = formData.get('file') as File | null;
+
   if (!imageFile || imageFile.size === 0) return;
 
-  // Compress before saving: cap dimensions + re-encode to ~1MB WebP.
-  const originalBuffer = Buffer.from(await imageFile.arrayBuffer());
-  const buffer = await compressImage(originalBuffer);
-
-  // Strip the original extension since we always write WebP now.
-  const baseName = imageFile.name.replaceAll(' ', '_').replace(/\.[^.]+$/, '');
-  const filename = `${Date.now()}-${baseName}.webp`;
-  const filepath = path.join(process.cwd(), 'public/uploads', filename);
-  await writeFile(filepath, buffer);
-
-  const newImagePath = `/uploads/${filename}`;
+  // Compressed to WebP and written under public/uploads.
+  const newImagePath = await saveUploadedImage(imageFile);
 
   // Insert into the database, linking whichever ID is present
   await db.insert(images).values({
@@ -93,12 +82,12 @@ export async function setCoverImage(id: number, imagePath: string, type: 'patter
     await db.update(patterns).set({ coverImage: imagePath }).where(eq(patterns.id, id));
     revalidatePath(`/crafting/patterns/${id}`);
     revalidatePath(`/crafting/patterns`)
-  } 
+  }
   else if (type === 'project') {
     await db.update(projects).set({ coverImage: imagePath }).where(eq(projects.id, id));
     revalidatePath(`/crafting/projects/${id}`);
     revalidatePath(`/crafting/projects`)
-  } 
+  }
   else if (type === 'yarn') {
     await db.update(yarns).set({ coverImage: imagePath }).where(eq(yarns.id, id));
     revalidatePath(`/crafting/stash/${id}`);
@@ -115,23 +104,25 @@ export async function deleteImage(imageId: number, revalidateUrl: string) {
   revalidatePath(revalidateUrl);
 }
 
+const OWNER_COLUMNS = { patternId: 'pattern', projectId: 'project', yarnId: 'yarn' } as const;
+
+// Attaches an existing library image (by path) to a pattern/project/yarn.
 export async function linkLibraryImageAction(
-    entityColumn: string, 
-    imageUrl: string, 
-    targetId: number, 
-    revalidateUrl: string // ✨ NEW
+    entityColumn: keyof typeof OWNER_COLUMNS,
+    imageUrl: string,
+    targetId: number,
+    revalidateUrl: string
 ) {
+    const entity = OWNER_COLUMNS[entityColumn];
+    if (!entity) throw new Error(`Unknown image owner: ${entityColumn}`);
+
     await db.insert(images).values({
         path: imageUrl,
         [entityColumn]: targetId,
     });
 
-    // Auto-set the cover image if one doesn't exist (first image wins),
-    // matching the behavior of a fresh upload.
-    const entity = entityColumn.replace(/Id$/, '') as EntityTable;
+    // First image wins the cover, same as a fresh upload.
     await setCoverIfMissing(entity, targetId, imageUrl);
-
-    // ✨ MAGIC REFRESH TRIGGER
     revalidatePath(revalidateUrl);
 }
 
