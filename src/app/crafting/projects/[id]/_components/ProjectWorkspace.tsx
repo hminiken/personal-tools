@@ -1,12 +1,13 @@
 /* eslint-disable react/no-unescaped-entities */
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     Title, Text, Group, Paper, Switch, Tabs, Divider, Box, Button,
-    TextInput, Stack, Typography, Anchor, Modal, useComputedColorScheme, ActionIcon, Card, Image, Badge, Collapse
+    TextInput, Stack, Typography, Anchor, Modal, useComputedColorScheme, ActionIcon, Card, Image, Badge, Collapse,
+    Textarea, Alert
 } from '@mantine/core';
-import { IconArrowLeft, IconPlus, IconUnlink, IconChevronDown, IconChevronRight } from '@tabler/icons-react';
+import { IconArrowLeft, IconPlus, IconUnlink, IconChevronDown, IconChevronRight, IconSparkles } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
 
@@ -15,7 +16,7 @@ import { RichTextEditor } from '@mantine/tiptap';
 import '@mantine/tiptap/styles.css';
 
 // Actions & Components
-import { saveRulerPosition, updateProject, updateProjectStatus, addQuickNote, deleteProject, unlinkYarnFromProject } from '../../_actions/project_actions';
+import { saveRulerPosition, updateProject, updateProjectStatus, addQuickNote, deleteProject, unlinkYarnFromProject, tailorProjectPattern } from '../../_actions/project_actions';
 import { processWholePattern } from '@/utils/patternHighlighter';
 import ImageGallery from '@/components/PatternImageGallery';
 import { Project, Pattern, PatternImage, yarnStash } from '../types';
@@ -75,6 +76,47 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
 
     const notesEditor = useCraftingEditor(project.notes, isEditingTabs);
     const patternEditor = useCraftingEditor(project.content || pattern.content, isEditingTabs);
+
+    // "Tailor with AI": Gemini rewrites the pattern copy (e.g. only size XL).
+    // The result is loaded into the editor in edit mode, NOT saved — the user
+    // reviews it, then Save Text keeps it or Cancel Editing throws it away.
+    const [tailorOpened, { open: openTailor, close: closeTailor }] = useDisclosure(false);
+    const [tailorPrompt, setTailorPrompt] = useState('');
+    const [isTailoring, setIsTailoring] = useState(false);
+    const [tailorError, setTailorError] = useState<string | null>(null);
+    const [showTailoredNotice, setShowTailoredNotice] = useState(false);
+    // Held in a ref until the editor has been rebuilt in edit mode (toggling
+    // edit mode recreates the editor, which would wipe content set earlier).
+    const pendingTailoredHtml = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (pendingTailoredHtml.current && patternEditor?.isEditable) {
+            patternEditor.commands.setContent(pendingTailoredHtml.current);
+            pendingTailoredHtml.current = null;
+        }
+    }, [patternEditor, isEditingTabs]);
+
+    const handleTailor = async () => {
+        if (!tailorPrompt.trim()) return;
+        setIsTailoring(true);
+        setTailorError(null);
+        const result = await tailorProjectPattern(project.id, tailorPrompt);
+        setIsTailoring(false);
+        if ('error' in result) {
+            setTailorError(result.error);
+            return;
+        }
+        pendingTailoredHtml.current = result.html;
+        setShowTailoredNotice(true);
+        openContent();
+        setIsEditingTabs(true);
+        closeTailor();
+    };
+
+    const stopEditingTabs = () => {
+        setIsEditingTabs(false);
+        setShowTailoredNotice(false);
+    };
 
 
 
@@ -213,7 +255,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
 
                 await updateProject(formData);
                 router.refresh(); // Pull fresh server props so the editors re-sync
-                setIsEditingTabs(false);
+                stopEditingTabs();
             }}>
                 <input type="hidden" name="projectId" value={project.id} />
 
@@ -225,7 +267,12 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                         <Title order={4}>Project Content</Title>
                     </Group>
                     <Group>
-                        <Button variant="light" onClick={() => { if (!isEditingTabs) openContent(); setIsEditingTabs(!isEditingTabs); }}>
+                        {!isEditingTabs && (
+                            <Button variant="light" color="grape" leftSection={<IconSparkles size={16} />} onClick={() => { setTailorError(null); openTailor(); }}>
+                                Tailor with AI
+                            </Button>
+                        )}
+                        <Button variant="light" onClick={() => { if (isEditingTabs) { stopEditingTabs(); } else { openContent(); setIsEditingTabs(true); } }}>
                             {isEditingTabs ? 'Cancel Editing' : 'Edit Text'}
                         </Button>
                         {isEditingTabs && <Button type="submit" color="olive.5">Save Text</Button>}
@@ -266,6 +313,11 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                         <Group justify="space-between" mb="sm">
                             <Text size="sm" c="dimmed" fs="italic">This is your project's clone of the pattern. Mark it up!</Text>
                         </Group>
+                        {showTailoredNotice && isEditingTabs && (
+                            <Alert color="grape" icon={<IconSparkles size={18} />} title="AI-tailored version loaded" mb="sm">
+                                Review the changes below. <strong>Save Text</strong> keeps them; <strong>Cancel Editing</strong> discards them and restores your saved copy.
+                            </Alert>
+                        )}
                         <Group>
                             <Switch checked={rainbowEnabled} onChange={(event) => setRainbowEnabled(event.currentTarget.checked)} label="Rainbow Steps" color="grape" />
                             <Switch checked={rulerEnabled} onChange={(event) => setRulerEnabled(event.currentTarget.checked)} label="Reading Ruler" />
@@ -462,6 +514,34 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                     <Button onClick={handleSaveNote}>Save Note</Button>
                 </Stack>
             </Modal>
+            <Modal opened={tailorOpened} onClose={() => { if (!isTailoring) closeTailor(); }} title="Tailor pattern with AI" centered size="lg">
+                <Stack>
+                    <Text size="sm" c="dimmed">
+                        Gemini rewrites this project's copy of the pattern. Nothing is saved until you review it and click Save Text.
+                    </Text>
+                    <Textarea
+                        label="What should change?"
+                        placeholder={'e.g. Only show size "XL" — remove the other sizes\' stitch counts and any sections for other sizes.'}
+                        value={tailorPrompt}
+                        onChange={(e) => setTailorPrompt(e.currentTarget.value)}
+                        autosize
+                        minRows={3}
+                        maxRows={8}
+                        disabled={isTailoring}
+                        data-autofocus
+                    />
+                    {tailorError && <Alert color="red" title="Couldn't tailor the pattern">{tailorError}</Alert>}
+                    <Group justify="space-between">
+                        <Text size="xs" c="dimmed">{isTailoring ? 'Working through the pattern section by section — long patterns can take a minute.' : ''}</Text>
+                        <Group>
+                            <Button variant="default" onClick={closeTailor} disabled={isTailoring}>Cancel</Button>
+                            <Button color="grape" leftSection={<IconSparkles size={16} />} onClick={handleTailor} loading={isTailoring} disabled={!tailorPrompt.trim()}>
+                                Tailor
+                            </Button>
+                        </Group>
+                    </Group>
+                </Stack>
+            </Modal>
             <StashBrowserModal
                 opened={stashModalOpened}
                 close={closeStashModal}
@@ -478,7 +558,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
             />
 
             {isEditingTabs ? (
-                <FloatingEditActions formId="project-content-form" onCancel={() => setIsEditingTabs(false)} />
+                <FloatingEditActions formId="project-content-form" onCancel={stopEditingTabs} />
             ) : (
                 <ScrollToTopButton />
             )}

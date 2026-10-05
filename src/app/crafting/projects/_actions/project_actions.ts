@@ -2,10 +2,44 @@
 'use server';
 
 import { db } from '@/db';
-import { projects, projectYarns } from '@/db/schema';
+import { patterns, projects, projectYarns } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
 
 import { revalidatePath } from 'next/cache';
+import { tailorPatternHtml } from '@/lib/patternAi/tailor';
+import { GeminiError, GeminiOutputError } from '@/lib/patternAi/gemini';
+
+// Rewrites the project's pattern copy with Gemini (e.g. "only show size XL").
+// Does NOT save: the client loads the result into the editor so the user can
+// review it and Save Text, or Cancel Editing to discard. Works from the saved
+// copy; the master pattern's sizing/materials/notes are only read for context
+// (they're where the size order is usually declared).
+export async function tailorProjectPattern(
+  projectId: number,
+  instructions: string,
+): Promise<{ html: string } | { error: string }> {
+  const prompt = instructions.trim().slice(0, 2000);
+  if (!prompt) return { error: 'Tell Gemini what to change.' };
+
+  const project = await db.select().from(projects).where(eq(projects.id, projectId)).get();
+  if (!project) return { error: 'Project not found.' };
+  const pattern = await db.select().from(patterns).where(eq(patterns.id, project.patternId)).get();
+  const source = project.content || pattern?.content || '';
+  if (!source.trim()) return { error: 'This project has no pattern text to change.' };
+
+  try {
+    const html = await tailorPatternHtml(source, prompt, [pattern?.sizing ?? '', pattern?.materials ?? '', pattern?.notes ?? '']);
+    if (!html.trim()) return { error: 'Gemini returned an empty pattern, so nothing was changed. Try rewording the request.' };
+    return { html };
+  } catch (err) {
+    console.error('tailorProjectPattern failed:', err);
+    if (err instanceof GeminiError) {
+      return { error: err.overloaded ? 'Gemini is busy right now. Please try again in a minute.' : err.message };
+    }
+    if (err instanceof GeminiOutputError) return { error: `Gemini returned a response we couldn't read. ${err.message}` };
+    return { error: err instanceof Error ? err.message : 'Something went wrong.' };
+  }
+}
 
 // 2. Add an action to silently save the highlighter position
 export async function saveRulerPosition(projectId: number, yPosition: number) {
