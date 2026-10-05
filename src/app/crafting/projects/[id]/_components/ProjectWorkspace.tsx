@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
     Title, Text, Group, Paper, Switch, Tabs, Divider, Box, Button,
-    TextInput, Stack, Typography, Anchor, Modal, useComputedColorScheme, ActionIcon, Card, Image, Badge, Collapse,
+    TextInput, Stack, Typography, Anchor, Modal, useComputedColorScheme, ActionIcon, Card, Image, Collapse,
     Textarea, Alert
 } from '@mantine/core';
 import { IconArrowLeft, IconPlus, IconUnlink, IconChevronDown, IconChevronRight, IconSparkles } from '@tabler/icons-react';
@@ -32,6 +32,8 @@ import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
 import type { CraftType } from '@/utils/knittingNeedles';
 import { sanitizePatternHtml } from '@/utils/sanitizeHtml';
 import { GeminiModelSelect } from '@/components/GeminiModelSelect';
+import { PLACEHOLDER_IMAGE } from '@/utils/placeholders';
+import { TagBadges } from '@components/TagBadges';
 function ReadOnlyHTML({ html, fallback }: { html: string | null, fallback: string }) {
     return (
         <Typography p={0}>
@@ -327,7 +329,7 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                                 Review the changes below. <strong>Save Text</strong> keeps them; <strong>Cancel Editing</strong> discards them and restores your saved copy.
                             </Alert>
                         )}
-                        <Group>
+                        <Group mb="sm">
                             <Switch checked={rainbowEnabled} onChange={(event) => setRainbowEnabled(event.currentTarget.checked)} label="Rainbow Steps" color="grape" />
                             <Switch checked={rulerEnabled} onChange={(event) => setRulerEnabled(event.currentTarget.checked)} label="Reading Ruler" />
                         </Group>
@@ -339,7 +341,9 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                         >
                             {rulerEnabled && !isEditingTabs && (
                                 <div style={{
-                                    position: 'absolute', top: `${rulerY - 15}px`, left: -10, right: -10, height: '35px',
+                                    // Clamped to the text box: at the saved default (0) it used to sit
+                                    // 15px above it, over the Rainbow/Ruler switches, and block clicks.
+                                    position: 'absolute', top: `${Math.max(0, rulerY - 15)}px`, left: -10, right: -10, height: '35px',
                                     backgroundColor: 'rgba(255, 224, 102, 0.4)', borderLeft: '4px solid var(--mantine-color-yellow-filled)',
                                     zIndex: 5, borderRadius: '4px',
                                     pointerEvents: 'auto',
@@ -439,13 +443,13 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
 
                             {/* 1. THE IMAGE (Uncommented the sizing so it renders!) */}
                             <Image
-                                src={yarn.coverImagePath || 'https://placehold.co/100x100?text=No+Photo'}
+                                src={yarn.coverImagePath || PLACEHOLDER_IMAGE}
                                 h={60}
                                 w={60}
                                 radius="md"
                                 fit="cover"
                                 alt={yarn.title}
-                                fallbackSrc="https://placehold.co/100x100?text=No+Photo"
+                                fallbackSrc={PLACEHOLDER_IMAGE}
                             />
 
                             {/* 2. THE DETAILS & BADGES */}
@@ -456,34 +460,9 @@ export default function ProjectWorkspace({ project, pattern, images, linkedYarns
                                 </Text>
 
                                 <Group gap={4}>
-                                    {/* Weight */}
-                                    {yarn.weight && (
-                                        <Badge size="xs" color="mustard" variant="outline">
-                                            {yarn.weight}
-                                        </Badge>
-                                    )}
-
-                                    {/* Fibers */}
-                                    {yarn.fiber_tags?.split(',').map((fiber: string) => {
-                                        const cleanFiber = fiber.trim();
-                                        if (!cleanFiber) return null;
-                                        return (
-                                            <Badge key={cleanFiber} size="xs" color="rust" variant="outline">
-                                                {cleanFiber}
-                                            </Badge>
-                                        );
-                                    })}
-
-                                    {/* Colors */}
-                                    {yarn.color_tags?.split(',').map((color: string) => {
-                                        const cleanColor = color.trim();
-                                        if (!cleanColor) return null;
-                                        return (
-                                            <Badge key={cleanColor} size="xs" color="olive" variant="outline">
-                                                {cleanColor}
-                                            </Badge>
-                                        );
-                                    })}
+                                    <TagBadges value={yarn.weight} color="mustard" size="xs" />
+                                    <TagBadges value={yarn.fiber_tags} color="rust" size="xs" />
+                                    <TagBadges value={yarn.color_tags} color="olive" variant="outline" size="xs" />
                                 </Group>
                             </Box>
 

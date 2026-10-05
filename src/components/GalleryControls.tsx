@@ -1,5 +1,5 @@
 // src/components/GalleryControls.tsx
-import { Group, Switch, Select } from '@mantine/core';
+import { Group, Switch, Select, Box } from '@mantine/core';
 import { IconSortAscending } from '@tabler/icons-react';
 import { FilterBuilder, Filter, FieldOption } from './FilterBuilder';
 
@@ -10,62 +10,73 @@ interface GalleryControlsProps {
   onAddFilter: (filter: Filter) => void;
   onRemoveFilter: (index: number) => void;
   onClearFilters: () => void;
+  onDraftChange?: (draft: Filter | null) => void;
   searchPlaceholder?: string;
   isGrouped: boolean;
   setIsGrouped: (val: boolean) => void;
+  groupLabel?: string;
   sortOption: string | null;
   setSortOption: (val: string | null) => void;
   universalInputStyles?: object;
+  // Page-level buttons (New Pattern, Smart Import, Add Yarn, ...).
+  actions?: React.ReactNode;
 }
 
+// Search on its own row; sort, grouping and the page's actions on the next.
+// Everything wraps cleanly down to phone width.
 export function GalleryControls({
-  fields, getSuggestions, filters, onAddFilter, onRemoveFilter, onClearFilters,
-  searchPlaceholder, isGrouped, setIsGrouped, sortOption, setSortOption,
-  universalInputStyles,
+  fields, getSuggestions, filters, onAddFilter, onRemoveFilter, onClearFilters, onDraftChange,
+  searchPlaceholder, isGrouped, setIsGrouped, groupLabel = 'Group by category', sortOption, setSortOption,
+  universalInputStyles, actions,
 }: GalleryControlsProps) {
   return (
-    <Group
-      wrap="wrap"
-      w={{ base: '100%', md: 'auto' }}
-      style={{ flexGrow: 1 }}
-      align="flex-start"
+    <Box
       bg="light-dark(var(--mantine-color-neutrals-0), var(--mantine-color-dark-7))"
       bdrs="md" p="sm" mb="sm"
     >
-      <Group wrap="nowrap" w={{ base: '100%', md: 'auto' }} style={{ flexGrow: 1 }}>
-        <FilterBuilder
-          fields={fields}
-          getSuggestions={getSuggestions}
-          filters={filters}
-          onAdd={onAddFilter}
-          onRemove={onRemoveFilter}
-          onClear={onClearFilters}
-          placeholder={searchPlaceholder}
-          universalInputStyles={universalInputStyles}
-        />
-      </Group>
+      <Group align="flex-start" gap="sm" wrap="wrap">
+        <Box style={{ flex: '1 1 320px', minWidth: 0 }}>
+          <FilterBuilder
+            fields={fields}
+            getSuggestions={getSuggestions}
+            filters={filters}
+            onAdd={onAddFilter}
+            onRemove={onRemoveFilter}
+            onClear={onClearFilters}
+            onDraftChange={onDraftChange}
+            placeholder={searchPlaceholder}
+            universalInputStyles={universalInputStyles}
+          />
+        </Box>
 
-      <Group justify="space-between" wrap="wrap" w={{ base: '100%', md: 'auto' }}>
-        <Switch
-          color="neutrals.7" label="Group by Category" checked={isGrouped}
-          onChange={(e) => setIsGrouped(e.currentTarget.checked)}
-          styles={{ track: { backgroundColor: 'var(--mantine-color-neutrals-2)' } }}
-        />
-        <Select
-          leftSection={<IconSortAscending size={16} color="var(--mantine-color-neutrals-9)" />}
-          styles={universalInputStyles}
-          placeholder="Sort by"
-          value={sortOption}
-          onChange={setSortOption}
-          data={[
-            { value: 'title-asc', label: 'Title (A-Z)' },
-            { value: 'title-desc', label: 'Title (Z-A)' },
-            { value: 'created-desc', label: 'Newest First' },
-            { value: 'updated-desc', label: 'Recently Updated' },
-          ]}
-          w={{ base: '100%', xs: 200 }}
-        />
+        <Group gap="sm" wrap="wrap" style={{ flex: '1 1 auto' }} justify="flex-end">
+          <Select
+            aria-label="Sort by"
+            leftSection={<IconSortAscending size={16} color="var(--mantine-color-neutrals-9)" />}
+            styles={universalInputStyles}
+            placeholder="Sort by"
+            value={sortOption}
+            onChange={setSortOption}
+            allowDeselect={false}
+            data={[
+              { value: 'title-asc', label: 'Title (A-Z)' },
+              { value: 'title-desc', label: 'Title (Z-A)' },
+              { value: 'created-desc', label: 'Newest first' },
+              { value: 'updated-desc', label: 'Recently updated' },
+            ]}
+            w={{ base: '100%', xs: 190 }}
+          />
+          <Switch
+            color="olive.6" label={groupLabel} checked={isGrouped}
+            onChange={(e) => setIsGrouped(e.currentTarget.checked)}
+          />
+          {actions && (
+            <Group gap="xs" wrap="nowrap" ml={{ base: 0, sm: 'auto' }}>
+              {actions}
+            </Group>
+          )}
+        </Group>
       </Group>
-    </Group>
+    </Box>
   );
 }

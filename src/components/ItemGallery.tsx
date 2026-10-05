@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { Text, Accordion, Box, Modal } from '@mantine/core';
+import { Text, Accordion, Box, Modal, Button } from '@mantine/core';
+import { IconPlus } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 import GalleryGrid from './GalleryGrid';
 import { GalleryControls } from './GalleryControls';
-import { FloatingAddButton } from './FloatingAddButton';
 import { Filter, FieldOption } from './FilterBuilder';
 
 // ==========================================
@@ -30,6 +30,10 @@ interface ItemGalleryProps<T extends BaseGalleryItem> {
   newItemText?: string;
   createModalTitle?: string;
   categoryField?: string;
+  // Label for the grouping switch, e.g. "Group by fiber" for yarn.
+  groupLabel?: string;
+  // Extra page buttons shown next to the "new item" button (e.g. Smart Import).
+  extraActions?: React.ReactNode;
   deleteAction?: (id: number) => Promise<void>;
   renderBadges?: (item: T) => React.ReactNode;
   renderCreateForm?: (closeModal: () => void) => React.ReactNode;
@@ -101,12 +105,14 @@ function applyFilters<T extends BaseGalleryItem>(items: T[], filters: Filter[]):
 // ==========================================
 export default function ItemGallery<T extends BaseGalleryItem>({
   items, basePath, searchPlaceholder = "Search...", newItemText = "New",
-  createModalTitle = "Create New", categoryField = 'categories', deleteAction,
+  createModalTitle = "Create New", categoryField = 'categories', groupLabel, extraActions, deleteAction,
   renderBadges, renderCreateForm
 }: ItemGalleryProps<T>) {
 
   // State Management
   const [filters, setFilters] = useState<Filter[]>([]);
+  // What's currently typed in the search box (filters live, before Enter).
+  const [draftFilter, setDraftFilter] = useState<Filter | null>(null);
   const [createModalOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
   const [itemToDelete, setItemToDelete] = useState<T | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -119,7 +125,11 @@ export default function ItemGallery<T extends BaseGalleryItem>({
   const clearFilters = useCallback(() => setFilters([]), []);
 
   // Derived Data (Memoized)
-  const filteredItems = useMemo(() => applyFilters(items, filters), [items, filters]);
+  const filteredItems = useMemo(
+    () => applyFilters(items, draftFilter ? [...filters, draftFilter] : filters),
+    [items, filters, draftFilter],
+  );
+  const hasFilters = filters.length > 0 || !!draftFilter;
 
   const sortedItems = useMemo(() => {
     return [...filteredItems].sort((a, b) => {
@@ -209,10 +219,6 @@ export default function ItemGallery<T extends BaseGalleryItem>({
 
   return (
     <div>
-      {renderCreateForm && (
-        <FloatingAddButton onClick={openCreate} text={newItemText} />
-      )}
-
       {/* CONTROLS BAR */}
         <GalleryControls
         fields={fieldOptions}
@@ -221,9 +227,21 @@ export default function ItemGallery<T extends BaseGalleryItem>({
         onAddFilter={addFilter}
         onRemoveFilter={removeFilter}
         onClearFilters={clearFilters}
+        onDraftChange={setDraftFilter}
         searchPlaceholder={searchPlaceholder}
         isGrouped={isGrouped}
         setIsGrouped={setIsGrouped}
+        groupLabel={groupLabel}
+        actions={(extraActions || renderCreateForm) && (
+          <>
+            {extraActions}
+            {renderCreateForm && (
+              <Button color="olive.6" leftSection={<IconPlus size={16} />} onClick={openCreate}>
+                {newItemText}
+              </Button>
+            )}
+          </>
+        )}
         sortOption={sortOption}
         setSortOption={setSortOption}
         universalInputStyles={universalInputStyles}
@@ -233,7 +251,7 @@ export default function ItemGallery<T extends BaseGalleryItem>({
       <Box mt="xl">
         {sortedItems.length === 0 ? (
           <Text c="dimmed" ta="center" mt="xl">
-            {filters.length > 0 ? 'No items match your filters.' : 'No items yet.'}
+            {hasFilters ? 'Nothing matches your search.' : 'Nothing here yet.'}
           </Text>
         ) : isGrouped ? (
           <Accordion multiple variant="separated">

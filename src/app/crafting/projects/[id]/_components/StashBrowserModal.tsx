@@ -6,6 +6,7 @@ import { IconSearch } from '@tabler/icons-react';
 import { linkYarnToProject } from '../../_actions/project_actions';
 import {  yarnStash } from '../types';
 import { LinkedYarn } from './ProjectWorkspace';
+import { PLACEHOLDER_IMAGE } from '@/utils/placeholders';
 
 interface StashBrowserModalProps {
   opened: boolean;
@@ -89,7 +90,7 @@ export function StashBrowserModal({
               <Card key={yarn.id} withBorder padding="sm" radius="md">
                 <Group wrap="nowrap">
                   <Image 
-                    src={yarn.coverImage || 'https://placehold.co/100x100?text=No+Photo'} 
+                    src={yarn.coverImage || PLACEHOLDER_IMAGE} 
                     h={80} w={80} radius="md" fit="cover" alt={yarn.title}
                   />
                   <Box style={{ flex: 1 }}>

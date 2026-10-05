@@ -1,7 +1,7 @@
 'use client';
 
 import ItemGallery from '@/components/ItemGallery';
-import { Badge, Group } from '@mantine/core';
+import { TagBadges, BadgeRow } from '@components/TagBadges';
 import { deleteYarn } from '../_actions/stash_actions';
 import YarnForm from './YarnForm';
 
@@ -16,18 +16,18 @@ export default function StashClient({ stashItems }: StashClientProps) {
       title="Yarn Stash"
       items={stashItems}
       basePath="/crafting/stash"
-      searchPlaceholder="Search 'colors:blue' or 'weight:worsted'"
+      searchPlaceholder="Search yarn..."
       newItemText="Add Yarn"
       createModalTitle="Log New Yarn"
       categoryField="fibers"
+      groupLabel="Group by fiber"
       deleteAction={deleteYarn}
       renderBadges={(item) => (
-        <Group gap="xs" mt="xs">
-          {item.weights && <Badge color="mustard.7" variant="outline">{item.weights}</Badge>}
-          {item.colors?.split(',').map((color: string) => (
-            color.trim() && <Badge key={color} color="olive.5" variant="outline">{color.trim()}</Badge>
-          ))}
-        </Group>
+        <BadgeRow>
+          <TagBadges value={item.weights} color="mustard" />
+          <TagBadges value={item.fibers} color="rust" />
+          <TagBadges value={item.colors} color="olive" variant="outline" />
+        </BadgeRow>
       )}
 
       renderCreateForm={(closeModal) => (

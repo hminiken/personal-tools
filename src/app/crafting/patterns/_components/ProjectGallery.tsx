@@ -1,6 +1,6 @@
 'use client';
 
-import { Group, Badge } from '@mantine/core';
+import { TagBadges, StatusBadge, BadgeRow } from '@components/TagBadges';
 import ItemGallery from '@/components/ItemGallery';
 import { projects } from '@/db/schema';
 import { InferSelectModel } from 'drizzle-orm';
@@ -20,13 +20,12 @@ export default function ProjectGallery({ initialProjects }: { initialProjects: P
       
       // Inject the Project-specific badges
       renderBadges={(project) => (
-        <Group gap="xs" mb="md">
-          {project.status && <Badge color="mustard" variant="light">{project.status}</Badge>}
-          {project.yarn && <Badge color="mustard" variant="outline">{project.yarn}</Badge>}
-          {project.hooks && <Badge color="rust" variant="outline">{project.hooks}</Badge>}
-          {project.weights && <Badge color="olive" variant="outline">{project.weights}</Badge>}
-          {project.categories && <Badge color="olive" variant="outline">{project.categories}</Badge>}
-        </Group>
+        <BadgeRow>
+          <StatusBadge status={project.status} />
+          <TagBadges value={project.yarn} color="neutrals.7" variant="outline" />
+          <TagBadges value={project.hooks} color="mustard" />
+          <TagBadges value={project.weights} color="rust" />
+        </BadgeRow>
       )}
       
     />

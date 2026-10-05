@@ -18,6 +18,6 @@ export async function saveImportedPattern(data: any) {
     
     // Classifications
     categories: data.categories,
-    status: 'planned', // Default status
+    status: 'Not Started', // must match one of the pattern status options
   });
 }

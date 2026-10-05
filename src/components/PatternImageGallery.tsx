@@ -3,7 +3,7 @@
 import { startTransition, useState, useEffect } from 'react';
 import {
     Accordion, Title, Group, SimpleGrid,
-    Image, Box, Modal, Text, ActionIcon
+    Image, Box, Modal, Text, ActionIcon, Button, Tooltip, Badge
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconTrash, IconPhotoStar, IconPlus, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
@@ -14,7 +14,7 @@ interface ImageGalleryProps {
     images: PatternImage[];
     title?: string;
     targetId: number;
-    idFieldName: string; 
+    idFieldName: string;
     revalidateUrl: string;
     uploadAction: (formData: FormData) => Promise<void>;
     deleteAction: (imageId: number, url: string) => Promise<void>;
@@ -39,7 +39,7 @@ export default function ImageGallery({
 
     const [uploadModalOpened, { open: openUpload, close: closeUpload }] = useDisclosure(false);
     const [imageViewerOpened, { open: openImageViewer, close: closeImageViewer }] = useDisclosure(false);
-    
+
     // ✨ CHANGED: Track the index instead of the URL
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
@@ -85,21 +85,20 @@ export default function ImageGallery({
         <Box>
             <Accordion mb="lg" defaultValue="photos" variant="separated">
                 <Accordion.Item value="photos">
-                    <Accordion.Control>
-                        <Group align="center">
+                    {/* The add button sits beside the control rather than inside it
+                        (a button can't be nested in the accordion's toggle button). */}
+                    <Group wrap="nowrap" gap={0} align="center">
+                        <Accordion.Control style={{ flex: 1 }}>
                             <Title order={5}>{title} ({images?.length || 0})</Title>
-                            <ActionIcon
-                                component="div" variant="filled" color="rust.7" size="sm"
-                                onClick={(e) => {
-                                    e.preventDefault(); 
-                                    e.stopPropagation(); 
-                                    openUpload();
-                                }}
-                            >
-                                <IconPlus size={14} />
-                            </ActionIcon>
-                        </Group>
-                    </Accordion.Control>
+                        </Accordion.Control>
+                        <Button
+                            size="xs" variant="light" color="olive" mr="md"
+                            leftSection={<IconPlus size={14} />}
+                            onClick={openUpload}
+                        >
+                            Add photos
+                        </Button>
+                    </Group>
                     <Accordion.Panel>
                         {images?.length > 0 ? (
                             <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }} spacing="sm">
@@ -122,35 +121,48 @@ export default function ImageGallery({
                                                 setSelectedIndex(index);
                                                 openImageViewer();
                                             }}
-                                            fallbackSrc="https://placehold.co/120x120?text=Not+Found"
+                                            fallbackSrc={'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#e9ecef"/></svg>')}
                                         />
 
-                                        <ActionIcon
-                                            variant="filled" color="red" size="sm"
-                                            style={{ position: 'absolute', top: 5, right: 5, zIndex: 10 }}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                startTransition(async () => {
-                                                    await deleteAction(img.id, revalidateUrl);
-                                                });
-                                            }}
-                                        >
-                                            <IconTrash size={14} />
-                                        </ActionIcon>
-
-                                        {setCoverAction && (
+                                        <Tooltip label="Delete photo" withArrow openDelay={300}>
                                             <ActionIcon
-                                                variant="filled" color="blue" size="sm"
-                                                style={{ position: 'absolute', top: 5, left: 5, zIndex: 10 }}
+                                                variant="white" color="rust.7" size="sm" radius="xl"
+                                                aria-label="Delete photo"
+                                                style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, boxShadow: 'var(--mantine-shadow-xs)' }}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
+                                                    // One tap used to delete instantly with no undo.
+                                                    if (!confirm('Delete this photo?')) return;
                                                     startTransition(async () => {
-                                                        await setCoverAction(targetId, img.path);
+                                                        await deleteAction(img.id, revalidateUrl);
                                                     });
                                                 }}
                                             >
-                                                <IconPhotoStar size={14} />
+                                                <IconTrash size={14} />
                                             </ActionIcon>
+                                        </Tooltip>
+
+                                        {setCoverAction && coverImagePath === img.path && (
+                                            <Badge size="xs" color="olive.6" variant="filled" style={{ position: 'absolute', bottom: 6, left: 6, zIndex: 10 }}>
+                                                Cover
+                                            </Badge>
+                                        )}
+                                        {setCoverAction && coverImagePath !== img.path && (
+                                            <Tooltip label="Use as cover photo" withArrow openDelay={300}>
+                                                <ActionIcon
+                                                    variant="white" color="olive.7" size="sm" radius="xl"
+                                                    aria-label="Use as cover photo"
+                                                    style={{ position: 'absolute', top: 6, left: 6, zIndex: 10, boxShadow: 'var(--mantine-shadow-xs)' }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        startTransition(async () => {
+                                                            await setCoverAction(targetId, img.path);
+                                                        });
+                                                    }}
+                                                >
+                                                    <IconPhotoStar size={14} />
+                                                </ActionIcon>
+                                            </Tooltip>
                                         )}
                                     </Box>
                                 ))}
@@ -172,21 +184,21 @@ export default function ImageGallery({
             />
 
             {/* ✨ UPDATED: FULL SIZE VIEWER WITH CONTROLS */}
-            <Modal 
-                opened={imageViewerOpened} 
-                onClose={closeImageViewer} 
-                withCloseButton={false} 
-                size="auto" 
-                centered 
+            <Modal
+                opened={imageViewerOpened}
+                onClose={closeImageViewer}
+                withCloseButton={false}
+                size="auto"
+                centered
                 padding={0}
                 styles={{ content: { backgroundColor: 'transparent', boxShadow: 'none' } }} // Removes the white box behind the image
             >
                 {selectedIndex !== null && images[selectedIndex] && (
                     <Box style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        
+
                         {/* Only show arrows if there is more than 1 image */}
                         {images.length > 1 && (
-                            <ActionIcon 
+                            <ActionIcon
                                 variant="filled" color="dark" size="xl" radius="xl"
                                 style={{ position: 'absolute', left: 10, zIndex: 10, opacity: 0.7 }}
                                 onClick={goToPrevious}
@@ -195,14 +207,14 @@ export default function ImageGallery({
                             </ActionIcon>
                         )}
 
-                        <Image 
-                            src={images[selectedIndex].path} 
-                            alt="Full size" 
-                            style={{ maxHeight: '90vh', maxWidth: '90vw', objectFit: 'contain' }} 
+                        <Image
+                            src={images[selectedIndex].path}
+                            alt="Full size"
+                            style={{ maxHeight: '90vh', maxWidth: '90vw', objectFit: 'contain' }}
                         />
 
                         {images.length > 1 && (
-                            <ActionIcon 
+                            <ActionIcon
                                 variant="filled" color="dark" size="xl" radius="xl"
                                 style={{ position: 'absolute', right: 10, zIndex: 10, opacity: 0.7 }}
                                 onClick={goToNext}

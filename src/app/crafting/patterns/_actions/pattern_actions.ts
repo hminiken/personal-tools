@@ -175,7 +175,7 @@ export async function createPatternFromImport(data: any) {
     craftType: data.craftType === 'knitting' ? 'knitting' : 'crochet',
     hooks: data.hooks,
     weights: data.weights,
-    status: 'planned', // Give it a default status
+    status: 'Not Started', // must match one of the pattern status options
   }).returning({ id: patterns.id });
 revalidatePath('/crafting/patterns');
   return newPattern.id;

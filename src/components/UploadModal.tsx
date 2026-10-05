@@ -4,6 +4,7 @@ import { IconPhotoPlus } from '@tabler/icons-react';
 
 // Import server actions directly
 import { getAllLibraryImages, linkLibraryImageAction } from '@app/crafting/actions/ImageActions'; 
+import { PLACEHOLDER_IMAGE } from '@/utils/placeholders';
 
 export function UploadModal({ 
   opened, 
@@ -170,7 +171,7 @@ export function UploadModal({
                                             h={100}
                                             fit="cover"
                                             style={{ transition: 'opacity 0.2s', opacity: isLinking ? 0.5 : 1 }}
-                                            fallbackSrc="https://placehold.co/100x100?text=Error"
+                                            fallbackSrc={PLACEHOLDER_IMAGE}
                                         />
                                     </Box>
                                 ))}

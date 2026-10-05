@@ -4,7 +4,8 @@ import {
     Anchor, Select, Button, Badge,
     SimpleGrid
 } from '@mantine/core';
-import { IconExternalLink, IconNeedleThread } from '@tabler/icons-react';
+import { IconExternalLink, IconNeedleThread, IconEdit } from '@tabler/icons-react';
+import { TagBadges } from '@components/TagBadges';
 import { getTagSuggestions } from '@app/crafting/actions/MetadataActions';
 import { weightOptionsWith } from '@/utils/yarnWeights';
 import { hookOptionsWith } from '@/utils/hookSizes';
@@ -166,11 +167,11 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
                 ) : (
                   <Group justify="space-between" align="flex-start" w="100%">
                     <Box style={{ flexGrow: 1, minWidth: 0 }}>
-                        <Group>
-                            <Title order={2}>{props.title}</Title>
+                        <Group gap={6} wrap="nowrap" align="center">
+                            <Title order={2} style={{ overflowWrap: 'anywhere' }}>{props.title}</Title>
                             {props.sourceUrl && (
-                                <Anchor fw={500} href={props.sourceUrl} ml={4} target="_blank" rel="noopener noreferrer">
-                                    <IconExternalLink />
+                                <Anchor href={props.sourceUrl} target="_blank" rel="noopener noreferrer" c="olive.6" aria-label="Open original pattern" title="Open original pattern" style={{ display: 'flex', flexShrink: 0 }}>
+                                    <IconExternalLink size={20} />
                                 </Anchor>
                             )}
                         </Group>
@@ -186,7 +187,7 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
                             onChange={(val) => val && props.onUpdateStatus(val)}
                         />
                         {props.actionButtons}
-                        <Button c={'olive.6'} variant="outline" onClick={() => props.setIsEditing(true)}>
+                        <Button color="olive.6" variant="default" leftSection={<IconEdit size={16} />} onClick={() => props.setIsEditing(true)}>
                             Edit Details
                         </Button>
                     </Group>
@@ -196,14 +197,13 @@ export function CraftingMetadataForm(props: CraftingMetadataProps) {
             </Group>
 
             {!props.isEditing && (
-                <Group gap="xs" mb="md">
-                    {props.status && <Badge size='xs' color="neutrals.7" variant="outline">Status: {props.status}</Badge>}
-                    {props.yarnUsed && <Badge size='xs' color="neutrals.5" variant="outline" leftSection={<IconNeedleThread size={12} />}>{props.yarnUsed}</Badge>}
-                    {props.colors && <Badge size='xs' color="olive.7" variant="outline">Colors: {props.colors}</Badge>}
-                    
-                    {tags.categoryTags.map(tag => <Badge size='xs' key={`cat-${tag}`} color="rust.6" variant="outline">Categories: {tag}</Badge>)}
-                    {tags.hookTags.map(tag => <Badge size='xs' key={`hook-${tag}`} color="rust.5" variant="outline">{isKnitting ? 'Needle' : 'Hook'}: {tag}</Badge>)}
-                    {tags.weightTags.map(tag => <Badge size='xs' key={`weight-${tag}`} color="mustard.6" variant="outline">Weight: {tag}</Badge>)}
+                // Status lives in the dropdown above, so it isn't repeated here.
+                <Group gap={6} mb="md">
+                    {props.yarnUsed && <Badge color="neutrals.7" variant="outline" tt="none" leftSection={<IconNeedleThread size={12} />}>{props.yarnUsed}</Badge>}
+                    <TagBadges value={tags.hookTags.join(',')} color="mustard" />
+                    <TagBadges value={tags.weightTags.join(',')} color="rust" />
+                    <TagBadges value={tags.categoryTags.join(',')} color="olive" />
+                    <TagBadges value={props.colors} color="olive" variant="outline" />
                 </Group>
             )}
         </form>

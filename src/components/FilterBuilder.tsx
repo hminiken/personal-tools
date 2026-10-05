@@ -1,8 +1,8 @@
 // src/components/FilterBuilder.tsx
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Group, Stack, Select, Autocomplete, Button, Pill, Text } from '@mantine/core';
+import { useEffect, useMemo, useState } from 'react';
+import { Group, Stack, Select, Autocomplete, Button, Pill, Text, ActionIcon, Tooltip } from '@mantine/core';
 import { IconFilter, IconPlus } from '@tabler/icons-react';
 
 export interface Filter {
@@ -25,16 +25,23 @@ interface FilterBuilderProps {
   onAdd: (filter: Filter) => void;
   onRemove: (index: number) => void;
   onClear: () => void;
+  // The text being typed filters live; Enter / the + button keeps it as a
+  // filter chip so several filters can be combined.
+  onDraftChange?: (draft: Filter | null) => void;
   placeholder?: string;
   universalInputStyles?: object;
 }
 
 export function FilterBuilder({
-  fields, getSuggestions, filters, onAdd, onRemove, onClear,
+  fields, getSuggestions, filters, onAdd, onRemove, onClear, onDraftChange,
   placeholder = 'Search...', universalInputStyles,
 }: FilterBuilderProps) {
   const [field, setField] = useState<string>(fields[0]?.value ?? '__all__');
   const [value, setValue] = useState('');
+
+  useEffect(() => {
+    onDraftChange?.(value.trim() ? { field, value: value.trim() } : null);
+  }, [field, value, onDraftChange]);
 
   const labelFor = useMemo(() => {
     const map = new Map(fields.map((f) => [f.value, f.label]));
@@ -64,7 +71,8 @@ export function FilterBuilder({
           value={field}
           onChange={(val) => setField(val || '__all__')}
           allowDeselect={false}
-          w={{ base: 130, sm: 160 }}
+          w={{ base: 128, sm: 150 }}
+          style={{ flexShrink: 0 }}
         />
         <Autocomplete
           styles={universalInputStyles}
@@ -78,16 +86,20 @@ export function FilterBuilder({
             }
           }}
           placeholder={valuePlaceholder}
-          style={{ flexGrow: 1 }}
+          style={{ flexGrow: 1, minWidth: 0 }}
         />
-        <Button
-          color="olive.6"
-          leftSection={<IconPlus size={16} />}
-          onClick={commit}
-          disabled={!value.trim()}
-        >
-          Add
-        </Button>
+        <Tooltip label="Keep as a filter (Enter) to combine several" withArrow openDelay={300}>
+          <ActionIcon
+            size="input-sm"
+            variant="light"
+            color="olive"
+            aria-label="Keep as filter"
+            onClick={commit}
+            disabled={!value.trim()}
+          >
+            <IconPlus size={18} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
 
       {filters.length > 0 && (

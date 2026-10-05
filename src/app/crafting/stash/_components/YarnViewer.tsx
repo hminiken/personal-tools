@@ -2,10 +2,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Title, Group, Paper, Divider, Box, Button, TextInput, Stack, Select, TagsInput, Text, Badge, SimpleGrid, Card, ActionIcon } from '@mantine/core';
+import { Title, Group, Paper, Divider, Box, Button, TextInput, Stack, Select, TagsInput, Text, SimpleGrid, Card, ActionIcon, Image, Tooltip } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
 import { IconArrowLeft, IconEdit, IconCheck, IconUnlink } from '@tabler/icons-react';
+import { TagBadges, StatusBadge } from '@components/TagBadges';
+import { splitTags } from '@/utils/tags';
 import { useRouter } from 'next/navigation';
 
 // Tiptap Imports
@@ -21,16 +23,19 @@ import { useCraftingEditor } from '@hooks/useCraftingEditor';
 import { CraftingEditorToolbar } from '@components/CraftingEditorToolbar';
 import { YARN_WEIGHTS } from '@/utils/yarnWeights';
 
-// Interfaces
+// Interfaces — field names match the yarns table (the page passes the row
+// straight through). They used to be weight/fiber_tags/color_tags, which
+// never matched, so the tags never showed AND every save (even just notes)
+// wrote empty weight/fibers/colors back over the real values.
 interface Yarn {
     id: number;
     title: string;
     brand?: string | null;
-    weight?: string | null;
-    fiber_tags?: string | null;
-    color_tags?: string | null;
+    weights?: string | null;
+    fibers?: string | null;
+    colors?: string | null;
     notes?: string | null;
-    coverImagePath?: string | null;
+    coverImage?: string | null;
 }
 
 interface LinkedProject {
@@ -68,9 +73,9 @@ export default function YarnViewer({
 
     const [title, setTitle] = useState(yarn.title);
     const [brand, setBrand] = useState(yarn.brand || '');
-    const [weight, setWeight] = useState(yarn.weight || '');
-    const [fiberTags, setFiberTags] = useState<string[]>(yarn.fiber_tags ? yarn.fiber_tags.split(',') : []);
-    const [colorTags, setColorTags] = useState<string[]>(yarn.color_tags ? yarn.color_tags.split(',') : []);
+    const [weight, setWeight] = useState(yarn.weights || '');
+    const [fiberTags, setFiberTags] = useState<string[]>(splitTags(yarn.fibers));
+    const [colorTags, setColorTags] = useState<string[]>(splitTags(yarn.colors));
 
     // --- Deletion States ---
     const [deleteModalOpened, { open: openDelete, close: closeDelete }] = useDisclosure(false);
@@ -139,8 +144,8 @@ export default function YarnViewer({
 
             {/* --- METADATA SECTION --- */}
             <Box mb="xl">
-                <Group justify="space-between" align="flex-start">
-                    <Box style={{ flex: 1 }}>
+                <Group justify="space-between" align="flex-start" gap="sm">
+                    <Box style={{ flex: '1 1 260px', minWidth: 0 }}>
                         {isEditingDetails ? (
                             <Stack gap="sm" maw={{ base: '100%', sm: 500 }}>
                                 <TextInput label="Yarn Name" value={title} onChange={(e) => setTitle(e.currentTarget.value)} required />
@@ -155,31 +160,36 @@ export default function YarnViewer({
                                 <TagsInput label="Fibers" value={fiberTags} onChange={setFiberTags} clearable />
                                 <TagsInput label="Colors" value={colorTags} onChange={setColorTags} clearable />
 
-                                <Group mt="xs">
-                                    <Button onClick={handleUpdateMetadata} loading={isSaving} color="olive.6" leftSection={<IconCheck size={16} />}>Save Details</Button>
-                                    <Button variant="subtle" color="gray" onClick={() => setIsEditingDetails(false)} disabled={isSaving}>Cancel</Button>
+                                <Group justify="space-between" mt="md" pt="md" style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
+                                    <Button color="rust.9" variant="subtle" onClick={openDelete} disabled={isSaving}>Delete Yarn</Button>
+                                    <Group>
+                                        <Button variant="outline" onClick={() => setIsEditingDetails(false)} disabled={isSaving}>Cancel</Button>
+                                        <Button onClick={handleUpdateMetadata} loading={isSaving} color="olive.7" leftSection={<IconCheck size={16} />}>Save Details</Button>
+                                    </Group>
                                 </Group>
                             </Stack>
                         ) : (
-                            <>
-                                <Title order={1}>{yarn.title}</Title>
-                                <Text size="lg" c="dimmed" mb="sm">{yarn.brand || 'Unknown Brand'} {yarn.weight ? `• ${yarn.weight}` : ''}</Text>
-
-                                <Group gap="xs" mt="sm">
-                                    {fiberTags.map(f => f.trim() && <Badge key={f} color="rust.6" variant="outline">{f}</Badge>)}
-                                    {colorTags.map(c => c.trim() && <Badge key={c} color="mustard.7" variant="outline">{c}</Badge>)}
-                                </Group>
-                            </>
+                            <Group align="flex-start" wrap="nowrap" gap="md">
+                                {yarn.coverImage && (
+                                    <Image src={yarn.coverImage} alt={yarn.title} w={88} h={88} radius="md" fit="cover" style={{ flexShrink: 0 }} />
+                                )}
+                                <Box style={{ minWidth: 0 }}>
+                                    <Title order={2} style={{ overflowWrap: 'anywhere' }}>{yarn.title}</Title>
+                                    <Text c="dimmed" mb="xs">{yarn.brand || 'Unknown brand'}</Text>
+                                    <Group gap={6}>
+                                        <TagBadges value={yarn.weights} color="mustard" />
+                                        <TagBadges value={fiberTags.join(',')} color="rust" />
+                                        <TagBadges value={colorTags.join(',')} color="olive" variant="outline" />
+                                    </Group>
+                                </Box>
+                            </Group>
                         )}
                     </Box>
 
                     {!isEditingDetails && (
-                        <Group>
-                            <Button  color='olive.6' onClick={() => setIsEditingDetails(true)} leftSection={<IconEdit size={16} />}>
-                                Edit Details
-                            </Button>
-                            <Button  color="rust.6" onClick={openDelete}>Delete Yarn</Button>
-                        </Group>
+                        <Button color="olive.6" variant="default" onClick={() => setIsEditingDetails(true)} leftSection={<IconEdit size={16} />}>
+                            Edit Details
+                        </Button>
                     )}
                 </Group>
             </Box>
@@ -190,12 +200,12 @@ export default function YarnViewer({
             <Box mb="xl">
                 <Group justify="space-between" mb="sm">
                     <Title order={4}>Ideas & Notes</Title>
-                    <Group>
-                        <Button color='rust.7' variant="subtle" onClick={() => setIsEditingNotes(!isEditingNotes)}>
-                            {isEditingNotes ? 'Cancel Editing' : 'Edit Notes'}
+                    <Group gap="xs">
+                        <Button variant="light" color="olive" onClick={() => setIsEditingNotes(!isEditingNotes)} disabled={isSaving}>
+                            {isEditingNotes ? 'Cancel' : 'Edit Notes'}
                         </Button>
                         {isEditingNotes && (
-                            <Button color="olive.6" onClick={handleUpdateNotes} loading={isSaving}>Save Notes</Button>
+                            <Button color="olive.7" onClick={handleUpdateNotes} loading={isSaving}>Save Notes</Button>
                         )}
                     </Group>
                 </Group>
@@ -231,53 +241,28 @@ export default function YarnViewer({
                                 href={`/crafting/projects/${project.id}`}
                                 style={{ textDecoration: 'none', color: 'inherit' }}
                             >
-                                <Group wrap="nowrap" align="flex-start" justify="space-between">
-
-                                    {/* COLUMN 1: Identity (Title & Status) */}
-                                    <Box w="35%">
-                                        <Text fw={600} lineClamp={2} size="sm">{project.title}</Text>
-
-                                        <Badge
-                                            mt="md"
-                                            size="sm"
-                                            color={project.status === 'Complete' || project.status === 'Completed' ? 'olive' : 'rust'}
-                                        >
-                                            {project.status || 'Planned'}
-                                        </Badge>
-                                    </Box>
-
-                                    {/* COLUMN 2: Details (Categories & Hooks) */}
-                                    <Box style={{ flex: 1, borderLeft: '1px solid var(--mantine-color-gray-2)' }} pl="sm">
-                                        <Group gap={4}>
-                                            {project.categories?.split(',').map((cat: string) => {
-                                                const cleanCat = cat.trim();
-                                                if (!cleanCat) return null;
-                                                return (
-                                                    <Badge key={cleanCat} size="xs" color="mustard" variant="light">
-                                                        {cleanCat}
-                                                    </Badge>
-                                                );
-                                            })}
+                                <Group wrap="nowrap" align="flex-start" justify="space-between" gap="sm">
+                                    <Box style={{ minWidth: 0 }}>
+                                        <Text fw={600} lineClamp={2}>{project.title}</Text>
+                                        <Group gap={6} mt={6}>
+                                            <StatusBadge status={project.status} />
+                                            <TagBadges value={project.hooks} color="mustard" />
+                                            <TagBadges value={project.categories} color="olive" />
                                         </Group>
-
-                                        {project.hooks && (
-                                            <Text size="xs" c="dimmed" mt={6}>
-                                                <strong>Hooks:</strong> {project.hooks.split(',').map(h => h.trim()).join(', ')}
-                                            </Text>
-                                        )}
                                     </Box>
-
-                                    {/* Unlink Button */}
-                                    <ActionIcon
-                                        variant="subtle"
-                                        color="red"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            handleUnlinkProject(e, project.id);
-                                        }}
-                                    >
-                                        <IconUnlink size={16} />
-                                    </ActionIcon>
+                                    <Tooltip label="Unlink this project" withArrow>
+                                        <ActionIcon
+                                            variant="subtle"
+                                            color="rust.7"
+                                            aria-label="Unlink this project"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                handleUnlinkProject(e, project.id);
+                                            }}
+                                        >
+                                            <IconUnlink size={16} />
+                                        </ActionIcon>
+                                    </Tooltip>
                                 </Group>
                             </Card>
 
@@ -299,7 +284,7 @@ export default function YarnViewer({
                     revalidateUrl={`/crafting/stash/${yarn.id}`}
                     uploadAction={uploadImage}
                     deleteAction={deleteImage}
-                    coverImagePath={yarn.coverImagePath}
+                    coverImagePath={yarn.coverImage}
                     setCoverAction={(id, path) => setCoverImage(id, path, 'yarn')}
                 />
             </Box>
