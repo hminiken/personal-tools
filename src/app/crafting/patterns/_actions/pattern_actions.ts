@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from 'next/cache';
 import { eq } from 'drizzle-orm';
 import { sanitizePatternHtml } from "@/utils/sanitizeHtml";
+import { localizeImages } from "@/utils/localizeImages";
 
 // ==========================================
 // CREATE & FETCH
@@ -150,14 +151,26 @@ export async function deletePattern(patternId: number) {
 
 
 export async function createPatternFromImport(data: any) {
+  // Copy imported images into our own uploads (compressed) instead of
+  // hotlinking the source site.
+  const html = await localizeImages(
+    {
+      materials: sanitizePatternHtml(data.materials),
+      sizing: sanitizePatternHtml(data.sizing),
+      abbreviations: sanitizePatternHtml(data.abbreviations),
+      notes: sanitizePatternHtml(data.notes),
+      content: sanitizePatternHtml(data.content),
+    },
+    { referer: data.sourceUrl },
+  );
   const [newPattern] = await db.insert(patterns).values({
     title: data.title || 'Untitled Import',
     sourceUrl: data.sourceUrl,
-    materials: sanitizePatternHtml(data.materials),
-    sizing: sanitizePatternHtml(data.sizing),
-    abbreviations: sanitizePatternHtml(data.abbreviations),
-    notes: sanitizePatternHtml(data.notes),
-    content: sanitizePatternHtml(data.content),
+    materials: html.materials,
+    sizing: html.sizing,
+    abbreviations: html.abbreviations,
+    notes: html.notes,
+    content: html.content,
     categories: data.categories,
     craftType: data.craftType === 'knitting' ? 'knitting' : 'crochet',
     hooks: data.hooks,

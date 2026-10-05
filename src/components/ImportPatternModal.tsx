@@ -18,6 +18,7 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
   const [sourceUrl, setSourceUrl] = useState('');
   const [rawText, setRawText] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [instructions, setInstructions] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<ImportError | null>(null);
 
@@ -36,6 +37,7 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
         const formData = new FormData();
         formData.append('pdf', pdfFile);
         formData.append('modelTier', String(tier));
+        if (instructions.trim()) formData.append('instructions', instructions.trim());
         if (sourceUrl) formData.append('sourceUrl', sourceUrl);
         response = await fetch('/api/extract', {
           method: 'POST',
@@ -45,7 +47,7 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
         response = await fetch('/api/extract', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sourceUrl, rawText, modelTier: tier }),
+          body: JSON.stringify({ sourceUrl, rawText, modelTier: tier, instructions: instructions.trim() }),
         });
       }
 
@@ -90,6 +92,7 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
           <Box style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.8)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <Loader color="olive" />
             <Text mt="md" fw={500}>Gemini is parsing your pattern...</Text>
+            <Text size="sm" c="dimmed">Long patterns are read in sections, so this can take a minute or two.</Text>
           </Box>
         )}
 
@@ -123,6 +126,18 @@ export function ImportPatternModal({ opened, close }: { opened: boolean; close: 
           value={pdfFile}
           onChange={setPdfFile}
           clearable
+          mb="xl"
+        />
+
+        <Textarea
+          label="Extra instructions (optional)"
+          description="Tell Gemini how to tailor the import. Applies to every section of a long pattern."
+          placeholder={'e.g. Keep all instructions that apply to every size, but only the instructions for size XL. Drop everything under other size headings.'}
+          value={instructions}
+          onChange={(e) => setInstructions(e.currentTarget.value)}
+          autosize
+          minRows={2}
+          maxRows={6}
           mb="xl"
         />
 
